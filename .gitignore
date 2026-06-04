@@ -1,6 +1,43 @@
+# Environment files (SENSITIVE - never push these)
+backend/.env
+frontend/.env
+
+# Node modules (too large, auto-installed)
 node_modules/
-/frontend/node_modules/
-/backend/node_modules/
-.pnpm-store/
-/backend/uploads/*
-/backend/data/*
+backend/node_modules/
+frontend/node_modules/
+
+# Built output (regenerated on deploy)
+backend/dist/
+frontend/dist/
+
+# Database (your live data - never push)
+backend/data/snagdesk.db
+backend/data/snagdesk.db-shm
+backend/data/snagdesk.db-wal
+
+# Uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Android build artifacts (huge, auto-generated)
+frontend/android/build/
+frontend/android/app/build/
+frontend/android/.gradle/
+frontend/android/capacitor-cordova-android-plugins/build/
+frontend/android/**/build/
+frontend/android/**/.gradle/
+
+# Capacitor generated
+frontend/android/app/src/main/assets/capacitor.config.json
+frontend/android/app/src/main/assets/public/
+
+# IDE files
+.idea/
+*.iml
+hs_err_pid*.log
+replay_pid*.log
+
+# OS files
+.DS_Store
+Thumbs.db

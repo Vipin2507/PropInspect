@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { Capacitor } from '@capacitor/core'
 import type {
   User,
   Project,
@@ -14,9 +15,17 @@ import type {
   Review,
 } from '../types'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const getBaseURL = () => {
+  if (Capacitor.isNativePlatform()) {
+    return 'http://147.93.30.96/api'; // your live VPS
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+};
 
-export const api = axios.create({ baseURL: API_BASE })
+export const api = axios.create({
+  baseURL: getBaseURL(),
+  timeout: 30000,
+})
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('snagdesk_token')
@@ -53,6 +62,8 @@ export const towersApi = {
     unitPrefix: string
     startNumber: number
   }) => api.post('/towers', data),
+  update: (id: string, data: Partial<{ name: string }>) => api.put<Tower>(`/towers/${id}`, data),
+  delete: (id: string) => api.delete(`/towers/${id}`),
 }
 
 export const floorsApi = {
@@ -108,12 +119,20 @@ export const usersApi = {
   list: (role?: string) => api.get<User[]>('/users', { params: { role } }),
   create: (data: { name: string; email: string; mobile: string; password: string; role: string }) =>
     api.post<User>('/users', data),
+  update: (id: string, data: Partial<{ name: string; email: string; mobile: string; role: string }>) =>
+    api.put<User>(`/users/${id}`, data),
   toggleActive: (id: string) => api.patch(`/users/${id}/toggle-active`),
+  delete: (id: string) => api.delete(`/users/${id}`),
 }
 
 export const assignmentsApi = {
   create: (data: { flatId: string; engineerId: string; qaId: string }) =>
     api.post<Assignment>('/assignments', data),
+  bulkCreate: (data: { flatIds: string[]; engineerId: string; qaId: string }) =>
+    api.post<{ created: Assignment[]; skipped: string[] }>('/assignments/bulk', data),
+  update: (id: string, data: { engineerId?: string; qaId?: string }) =>
+    api.put<Assignment>(`/assignments/${id}`, data),
+  delete: (id: string) => api.delete(`/assignments/${id}`),
 }
 
 export const notificationsApi = {

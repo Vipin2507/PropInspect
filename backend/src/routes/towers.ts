@@ -59,7 +59,7 @@ router.post(
 
       for (let u = 0; u < body.unitsPerFloor; u++) {
         const flatId = uuidv4()
-        const flatNumber = `${body.unitPrefix}${body.startNumber + (f - 1) * body.unitsPerFloor + u}`
+        const flatNumber = `${body.unitPrefix}${f * 100 + (u + 1)}`
         db.prepare(
           `INSERT INTO flats (id, tower_id, project_id, floor_id, flat_number, floor) VALUES (?, ?, ?, ?, ?, ?)`
         ).run(flatId, towerId, body.projectId, floorId, flatNumber, f)

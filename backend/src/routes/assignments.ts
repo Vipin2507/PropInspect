@@ -67,6 +67,46 @@ router.post(
   })
 )
 
+router.post(
+  '/bulk',
+  asyncHandler(async (req, res) => {
+    const body = z
+      .object({ flatIds: z.array(z.string()).min(1), engineerId: z.string(), qaId: z.string() })
+      .parse(req.body)
+    const db = getDB()
+    const created: Record<string, unknown>[] = []
+    const skipped: string[] = []
+
+    for (const flatId of body.flatIds) {
+      const existing = db.prepare('SELECT id FROM assignments WHERE flat_id = ?').get(flatId)
+      if (existing) {
+        const flat = db.prepare('SELECT flat_number FROM flats WHERE id = ?').get(flatId) as { flat_number: string } | undefined
+        skipped.push(flat?.flat_number || flatId)
+        continue
+      }
+      const id = uuidv4()
+      db.prepare(
+        `INSERT INTO assignments (id, flat_id, engineer_id, qa_id, assigned_by) VALUES (?, ?, ?, ?, ?)`
+      ).run(id, flatId, body.engineerId, body.qaId, req.user!.id)
+
+      const flat = db.prepare('SELECT flat_number FROM flats WHERE id = ?').get(flatId) as { flat_number: string }
+      createNotification(body.engineerId, 'snag_assigned', 'Flat Assigned', `You have been assigned flat ${flat.flat_number}`, flatId)
+      createNotification(body.qaId, 'snag_assigned', 'Flat Assigned for QA', `Flat ${flat.flat_number} assigned for review`, flatId)
+
+      const row = db
+        .prepare(
+          `SELECT a.*, e.name as engineer_name, q.name as qa_name FROM assignments a
+           LEFT JOIN users e ON e.id = a.engineer_id
+           LEFT JOIN users q ON q.id = a.qa_id WHERE a.id = ?`
+        )
+        .get(id) as Record<string, unknown>
+      created.push(mapAssignment(row))
+    }
+
+    res.status(201).json({ created, skipped })
+  })
+)
+
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PropInspect</string>
+    <string name="title_activity_main">PropInspect</string>
+    <string name="package_name">com.propinspect.app</string>
+    <string name="custom_url_scheme">com.propinspect.app</string>
+</resources>
