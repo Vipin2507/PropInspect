@@ -89,7 +89,7 @@ router.delete(
       return
     }
     const inspection = db.prepare('SELECT engineer_id, status FROM inspections WHERE id = ?').get(image.inspection_id) as { engineer_id: string; status: string }
-    if (!inspection || inspection.engineer_id !== req.user!.id || inspection.status !== 'draft') {
+    if (!inspection || inspection.engineer_id !== req.user!.id || !['draft', 'revision_required'].includes(inspection.status)) {
       res.status(403).json({ error: 'Cannot delete image' })
       return
     }

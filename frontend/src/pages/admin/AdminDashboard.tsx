@@ -9,105 +9,90 @@ export default function AdminDashboard() {
 
   if (loading || !data) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Spinner />
+      <div className="flex flex-1 items-center justify-center py-24">
+        <Spinner size="lg" />
       </div>
     )
   }
 
   const totals = data.projectStats.reduce(
     (acc, p) => ({
-      flats: acc.flats + p.totalFlats,
+      flats:    acc.flats    + p.totalFlats,
       approved: acc.approved + p.approved,
-      pending: acc.pending + p.notStarted + p.inProgress,
+      pending:  acc.pending  + p.notStarted + p.inProgress,
     }),
     { flats: 0, approved: 0, pending: 0 }
   )
 
   const barData = data.projectStats.map((p) => ({
-    name: p.projectName,
-    Approved: p.approved,
-    Pending: p.notStarted + p.inProgress,
-    'Revision Req.': p.revisionRequired,
+    name:           p.projectName.slice(0, 12),
+    Approved:       p.approved,
+    Pending:        p.notStarted + p.inProgress,
+    'Revision Req': p.revisionRequired,
   }))
 
-  const snagStats = [
-    {
-      label: 'Open Snags',
-      value: data.snagSummary.open,
-      icon: AlertTriangle,
-      colorClass: 'text-fail bg-red-100',
-    },
-    {
-      label: 'Rectified',
-      value: data.snagSummary.rectified,
-      icon: Wrench,
-      colorClass: 'text-secondary bg-orange-100',
-    },
-    {
-      label: 'Closed',
-      value: data.snagSummary.closed,
-      icon: ShieldCheck,
-      colorClass: 'text-pass bg-green-100',
-    },
-  ]
-
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Projects" value={data.projectStats.length} icon={Building2} />
-        <StatCard label="Total Flats" value={totals.flats} icon={Home} />
-        <StatCard
-          label="Completed"
-          value={totals.approved}
-          icon={CheckCircle}
-          colorClass="text-pass bg-green-100"
-        />
-        <StatCard
-          label="Pending"
-          value={totals.pending}
-          icon={Clock}
-          colorClass="text-pending bg-amber-100"
-        />
+    <div className="space-y-6 pb-6">
+      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Admin Dashboard</h1>
+
+      {/* Top stats */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Projects"   value={data.projectStats.length} icon={Building2} />
+        <StatCard label="Total Flats" value={totals.flats}  icon={Home} />
+        <StatCard label="Completed"  value={totals.approved} icon={CheckCircle} colorClass="text-pass bg-green-100" />
+        <StatCard label="Pending"    value={totals.pending}  icon={Clock}       colorClass="text-pending bg-amber-100" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-3">
-          <h2 className="mb-4 font-semibold">Flat Status by Project</h2>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={barData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
+      {/* Charts */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-3">
+          <h2 className="mb-4 text-base font-semibold text-slate-800">Flat Status by Project</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={barData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '0.5rem',
-                }}
+                contentStyle={{ borderRadius: '0.75rem', border: '1px solid #e2e8f0', fontSize: 13 }}
               />
-              <Legend wrapperStyle={{ fontSize: '14px' }} />
-              <Bar dataKey="Approved" stackId="a" fill="#16A34A" />
-              <Bar dataKey="Pending" stackId="a" fill="#D97706" />
-              <Bar dataKey="Revision Req." stackId="a" fill="#F97316" />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="Approved"     stackId="a" fill="#16A34A" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Pending"      stackId="a" fill="#D97706" />
+              <Bar dataKey="Revision Req" stackId="a" fill="#F97316" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
-          <h2 className="mb-4 font-semibold">Snag Summary</h2>
-          <div className="space-y-4">
-            {snagStats.map((stat) => (
-              <StatCard
-                key={stat.label}
-                label={stat.label}
-                value={stat.value}
-                icon={stat.icon}
-                colorClass={stat.colorClass}
-              />
-            ))}
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
+          <h2 className="mb-4 text-base font-semibold text-slate-800">Snag Summary</h2>
+          <div className="space-y-3">
+            <StatCard label="Open Snags" value={data.snagSummary.open}      icon={AlertTriangle} colorClass="text-fail bg-red-100" />
+            <StatCard label="Rectified"  value={data.snagSummary.rectified} icon={Wrench}        colorClass="text-secondary bg-orange-100" />
+            <StatCard label="Closed"     value={data.snagSummary.closed}    icon={ShieldCheck}   colorClass="text-pass bg-green-100" />
           </div>
         </div>
       </div>
+
+      {/* Recent submissions */}
+      {data.recentSubmissions.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-slate-800">Recent Submissions</h2>
+          <ul className="divide-y divide-slate-100">
+            {data.recentSubmissions.slice(0, 6).map((s, i) => (
+              <li key={i} className="flex min-h-[52px] items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">
+                    {s.flatNumber} · {s.towerName}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">{s.engineerName}</p>
+                </div>
+                <span className="shrink-0 text-xs text-slate-400">
+                  {new Date(s.submittedAt).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

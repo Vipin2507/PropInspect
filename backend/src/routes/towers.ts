@@ -8,7 +8,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { rowToTower, rowToFloor, rowToFlat } from '../utils/mappers'
 
 const router = Router()
-router.use(authenticate, requireRole('admin'))
+router.use(authenticate)
 
 router.get(
   '/',
@@ -25,6 +25,7 @@ router.get(
 
 router.post(
   '/',
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
     const body = z
       .object({

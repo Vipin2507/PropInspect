@@ -8,10 +8,11 @@ import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 
 const router = Router()
-router.use(authenticate, requireRole('admin'))
+router.use(authenticate)
 
 router.get(
   '/',
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
     const role = req.query.role as string | undefined
     const db = getDB()

@@ -15,8 +15,8 @@ import { useIsMobile } from '../../hooks/useBreakpoint'
 
 export default function InspectionSummaryPage() {
   const { flatId } = useParams<{ flatId: string }>()
-  const navigate = useNavigate()
-  const isMobile = useIsMobile()
+  const navigate  = useNavigate()
+  const isMobile  = useIsMobile()
   const [flat, setFlat] = useState<Flat | null>(null)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const { inspection, loading, submit } = useInspection(flatId)
@@ -27,16 +27,16 @@ export default function InspectionSummaryPage() {
 
   if (loading || !inspection || !flat) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
+      <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />
       </div>
     )
   }
 
-  const doneCount = inspection.responses.filter((r) => r.status !== 'pending').length
+  const doneCount  = inspection.responses.filter((r) => r.status !== 'pending').length
   const totalCount = inspection.responses.length
-  const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0
-  const canSubmit = progress === 100
+  const progress   = totalCount > 0 ? (doneCount / totalCount) * 100 : 0
+  const canSubmit  = progress === 100
 
   const handleSubmit = async () => {
     await submit()
@@ -44,55 +44,56 @@ export default function InspectionSummaryPage() {
   }
 
   return (
-    <div className="pb-32 md:pb-6">
+    <div className="flex flex-col gap-4 pb-32 md:pb-6">
       <Link
         to={ROUTES.ENGINEER_FLAT(flatId!)}
-        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
+        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={18} aria-hidden="true" />
         Back to Flat Details
       </Link>
 
-      <div className="text-center md:text-left">
-        <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">Inspection Summary</h1>
-        <p className="text-slate-500">
-          {flat.flatNumber} | {flat.towerName} · {flat.floorLabel}
-        </p>
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Inspection Summary</h1>
+        <p className="text-sm text-slate-500">{flat.flatNumber} · {flat.towerName}</p>
       </div>
 
-      <div className="my-6 flex flex-col items-center gap-6 rounded-xl bg-white p-6 shadow-sm md:flex-row">
+      {/* Progress card */}
+      <div className="flex flex-col items-center gap-5 rounded-2xl bg-white p-6 shadow-sm md:flex-row">
         <div className="relative">
-          <ProgressRing pct={progress} size={isMobile ? 90 : 120} strokeWidth={10} />
+          <ProgressRing pct={progress} size={isMobile ? 88 : 112} strokeWidth={10} />
           {canSubmit && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <CheckCircle size={36} className="text-pass" />
+              <CheckCircle size={32} className="text-pass" aria-hidden="true" />
             </div>
           )}
         </div>
         <div className="text-center md:text-left">
-          <h2 className="text-xl font-bold text-slate-800">
-            {canSubmit ? 'Ready to Submit' : 'In Progress'}
+          <h2 className="text-lg font-bold text-slate-800">
+            {canSubmit ? '✓ Ready to Submit' : 'In Progress'}
           </h2>
-          <p className="text-slate-500">
-            {doneCount} of {totalCount} checklist items completed.
+          <p className="mt-1 text-sm text-slate-500">
+            {doneCount} of {totalCount} items completed
           </p>
           {!canSubmit && (
-            <p className="mt-1 text-sm text-amber-600">Complete all items to enable submission.</p>
+            <p className="mt-1 text-sm text-amber-600">
+              Complete all items to enable submission.
+            </p>
           )}
         </div>
       </div>
 
-      <h3 className="mb-3 text-lg font-bold text-slate-800">Category-wise Progress</h3>
+      {/* Category breakdown */}
+      <h3 className="text-base font-bold text-slate-800">Category Progress</h3>
       <InspectionSummary responses={inspection.responses} flatId={flatId!} />
 
-      <div
-        className={cn(
-          'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/90 p-3 backdrop-blur-sm pb-safe',
-          'md:relative md:mt-6 md:border-none md:bg-transparent md:p-0'
-        )}
-      >
+      {/* Fixed submit bar */}
+      <div className={cn(
+        'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-safe backdrop-blur-sm',
+        'md:relative md:bottom-auto md:left-auto md:right-auto md:border-none md:bg-transparent md:p-0'
+      )}>
         <Button
-          className="mx-auto h-12 w-full max-w-md text-base"
+          className="mx-auto w-full max-w-md"
           onClick={() => setIsConfirmOpen(true)}
           disabled={!canSubmit}
         >
@@ -104,7 +105,7 @@ export default function InspectionSummaryPage() {
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
         title="Submit Inspection?"
-        message="Once submitted, you cannot edit this inspection until the QA checker responds. Are you sure you want to proceed?"
+        message="Once submitted, you cannot edit this inspection until the QA checker responds."
         confirmLabel="Yes, Submit"
         onConfirm={handleSubmit}
       />

@@ -78,12 +78,17 @@ router.get(
 
 router.get(
   '/:inspectionId',
-  requireRole('qa', 'admin'),
+  requireRole('qa', 'admin', 'engineer'),
   asyncHandler(async (req, res) => {
     const db = getDB()
     const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(req.params.inspectionId) as Record<string, unknown>
     if (!row) {
       res.status(404).json({ error: 'Inspection not found' })
+      return
+    }
+    // Engineers can only see their own inspections
+    if (req.user!.role === 'engineer' && row.engineer_id !== req.user!.id) {
+      res.status(403).json({ error: 'Not your inspection' })
       return
     }
     const responses = (

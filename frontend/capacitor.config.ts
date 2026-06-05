@@ -9,16 +9,17 @@ const config: CapacitorConfig = {
     cleartext: true, // required since backend is HTTP not HTTPS
   },
   android: {
+    backgroundColor: '#ffffff',
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // production build
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     CapacitorHttp: {
       enabled: true,
     },
     SplashScreen: {
-      launchShowDuration: 2000,
+      launchShowDuration: 1500,
       launchAutoHide: true,
       backgroundColor: '#1A6FE8',
       androidSplashResourceName: 'splash',

@@ -1,5 +1,5 @@
-import { Button } from '../ui/Button';
-import { Check, MessageSquare, X } from 'lucide-react';
+import { Button } from '../ui/Button'
+import { Check, MessageSquare, X } from 'lucide-react'
 
 export function ReviewActions({
   onApprove,
@@ -7,39 +7,39 @@ export function ReviewActions({
   onReject,
   isSubmitting,
 }: {
-  onApprove: () => void;
-  onRevision: () => void;
-  onReject: () => void;
-  isSubmitting?: boolean;
+  onApprove: () => void
+  onRevision: () => void
+  onReject: () => void
+  isSubmitting?: boolean
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <Button
-        className="h-12 bg-green-600 hover:bg-green-700"
+        className="w-full bg-pass active:bg-green-700"
         onClick={onApprove}
         loading={isSubmitting}
       >
-        <Check size={20} className="mr-2" />
+        <Check size={18} aria-hidden="true" />
         Approve
       </Button>
       <Button
-        variant="secondary"
-        className="h-12"
+        variant="outline"
+        className="w-full"
         onClick={onRevision}
         loading={isSubmitting}
       >
-        <MessageSquare size={20} className="mr-2" />
+        <MessageSquare size={18} aria-hidden="true" />
         Request Revision
       </Button>
       <Button
         variant="danger"
-        className="h-12"
+        className="w-full"
         onClick={onReject}
         loading={isSubmitting}
       >
-        <X size={20} className="mr-2" />
+        <X size={18} aria-hidden="true" />
         Reject
       </Button>
     </div>
-  );
+  )
 }

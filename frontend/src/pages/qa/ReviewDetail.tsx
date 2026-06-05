@@ -12,7 +12,6 @@ import { Spinner } from '../../components/ui/Spinner'
 import { ArrowLeft } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
-import { cn } from '../../utils/cn'
 
 export default function ReviewDetail() {
   const { inspectionId } = useParams()
@@ -22,11 +21,11 @@ export default function ReviewDetail() {
     flatNumber: string
     engineerName: string
   } | null>(null)
-  const [itemComments, setItemComments] = useState<Record<string, string>>({})
+  const [itemComments, setItemComments]       = useState<Record<string, string>>({})
   const [overallComments, setOverallComments] = useState('')
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null)
-  const [isRevisionDrawerOpen, setRevisionDrawerOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [lightboxImage, setLightboxImage]     = useState<string | null>(null)
+  const [revisionDrawerOpen, setRevisionDrawerOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting]       = useState(false)
 
   useEffect(() => {
     if (inspectionId) {
@@ -45,15 +44,10 @@ export default function ReviewDetail() {
     }
     setIsSubmitting(true)
     try {
-      await reviewsApi.submit({
-        inspectionId,
-        decision,
-        overallComments,
-        itemComments,
-      })
-      toast.success(`Inspection has been ${decision.replace('_', ' ')}.`)
+      await reviewsApi.submit({ inspectionId, decision, overallComments, itemComments })
+      toast.success(`Inspection ${decision.replace('_', ' ')}.`)
       navigate(ROUTES.QA_REVIEWS)
-    } catch (err) {
+    } catch {
       toast.error('Failed to submit review. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -63,57 +57,48 @@ export default function ReviewDetail() {
 
   if (!data) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Spinner />
+      <div className="flex flex-1 items-center justify-center py-24">
+        <Spinner size="lg" />
       </div>
     )
   }
 
-  const bottomPanelPadding = 'pb-[220px] md:pb-0'
-
   return (
-    <div className={cn('h-full', bottomPanelPadding)}>
-      <div className="p-4 md:p-6">
-        <button
-          onClick={() => navigate(ROUTES.QA_REVIEWS)}
-          className="mb-2 flex items-center gap-2 rounded-lg p-2 text-sm font-medium text-slate-600 active:bg-slate-100"
-        >
-          <ArrowLeft size={18} /> Back to Reviews
-        </button>
-        <h1 className="text-2xl font-bold">Review: {data.flatNumber}</h1>
-        <p className="text-sm text-slate-500">
-          Submitted by {data.engineerName}
-        </p>
-        <div className="mt-6">
-          <ReviewChecklist
-            responses={data.inspection.responses}
-            itemComments={itemComments}
-            onItemCommentChange={(id, value) =>
-              setItemComments((c) => ({ ...c, [id]: value }))
-            }
-            onImageClick={setLightboxImage}
-          />
-        </div>
+    <div className="flex flex-col gap-4 pb-[260px] md:pb-6">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => navigate(ROUTES.QA_REVIEWS)}
+        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
+      >
+        <ArrowLeft size={18} aria-hidden="true" />
+        Back to Reviews
+      </button>
+
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">Review: {data.flatNumber}</h1>
+        <p className="text-sm text-slate-500">Submitted by {data.engineerName}</p>
       </div>
 
-      {/* Bottom Actions Panel */}
-      <div
-        className={cn(
-          'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/90 p-4 backdrop-blur-sm',
-          'md:left-auto md:right-auto md:w-full', // Adjust for sidebar
-          'lg:left-60' // Desktop with full sidebar
-        )}
-      >
-        <div className="mx-auto max-w-4xl">
-          <label className="text-xs font-semibold uppercase text-slate-500">
+      <ReviewChecklist
+        responses={data.inspection.responses}
+        itemComments={itemComments}
+        onItemCommentChange={(id, value) => setItemComments((c) => ({ ...c, [id]: value }))}
+        onImageClick={setLightboxImage}
+      />
+
+      {/* Fixed bottom actions panel */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-4 pb-safe backdrop-blur-sm lg:left-60">
+        <div className="mx-auto max-w-2xl">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
             Overall Comments
           </label>
           <Textarea
             value={overallComments}
             onChange={(e) => setOverallComments(e.target.value)}
-            rows={3}
-            className="mb-3 mt-1"
-            placeholder="Add overall comments for revision or rejection..."
+            rows={2}
+            className="mb-3"
+            placeholder="Add overall comments for revision or rejection…"
           />
           <ReviewActions
             onApprove={() => submitReview('approved')}
@@ -124,29 +109,28 @@ export default function ReviewDetail() {
         </div>
       </div>
 
-      {/* Revision Drawer (Mobile) / Modal (Desktop) */}
+      {/* Revision drawer */}
       <Drawer
-        isOpen={isRevisionDrawerOpen}
+        isOpen={revisionDrawerOpen}
         onClose={() => setRevisionDrawerOpen(false)}
         title="Request Revision"
       >
-        <div className="p-4">
-          <p className="mb-3 text-sm text-slate-600">
-            Provide clear comments for the engineer to address.
-          </p>
-          <Textarea
-            value={overallComments}
-            onChange={(e) => setOverallComments(e.target.value)}
-            rows={5}
-            placeholder="e.g., 'Paint touch-up needed in master bedroom...'" />
-          <Button
-            className="mt-4 w-full"
-            onClick={() => submitReview('revision_required')}
-            loading={isSubmitting}
-          >
-            Send for Revision
-          </Button>
-        </div>
+        <p className="mb-4 text-sm text-slate-600">
+          Provide clear comments so the engineer knows what to fix.
+        </p>
+        <Textarea
+          value={overallComments}
+          onChange={(e) => setOverallComments(e.target.value)}
+          rows={5}
+          placeholder="e.g. Paint touch-up needed in master bedroom…"
+        />
+        <Button
+          className="mt-4 w-full"
+          onClick={() => submitReview('revision_required')}
+          loading={isSubmitting}
+        >
+          Send for Revision
+        </Button>
       </Drawer>
 
       {lightboxImage && (

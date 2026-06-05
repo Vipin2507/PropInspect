@@ -33,6 +33,14 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
+      // dvh units so h-screen works correctly in Android WebView
+      height: {
+        'screen-dvh': '100dvh',
+        'screen-svh': '100svh',
+      },
+      minHeight: {
+        'screen-dvh': '100dvh',
+      },
     },
   },
   plugins: [],

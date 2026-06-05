@@ -7,7 +7,7 @@ import { getProjectStats } from '../utils/stats'
 import { param } from '../utils/params'
 
 const router = Router()
-router.use(authenticate, requireRole('admin', 'viewer'))
+router.use(authenticate)
 
 router.get(
   '/overview',

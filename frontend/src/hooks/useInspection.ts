@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { inspectionsApi } from '../utils/api'
 import { saveInspection, getInspection } from '../utils/storage'
 import { queueChange } from '../utils/sync'
@@ -10,6 +10,10 @@ export function useInspection(flatId: string | undefined) {
   const [inspection, setInspection] = useState<Inspection | null>(null)
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // Keep a ref to the latest inspection so saveResponses doesn't need it as a dep
+  const inspectionRef = useRef<Inspection | null>(null)
+  inspectionRef.current = inspection
 
   const load = useCallback(async () => {
     if (!flatId) return
@@ -37,21 +41,22 @@ export function useInspection(flatId: string | undefined) {
 
   const setGlobalSaveState = useInspectionUiStore((s) => s.setSaveState)
 
-  const saveResponses = async (responses: InspectionResponse[]) => {
-    if (!inspection) return
+  const saveResponses = useCallback(async (responses: InspectionResponse[]) => {
+    const current = inspectionRef.current
+    if (!current) return
     setSaveState('saving')
     setGlobalSaveState('saving')
-    const updated = { ...inspection, responses }
+    const updated = { ...current, responses }
     setInspection(updated)
     await saveInspection(updated)
     if (navigator.onLine) {
       try {
-        await inspectionsApi.save(inspection.id, responses)
+        await inspectionsApi.save(current.id, responses)
       } catch {
-        await queueChange('save_inspection', { inspectionId: inspection.id, responses })
+        await queueChange('save_inspection', { inspectionId: current.id, responses })
       }
     } else {
-      await queueChange('save_inspection', { inspectionId: inspection.id, responses })
+      await queueChange('save_inspection', { inspectionId: current.id, responses })
     }
     setSaveState('saved')
     setGlobalSaveState('saved')
@@ -59,7 +64,7 @@ export function useInspection(flatId: string | undefined) {
       setSaveState('idle')
       setGlobalSaveState('idle')
     }, 2000)
-  }
+  }, [setGlobalSaveState])
 
   const submit = async () => {
     if (!inspection) return

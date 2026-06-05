@@ -6,15 +6,21 @@ export function useSnags(params: { flatId?: string; projectId?: string; inspecti
   const [snags, setSnags] = useState<Snag[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Destructure to primitives so the effect only re-runs when values actually change
+  const { flatId, projectId, inspectionId } = params
+
   useEffect(() => {
-    if (!params.flatId && !params.projectId && !params.inspectionId) return
+    if (!flatId && !projectId && !inspectionId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     snagsApi
-      .list(params)
+      .list({ flatId, projectId, inspectionId })
       .then(({ data }) => setSnags(data))
       .catch(() => setSnags([]))
       .finally(() => setLoading(false))
-  }, [params.flatId, params.projectId, params.inspectionId])
+  }, [flatId, projectId, inspectionId])
 
   return { snags, loading, setSnags }
 }
