@@ -24,6 +24,21 @@ allprojects {
     }
 }
 
+// capacitor plugins require jvmToolchain(21) but we only have Java 17.
+// Override toolchain and compileOptions for all subprojects to use Java 17.
+subprojects {
+    afterEvaluate { project ->
+        project.extensions.findByName('kotlin')?.jvmToolchain(17)
+        def android = project.extensions.findByName('android')
+        if (android) {
+            android.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

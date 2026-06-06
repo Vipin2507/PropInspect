@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { v4 as uuidv4 } from 'uuid'
-import { getDB } from '../db/database'
+import { getDB, utcTs } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
@@ -90,7 +90,7 @@ function mapTemplate(row: Record<string, unknown>) {
     categories: JSON.parse(row.sections as string),
     isDefault: Boolean(row.is_default),
     createdBy: row.created_by,
-    createdAt: row.created_at,
+    createdAt: utcTs(row.created_at),
   }
 }
 

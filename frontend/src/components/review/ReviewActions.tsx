@@ -13,9 +13,9 @@ export function ReviewActions({
   isSubmitting?: boolean
 }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
       <Button
-        className="w-full bg-pass active:bg-green-700"
+        className="w-full min-h-[48px] bg-pass active:bg-green-700"
         onClick={onApprove}
         loading={isSubmitting}
       >
@@ -24,7 +24,7 @@ export function ReviewActions({
       </Button>
       <Button
         variant="outline"
-        className="w-full"
+        className="w-full min-h-[48px]"
         onClick={onRevision}
         loading={isSubmitting}
       >
@@ -33,7 +33,7 @@ export function ReviewActions({
       </Button>
       <Button
         variant="danger"
-        className="w-full"
+        className="w-full min-h-[48px]"
         onClick={onReject}
         loading={isSubmitting}
       >

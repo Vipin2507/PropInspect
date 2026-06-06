@@ -2,6 +2,16 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import path from 'path'
 import fs from 'fs'
 
+/** Append 'Z' to SQLite UTC timestamps that lack a timezone suffix.
+ *  SQLite datetime('now') returns "2024-06-05 00:09:00" — without Z,
+ *  JS Date parses it as local time instead of UTC. */
+export function utcTs(ts: unknown): string | undefined {
+  if (!ts) return undefined
+  const s = String(ts)
+  if (s.endsWith('Z') || s.includes('+')) return s
+  return s.replace(' ', 'T') + 'Z'
+}
+
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/snagdesk.db')
 
 export interface SnagDeskDatabase {
@@ -273,7 +283,7 @@ export function rowToUser(row: Record<string, unknown>) {
     role: row.role,
     avatar: row.avatar || undefined,
     isActive: Boolean(row.is_active),
-    createdAt: row.created_at,
+    createdAt: utcTs(row.created_at),
   }
 }
 
@@ -289,7 +299,7 @@ export function rowToProject(row: Record<string, unknown>) {
     totalTowers: towerCount.c,
     status: row.status,
     createdBy: row.created_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: utcTs(row.created_at),
+    updatedAt: utcTs(row.updated_at),
   }
 }

@@ -1,38 +1,55 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Building2, Search } from 'lucide-react'
 import { useFlats } from '../../hooks/useFlats'
+import { useProjects } from '../../hooks/useProjects'
+import { useAuthStore } from '../../store/authStore'
 import { Badge } from '../../components/ui/Badge'
 import { ProgressBar } from '../../components/ui/ProgressBar'
+import { Select } from '../../components/ui/Select'
 import { ROUTES } from '../../constants/routes'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
 import { cn } from '../../utils/cn'
 
 const TABS = [
+  { id: 'all',       label: 'All' },
   { id: 'pending',   label: 'Pending' },
   { id: 'submitted', label: 'Submitted' },
   { id: 'revision',  label: 'Revision' },
-  { id: 'all',       label: 'All' },
+  { id: 'approved',  label: 'Approved' },
 ]
 
 function flatProgress(flat: { status: string }) {
-  if (flat.status === 'approved')  return 100
-  if (flat.status === 'submitted') return 100
+  if (['approved', 'submitted'].includes(flat.status)) return 100
   if (flat.status === 'in_progress') return 40
   return 0
 }
 
 export default function MyFlats() {
-  const { flats, loading } = useFlats()
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = user?.role === 'admin'
+
+  // Admin can filter by project; engineer doesn't need this
+  const { projects } = useProjects()
+  const [projectFilter, setProjectFilter] = useState('')
+
+  const { flats, loading } = useFlats(isAdmin && projectFilter ? projectFilter : undefined)
+
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState('pending')
+  const [tab, setTab]       = useState('all')
+
+  // Default admin to "all" tab; engineer to "pending"
+  useEffect(() => {
+    setTab(isAdmin ? 'all' : 'pending')
+  }, [isAdmin])
 
   const getTabCount = (tabId: string) => {
     if (tabId === 'all')       return flats.length
     if (tabId === 'pending')   return flats.filter((f) => ['not_started', 'in_progress'].includes(f.status)).length
     if (tabId === 'submitted') return flats.filter((f) => f.status === 'submitted').length
     if (tabId === 'revision')  return flats.filter((f) => f.status === 'revision_required').length
+    if (tabId === 'approved')  return flats.filter((f) => f.status === 'approved').length
     return 0
   }
 
@@ -41,6 +58,7 @@ export default function MyFlats() {
     if (tab === 'pending')   list = list.filter((f) => ['not_started', 'in_progress'].includes(f.status))
     if (tab === 'submitted') list = list.filter((f) => f.status === 'submitted')
     if (tab === 'revision')  list = list.filter((f) => f.status === 'revision_required')
+    if (tab === 'approved')  list = list.filter((f) => f.status === 'approved')
     if (search) {
       const q = search.toLowerCase()
       list = list.filter((f) =>
@@ -54,11 +72,35 @@ export default function MyFlats() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">My Flats</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">
+          {isAdmin ? 'All Flats' : 'My Flats'}
+        </h1>
+        {isAdmin && (
+          <span className="text-sm text-slate-500">{flats.length} total</span>
+        )}
+      </div>
+
+      {/* Admin: project filter */}
+      {isAdmin && projects.length > 0 && (
+        <Select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+        >
+          <option value="">All Projects</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </Select>
+      )}
 
       {/* Search */}
       <div className="relative">
-        <Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        <Search
+          size={18}
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          aria-hidden="true"
+        />
         <input
           type="text"
           value={search}
@@ -97,7 +139,7 @@ export default function MyFlats() {
       ) : filteredFlats.length === 0 ? (
         <EmptyState
           title="No Flats Found"
-          description={search ? 'Try a different search term.' : `You have no ${tab} flats.`}
+          description={search ? 'Try a different search term.' : `No ${tab === 'all' ? '' : tab} flats found.`}
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -119,6 +161,11 @@ export default function MyFlats() {
                       <p className="truncate text-sm text-slate-500">
                         {flat.towerName} · {flat.floorLabel}
                       </p>
+                      {isAdmin && flat.assignment?.engineerName && (
+                        <p className="truncate text-xs text-slate-400">
+                          Eng: {flat.assignment.engineerName}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <Badge status={flat.status} />

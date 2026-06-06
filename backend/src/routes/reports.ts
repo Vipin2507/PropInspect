@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getDB } from '../db/database'
+import { getDB, utcTs } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
@@ -69,7 +69,7 @@ router.get(
         flatNumber: r.flat_number,
         towerName: r.tower_name,
         engineerName: r.engineer_name,
-        submittedAt: r.submitted_at,
+        submittedAt: utcTs(r.submitted_at),
         status: r.status,
       })),
       engineerLeaderboard: engineerLeaderboard.map((e) => ({

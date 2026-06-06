@@ -9,6 +9,7 @@ interface AuthStore {
   token: string | null
   otpMobile: string | null
   setAuth: (user: User, token: string) => void
+  setUser: (user: User) => void
   logout: () => void
   setOtpMobile: (mobile: string | null) => void
   login: (email: string, password: string) => Promise<string>
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.setItem('snagdesk_token', token)
         set({ user, token })
       },
+      setUser: (user) => set({ user }),
       logout: () => {
         localStorage.removeItem('snagdesk_token')
         set({ user: null, token: null })

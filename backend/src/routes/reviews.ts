@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { v4 as uuidv4 } from 'uuid'
-import { getDB } from '../db/database'
+import { getDB, utcTs } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
@@ -13,7 +13,7 @@ router.use(authenticate)
 
 router.get(
   '/queue',
-  requireRole('qa'),
+  requireRole('qa', 'admin'),
   asyncHandler(async (req, res) => {
     const filter = req.query.filter as string | undefined
     const db = getDB()
@@ -25,15 +25,19 @@ router.get(
       JOIN projects p ON p.id = i.project_id
       JOIN users u ON u.id = i.engineer_id
       JOIN assignments a ON a.flat_id = i.flat_id
-      WHERE i.status = 'submitted' AND a.qa_id = ?
+      WHERE i.status = 'submitted'
     `
+    // QA only sees their own queue; admin sees all
+    if (req.user!.role === 'qa') {
+      sql += ` AND a.qa_id = '${req.user!.id}'`
+    }
     if (filter === 'today') {
       sql += ` AND date(i.submitted_at) = date('now')`
     } else if (filter === 'overdue') {
       sql += ` AND datetime(i.submitted_at) < datetime('now', '-2 days')`
     }
     sql += ` ORDER BY i.submitted_at DESC`
-    const rows = db.prepare(sql).all(req.user!.id) as Record<string, unknown>[]
+    const rows = db.prepare(sql).all() as Record<string, unknown>[]
     res.json(
       rows.map((r) => ({
         inspectionId: r.id,
@@ -42,7 +46,7 @@ router.get(
         towerName: r.tower_name,
         projectName: r.project_name,
         engineerName: r.engineer_name,
-        submittedAt: r.submitted_at,
+        submittedAt: utcTs(r.submitted_at),
         status: r.status,
       }))
     )
@@ -51,15 +55,13 @@ router.get(
 
 router.get(
   '/history/list',
-  requireRole('qa'),
+  requireRole('qa', 'admin'),
   asyncHandler(async (req, res) => {
-    const rows = getDB()
-      .prepare(
-        `SELECT r.*, f.flat_number FROM reviews r
-         JOIN flats f ON f.id = r.flat_id
-         WHERE r.qa_id = ? ORDER BY r.reviewed_at DESC LIMIT 50`
-      )
-      .all(req.user!.id) as Record<string, unknown>[]
+    const db = getDB()
+    // Admin sees all history; QA sees only their own
+    const rows = req.user!.role === 'admin'
+      ? db.prepare(`SELECT r.*, f.flat_number FROM reviews r JOIN flats f ON f.id = r.flat_id ORDER BY r.reviewed_at DESC LIMIT 100`).all() as Record<string, unknown>[]
+      : db.prepare(`SELECT r.*, f.flat_number FROM reviews r JOIN flats f ON f.id = r.flat_id WHERE r.qa_id = ? ORDER BY r.reviewed_at DESC LIMIT 50`).all(req.user!.id) as Record<string, unknown>[]
     res.json(
       rows.map((r) => ({
         id: r.id,
@@ -70,7 +72,7 @@ router.get(
         decision: r.decision,
         overallComments: r.overall_comments,
         itemComments: JSON.parse(r.item_comments as string),
-        reviewedAt: r.reviewed_at,
+        reviewedAt: utcTs(r.reviewed_at),
       }))
     )
   })
@@ -113,7 +115,7 @@ router.get(
 
 router.post(
   '/',
-  requireRole('qa'),
+  requireRole('qa', 'admin'),
   asyncHandler(async (req, res) => {
     const body = z
       .object({
@@ -132,7 +134,8 @@ router.post(
     }
 
     const assignment = db.prepare('SELECT qa_id FROM assignments WHERE flat_id = ?').get(inspection.flat_id) as { qa_id: string }
-    if (assignment.qa_id !== req.user!.id) {
+    // Admin can review any inspection; QA must be the assigned reviewer
+    if (req.user!.role !== 'admin' && assignment.qa_id !== req.user!.id) {
       res.status(403).json({ error: 'Not assigned QA for this flat' })
       return
     }

@@ -10,7 +10,7 @@ import { EmptyState } from '../../../components/ui/EmptyState'
 import { useState } from 'react'
 import { usersApi } from '../../../utils/api'
 import type { User } from '../../../types'
-import { Pencil, Plus, Power, UserCheck, UserX } from 'lucide-react'
+import { Pencil, Plus, Power, UserCheck, UserX, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function UserManagement() {
@@ -20,8 +20,14 @@ export default function UserManagement() {
   const [editOpen, setEditOpen]     = useState(false)
   const [editUser, setEditUser]     = useState<User | null>(null)
   const [editForm, setEditForm]     = useState({ name: '', email: '', mobile: '', role: 'engineer' })
-  const [toggleOpen, setToggleOpen]   = useState(false)
+  const [toggleOpen, setToggleOpen]     = useState(false)
   const [toggleTarget, setToggleTarget] = useState<User | null>(null)
+  // Reset password state
+  const [resetOpen, setResetOpen]     = useState(false)
+  const [resetTarget, setResetTarget] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [savingReset, setSavingReset] = useState(false)
 
   const create = async () => {
     try {
@@ -57,6 +63,22 @@ export default function UserManagement() {
       setToggleOpen(false)
       refresh()
     } catch { toast.error('Failed to update user') }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetTarget) return
+    if (newPassword.length < 6) { toast.error('Password must be at least 6 characters.'); return }
+    if (newPassword !== confirmPassword) { toast.error('Passwords do not match.'); return }
+    setSavingReset(true)
+    try {
+      await usersApi.resetPassword(resetTarget.id, newPassword)
+      toast.success(`Password reset for ${resetTarget.name}.`)
+      setResetOpen(false)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch { toast.error('Failed to reset password.') }
+    finally { setSavingReset(false) }
   }
 
   return (
@@ -100,14 +122,26 @@ export default function UserManagement() {
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(u)}>
-                  <Pencil size={14} aria-hidden="true" /> Edit
-                </Button>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                {/* Top row: Edit + Reset Pass */}
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(u)}>
+                    <Pencil size={14} aria-hidden="true" /> Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 text-primary"
+                    onClick={() => { setResetTarget(u); setNewPassword(''); setConfirmPassword(''); setResetOpen(true) }}
+                  >
+                    <KeyRound size={14} aria-hidden="true" /> Reset Pass
+                  </Button>
+                </div>
+                {/* Full-width Activate / Deactivate below */}
                 <Button
                   variant={u.isActive ? 'danger' : 'outline'}
                   size="sm"
-                  className="flex-1"
+                  className="mt-2 w-full"
                   onClick={() => { setToggleTarget(u); setToggleOpen(true) }}
                 >
                   <Power size={14} aria-hidden="true" />
@@ -199,6 +233,53 @@ export default function UserManagement() {
         variant={toggleTarget?.isActive ? 'danger' : 'primary'}
         onConfirm={confirmToggle}
       />
+
+      {/* Reset Password Modal */}
+      <Modal open={resetOpen} onOpenChange={(v) => { if (!v) { setResetOpen(false); setNewPassword(''); setConfirmPassword('') } }} title={`Reset Password — ${resetTarget?.name}`}>
+        <p className="mb-4 text-sm text-slate-500">
+          Set a new password for this user. They will need to use it on their next login.
+        </p>
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">New Password</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Confirm Password</label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repeat new password"
+              autoComplete="new-password"
+              required
+            />
+            {confirmPassword && newPassword !== confirmPassword && (
+              <p className="mt-1.5 text-sm text-fail">Passwords do not match.</p>
+            )}
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" onClick={() => setResetOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="flex-1"
+              loading={savingReset}
+              disabled={!newPassword || newPassword !== confirmPassword}
+            >
+              Reset Password
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

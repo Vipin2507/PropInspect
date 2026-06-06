@@ -22,6 +22,24 @@ const getBaseURL = () => {
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 };
 
+// Base URL for static media (uploads). Relative paths from the server
+// need to be prefixed with the VPS host when running as a native app,
+// because capacitor://localhost cannot resolve /uploads/... paths.
+export const getMediaBaseURL = () => {
+  if (Capacitor.isNativePlatform()) {
+    return 'http://147.93.30.96';
+  }
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+  return apiBase.replace(/\/api$/, '');
+};
+
+// Resolve a relative server path like /uploads/... to a full URL on native.
+export function resolveMediaUrl(url: string | undefined | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
+  return `${getMediaBaseURL()}${url}`;
+}
+
 export const api = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
@@ -37,6 +55,8 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ user: User; token: string }>('/auth/login', { email, password }),
   me: () => api.get<{ user: User }>('/auth/me'),
+  updateProfile: (data: { name?: string; email?: string; mobile?: string; newPassword?: string }) =>
+    api.patch<{ user: User }>('/auth/profile', data),
   sendOtp: (mobile: string) => api.post<{ otp?: string }>('/auth/otp/send', { mobile }),
   verifyOtp: (mobile: string, otp: string) =>
     api.post<{ user: User; token: string }>('/auth/otp/verify', { mobile, otp }),
@@ -121,6 +141,8 @@ export const usersApi = {
     api.post<User>('/users', data),
   update: (id: string, data: Partial<{ name: string; email: string; mobile: string; role: string }>) =>
     api.put<User>(`/users/${id}`, data),
+  resetPassword: (id: string, newPassword: string) =>
+    api.patch(`/users/${id}/password`, { newPassword }),
   toggleActive: (id: string) => api.patch(`/users/${id}/toggle-active`),
   delete: (id: string) => api.delete(`/users/${id}`),
 }
@@ -156,4 +178,6 @@ export const syncApi = {
 
 export const templatesApi = {
   list: () => api.get<ChecklistTemplate[]>('/templates'),
+  update: (id: string, data: { name?: string; sections?: unknown[] }) =>
+    api.put<ChecklistTemplate>(`/templates/${id}`, data),
 }

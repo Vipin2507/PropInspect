@@ -6,12 +6,23 @@ import { useEffect, useState } from 'react'
 import { initSyncListeners } from '../../utils/sync'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
+import { Capacitor } from '@capacitor/core'
+import { StatusBar, Style } from '@capacitor/status-bar'
 
 export function AppShell() {
   const user = useAuthStore((s) => s.user)
   const fetchCount = useNotificationStore((s) => s.fetchCount)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const location = useLocation()
+
+  // Keep status bar solid white with dark icons — Android manages the space above the WebView.
+  // safe-area-inset-top in the navbar header pushes content below the status bar on notched devices.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: '#ffffff' }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const cleanup = initSyncListeners(user?.role === 'engineer' ? user.id : undefined)

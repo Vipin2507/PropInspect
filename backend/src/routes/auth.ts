@@ -77,6 +77,39 @@ router.get(
   })
 )
 
+router.patch(
+  '/profile',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const body = z.object({
+      name:        z.string().min(1).optional(),
+      email:       z.string().email().optional(),
+      mobile:      z.string().min(10).optional(),
+      newPassword: z.string().min(6).optional(),
+    }).parse(req.body)
+
+    const db  = getDB()
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user!.id) as Record<string, unknown>
+    if (!row) { res.status(404).json({ error: 'User not found' }); return }
+
+    const updates: Record<string, unknown> = {
+      name:   body.name   ?? row.name,
+      email:  body.email  ?? row.email,
+      mobile: body.mobile ?? row.mobile,
+    }
+    if (body.newPassword) {
+      updates.password = bcrypt.hashSync(body.newPassword, 10)
+    }
+
+    db.prepare(
+      `UPDATE users SET name = ?, email = ?, mobile = ?, password = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(updates.name, updates.email, updates.mobile, updates.password ?? row.password, req.user!.id)
+
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user!.id) as Record<string, unknown>
+    res.json({ user: rowToUser(updated) })
+  })
+)
+
 router.post(
   '/otp/send',
   asyncHandler(async (req, res) => {

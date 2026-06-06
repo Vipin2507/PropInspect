@@ -151,10 +151,8 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
 
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
 
+  // Only validate mandatory-image rule for fail items — pending items are allowed
   for (const r of responses) {
-    if (r.status === 'pending') {
-      throw new AppError('All checklist items must be answered before submit', 400)
-    }
     if (r.status === 'fail') {
       const mandatory = getItemMandatoryImage(r.item_id as string)
       const imageCount = (

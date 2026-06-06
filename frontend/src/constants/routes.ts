@@ -9,6 +9,8 @@ export const ROUTES = {
   ENGINEER_CATEGORY_SUMMARY: (flatId: string, categoryId: string) =>
     `/engineer/flats/${flatId}/summary/${categoryId}`,
   ENGINEER_INSPECTION_SUMMARY: (flatId: string) => `/engineer/flats/${flatId}/inspection-summary`,
+  ENGINEER_FLAT_SNAGS: (flatId: string) => `/engineer/flats/${flatId}/snags`,
+  ENGINEER_NOTIFICATIONS: '/engineer/notifications',
   QA_DASHBOARD: '/qa/dashboard',
   QA_REVIEWS: '/qa/reviews',
   QA_REVIEW_DETAIL: (inspectionId: string) => `/qa/reviews/${inspectionId}`,
@@ -21,8 +23,10 @@ export const ROUTES = {
   ADMIN_USERS: '/admin/users',
   ADMIN_TEMPLATES: '/admin/templates',
   ADMIN_REPORTS: '/admin/reports',
+  ADMIN_MONITORING: '/admin/monitoring',
   DESNAGGING: '/desnagging',
   DESNAGGING_DETAIL: (snagId: string) => `/desnagging/${snagId}`,
+  PROFILE: '/profile',
 } as const
 
 export function dashboardForRole(role: string): string {

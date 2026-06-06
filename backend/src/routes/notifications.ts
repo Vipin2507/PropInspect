@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getDB } from '../db/database'
+import { getDB, utcTs } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { asyncHandler } from '../middleware/errorHandler'
 
@@ -24,7 +24,7 @@ router.get(
         message: r.message,
         relatedId: r.related_id,
         isRead: Boolean(r.is_read),
-        createdAt: r.created_at,
+        createdAt: utcTs(r.created_at),
       }))
     )
   })

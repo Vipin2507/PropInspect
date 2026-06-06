@@ -1,47 +1,53 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useMemo } from 'react'
 import { flatsApi, usersApi, assignmentsApi, towersApi } from '../../../utils/api'
-import { Table, Th, Td } from '../../../components/ui/Table'
 import { Button } from '../../../components/ui/Button'
 import { Select } from '../../../components/ui/Select'
 import { Modal } from '../../../components/ui/Modal'
 import { Badge } from '../../../components/ui/Badge'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
+import { Spinner } from '../../../components/ui/Spinner'
+import { EmptyState } from '../../../components/ui/EmptyState'
 import { ROUTES } from '../../../constants/routes'
 import type { Flat, User, Tower } from '../../../types'
-import { ArrowLeft, Pencil, X, CheckSquare, Square, Users, Minus } from 'lucide-react'
+import {
+  ArrowLeft, Pencil, X, CheckSquare, Square,
+  Users, Minus, UserCheck, UserX,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
+import { cn } from '../../../utils/cn'
 
 export default function FlatManagement() {
   const { id: projectId } = useParams()
   const navigate = useNavigate()
-  const [flats, setFlats] = useState<Flat[]>([])
+
+  const [flats, setFlats]         = useState<Flat[]>([])
   const [engineers, setEngineers] = useState<User[]>([])
-  const [qas, setQas] = useState<User[]>([])
-  const [towers, setTowers] = useState<Tower[]>([])
-  const [loading, setLoading] = useState(true)
+  const [qas, setQas]             = useState<User[]>([])
+  const [towers, setTowers]       = useState<Tower[]>([])
+  const [loading, setLoading]     = useState(true)
 
-  // Selection state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-
-  // Bulk assign form
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
   const [bulkEngineerId, setBulkEngineerId] = useState('')
-  const [bulkQaId, setBulkQaId] = useState('')
+  const [bulkQaId, setBulkQaId]         = useState('')
 
-  // Filters
-  const [filterTower, setFilterTower] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterTower, setFilterTower]           = useState('')
+  const [filterStatus, setFilterStatus]         = useState('')
   const [filterAssignment, setFilterAssignment] = useState<'all' | 'assigned' | 'unassigned'>('all')
 
-  // Edit assignment
-  const [editOpen, setEditOpen] = useState(false)
-  const [editFlat, setEditFlat] = useState<Flat | null>(null)
+  const [editOpen, setEditOpen]         = useState(false)
+  const [editFlat, setEditFlat]         = useState<Flat | null>(null)
   const [editEngineerId, setEditEngineerId] = useState('')
-  const [editQaId, setEditQaId] = useState('')
+  const [editQaId, setEditQaId]         = useState('')
 
-  // Remove assignment
-  const [removeOpen, setRemoveOpen] = useState(false)
-  const [removeFlat, setRemoveFlat] = useState<Flat | null>(null)
+  const [removeOpen, setRemoveOpen]   = useState(false)
+  const [removeFlat, setRemoveFlat]   = useState<Flat | null>(null)
+
+  // Quick-assign a single unassigned flat
+  const [assignOpen, setAssignOpen]   = useState(false)
+  const [assignFlat, setAssignFlat]   = useState<Flat | null>(null)
+  const [assignEngineerId, setAssignEngineerId] = useState('')
+  const [assignQaId, setAssignQaId]   = useState('')
 
   const loadData = () => {
     setLoading(true)
@@ -53,72 +59,61 @@ export default function FlatManagement() {
     ]).finally(() => setLoading(false))
   }
 
-  useEffect(() => {
-    loadData()
-  }, [projectId])
+  useEffect(() => { loadData() }, [projectId])
 
-  // Filtered flats
   const filteredFlats = useMemo(() => {
     return flats.filter((f) => {
-      if (filterTower && f.towerId !== filterTower) return false
-      if (filterStatus && f.status !== filterStatus) return false
-      if (filterAssignment === 'assigned' && !f.assignment) return false
-      if (filterAssignment === 'unassigned' && f.assignment) return false
+      if (filterTower      && f.towerId !== filterTower)    return false
+      if (filterStatus     && f.status  !== filterStatus)   return false
+      if (filterAssignment === 'assigned'   && !f.assignment) return false
+      if (filterAssignment === 'unassigned' &&  f.assignment) return false
       return true
     })
   }, [flats, filterTower, filterStatus, filterAssignment])
 
-  // Selection helpers
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredFlats.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredFlats.map((f) => f.id)))
-    }
+    setSelectedIds(
+      selectedIds.size === filteredFlats.length
+        ? new Set()
+        : new Set(filteredFlats.map((f) => f.id))
+    )
   }
 
   const clearSelection = () => setSelectedIds(new Set())
 
   const selectedCount = selectedIds.size
-  const allSelected = filteredFlats.length > 0 && selectedIds.size === filteredFlats.length
-  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredFlats.length
+  const allSelected   = filteredFlats.length > 0 && selectedIds.size === filteredFlats.length
+  const someSelected  = selectedIds.size > 0 && selectedIds.size < filteredFlats.length
 
-  // Bulk assign
+  const statCounts = useMemo(() => ({
+    total:      flats.length,
+    assigned:   flats.filter((f) =>  f.assignment).length,
+    unassigned: flats.filter((f) => !f.assignment).length,
+  }), [flats])
+
   const bulkAssign = async () => {
-    if (!bulkEngineerId || !bulkQaId) {
-      toast.error('Select both Engineer and QA')
-      return
-    }
-    const flatIds = Array.from(selectedIds)
+    if (!bulkEngineerId || !bulkQaId) { toast.error('Select both Engineer and QA'); return }
     try {
-      const { data } = await assignmentsApi.bulkCreate({ flatIds, engineerId: bulkEngineerId, qaId: bulkQaId })
-      const createdCount = data.created.length
-      const skippedCount = data.skipped.length
-      if (createdCount > 0) {
-        toast.success(`Assigned ${createdCount} flat${createdCount > 1 ? 's' : ''}`)
-      }
-      if (skippedCount > 0) {
-        toast(`${skippedCount} flat${skippedCount > 1 ? 's' : ''} skipped (already assigned)`, { icon: 'ℹ️' })
-      }
-      clearSelection()
-      setBulkEngineerId('')
-      setBulkQaId('')
+      const { data } = await assignmentsApi.bulkCreate({
+        flatIds: Array.from(selectedIds),
+        engineerId: bulkEngineerId,
+        qaId: bulkQaId,
+      })
+      if (data.created.length) toast.success(`Assigned ${data.created.length} flat${data.created.length > 1 ? 's' : ''}`)
+      if (data.skipped.length) toast(`${data.skipped.length} skipped (already assigned)`, { icon: 'ℹ️' })
+      clearSelection(); setBulkEngineerId(''); setBulkQaId('')
       loadData()
-    } catch {
-      toast.error('Failed to assign flats')
-    }
+    } catch { toast.error('Failed to assign flats') }
   }
 
-  // Edit existing assignment
   const openEditAssignment = (f: Flat) => {
     setEditFlat(f)
     setEditEngineerId(f.assignment?.engineerId || '')
@@ -130,64 +125,73 @@ export default function FlatManagement() {
     if (!editFlat?.assignment) return
     await assignmentsApi.update(editFlat.assignment.id, { engineerId: editEngineerId, qaId: editQaId })
     toast.success('Assignment updated')
-    setEditOpen(false)
-    loadData()
+    setEditOpen(false); loadData()
   }
 
-  // Remove assignment
   const confirmRemoveAssignment = async () => {
     if (!removeFlat?.assignment) return
     await assignmentsApi.delete(removeFlat.assignment.id)
     toast.success('Assignment removed')
-    setRemoveOpen(false)
-    loadData()
+    setRemoveOpen(false); loadData()
   }
 
-  const statCounts = useMemo(() => {
-    const total = flats.length
-    const assigned = flats.filter((f) => f.assignment).length
-    const unassigned = total - assigned
-    return { total, assigned, unassigned }
-  }, [flats])
+  const openQuickAssign = (f: Flat) => {
+    setAssignFlat(f); setAssignEngineerId(''); setAssignQaId(''); setAssignOpen(true)
+  }
 
-  if (loading) return <p className="p-4">Loading...</p>
+  const saveQuickAssign = async () => {
+    if (!assignFlat || !assignEngineerId || !assignQaId) {
+      toast.error('Select both Engineer and QA'); return
+    }
+    await assignmentsApi.create({ flatId: assignFlat.id, engineerId: assignEngineerId, qaId: assignQaId })
+    toast.success(`${assignFlat.flatNumber} assigned`)
+    setAssignOpen(false); loadData()
+  }
+
+  if (loading) return (
+    <div className="flex flex-1 items-center justify-center py-24">
+      <Spinner size="lg" />
+    </div>
+  )
 
   return (
-    <div>
+    <div className="flex flex-col gap-4 pb-6">
       {/* Header */}
-      <div className="mb-6">
-        <button onClick={() => navigate(ROUTES.ADMIN_PROJECT(projectId!))} className="mb-3 flex items-center gap-1 text-sm text-slate-500 hover:text-primary">
-          <ArrowLeft size={16} /> Back to Project
-        </button>
-        <h1 className="text-xl font-bold sm:text-2xl">Flat Management</h1>
-        <p className="mt-1 text-sm text-slate-500">Assign engineers and QA reviewers to flats</p>
+      <button
+        onClick={() => navigate(ROUTES.ADMIN_PROJECT(projectId!))}
+        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
+      >
+        <ArrowLeft size={18} aria-hidden="true" /> Back to Project
+      </button>
+
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Flat Management</h1>
+        <p className="text-sm text-slate-500">Assign engineers and QA reviewers to flats</p>
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-3 text-center">
-          <div className="text-2xl font-bold text-slate-900">{statCounts.total}</div>
-          <div className="text-xs text-slate-500">Total Flats</div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm">
+          <p className="text-2xl font-bold text-slate-900">{statCounts.total}</p>
+          <p className="text-xs text-slate-500">Total Flats</p>
         </div>
-        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-center">
-          <div className="text-2xl font-bold text-green-700">{statCounts.assigned}</div>
-          <div className="text-xs text-green-600">Assigned</div>
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-3 text-center shadow-sm">
+          <p className="text-2xl font-bold text-green-700">{statCounts.assigned}</p>
+          <p className="text-xs text-green-600">Assigned</p>
         </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
-          <div className="text-2xl font-bold text-amber-700">{statCounts.unassigned}</div>
-          <div className="text-xs text-amber-600">Unassigned</div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-center shadow-sm">
+          <p className="text-2xl font-bold text-amber-700">{statCounts.unassigned}</p>
+          <p className="text-xs text-amber-600">Unassigned</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-3">
-        <Select value={filterTower} onChange={(e) => setFilterTower(e.target.value)} className="w-auto min-w-[140px]">
+      <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-3">
+        <Select value={filterTower} onChange={(e) => setFilterTower(e.target.value)}>
           <option value="">All Towers</option>
-          {towers.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
+          {towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </Select>
-        <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-auto min-w-[140px]">
+        <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           <option value="">All Statuses</option>
           <option value="not_started">Not Started</option>
           <option value="in_progress">In Progress</option>
@@ -197,178 +201,244 @@ export default function FlatManagement() {
           <option value="revision_required">Revision Required</option>
           <option value="desnagging">Desnagging</option>
         </Select>
-        <Select value={filterAssignment} onChange={(e) => setFilterAssignment(e.target.value as 'all' | 'assigned' | 'unassigned')} className="w-auto min-w-[140px]">
+        <Select
+          value={filterAssignment}
+          onChange={(e) => setFilterAssignment(e.target.value as 'all' | 'assigned' | 'unassigned')}
+          className="col-span-2 md:w-auto"
+        >
           <option value="all">All Assignments</option>
           <option value="assigned">Assigned Only</option>
           <option value="unassigned">Unassigned Only</option>
         </Select>
-        <div className="ml-auto text-sm text-slate-500 self-center">
-          Showing {filteredFlats.length} of {flats.length} flats
-        </div>
       </div>
 
-      {/* Bulk Assignment Toolbar */}
+      <p className="text-sm text-slate-500">
+        Showing {filteredFlats.length} of {flats.length} flats
+      </p>
+
+      {/* Select-all row */}
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <button
+          type="button"
+          onClick={toggleSelectAll}
+          className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center active:bg-slate-50"
+          aria-label="Select all"
+        >
+          {allSelected
+            ? <CheckSquare size={20} className="text-primary" />
+            : someSelected
+            ? <Minus size={20} className="text-primary" />
+            : <Square size={20} className="text-slate-400" />}
+        </button>
+        <span className="text-sm font-medium text-slate-600">
+          {selectedCount > 0 ? `${selectedCount} selected` : 'Select all'}
+        </span>
+        {selectedCount > 0 && (
+          <button
+            onClick={clearSelection}
+            className="ml-auto text-xs font-medium text-primary active:underline"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Bulk assign toolbar (shown when items selected) */}
       {selectedCount > 0 && (
-        <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <Users size={18} className="text-primary" />
-            <span className="font-semibold text-primary">{selectedCount} flat{selectedCount > 1 ? 's' : ''} selected</span>
-            <button onClick={clearSelection} className="ml-1 text-xs text-slate-500 underline hover:text-slate-700">Clear</button>
+            <Users size={16} className="text-primary" aria-hidden="true" />
+            <span className="text-sm font-semibold text-primary">
+              Assign {selectedCount} flat{selectedCount !== 1 ? 's' : ''}
+            </span>
           </div>
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-            <Select value={bulkEngineerId} onChange={(e) => setBulkEngineerId(e.target.value)} className="flex-1">
-              <option value="">Select Engineer</option>
-              {engineers.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </Select>
-            <Select value={bulkQaId} onChange={(e) => setBulkQaId(e.target.value)} className="flex-1">
-              <option value="">Select QA</option>
-              {qas.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </Select>
-            <Button onClick={bulkAssign} className="whitespace-nowrap">
-              Assign Selected
-            </Button>
-          </div>
+          <Select value={bulkEngineerId} onChange={(e) => setBulkEngineerId(e.target.value)}>
+            <option value="">Select Engineer</option>
+            {engineers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </Select>
+          <Select value={bulkQaId} onChange={(e) => setBulkQaId(e.target.value)}>
+            <option value="">Select QA</option>
+            {qas.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </Select>
+          <Button onClick={bulkAssign} className="w-full">
+            Assign Selected Flats
+          </Button>
         </div>
       )}
 
-      {/* Flats Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <Table>
-          <thead>
-            <tr>
-              <Th>
-                <button onClick={toggleSelectAll} className="flex items-center gap-1 text-slate-500 hover:text-primary" title="Select all">
-                  {allSelected ? <CheckSquare size={18} className="text-primary" /> : someSelected ? <Minus size={18} className="text-primary" /> : <Square size={18} />}
-                </button>
-              </Th>
-              <Th>Flat</Th>
-              <Th>Tower</Th>
-              <Th>Floor</Th>
-              <Th>Status</Th>
-              <Th>Engineer</Th>
-              <Th>QA</Th>
-              <Th>Actions</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredFlats.map((f) => {
-              const isSelected = selectedIds.has(f.id)
-              const hasAssignment = !!f.assignment
-              return (
-                <tr
-                  key={f.id}
-                  className={`transition ${isSelected ? 'bg-primary/5' : ''} ${!hasAssignment ? 'bg-amber-50/30' : ''}`}
-                >
-                  <Td>
-                    <button onClick={() => toggleSelect(f.id)} className="flex items-center text-slate-500 hover:text-primary">
-                      {isSelected ? <CheckSquare size={18} className="text-primary" /> : <Square size={18} />}
-                    </button>
-                  </Td>
-                  <Td>
-                    <span className="font-medium text-slate-900">{f.flatNumber}</span>
-                  </Td>
-                  <Td>{f.towerName || '—'}</Td>
-                  <Td>{f.floorLabel || '—'}</Td>
-                  <Td><Badge status={f.status} /></Td>
-                  <Td>
-                    {f.assignment?.engineerName ? (
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        <span className="h-2 w-2 rounded-full bg-green-500" />
-                        {f.assignment.engineerName}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-slate-400">Unassigned</span>
-                    )}
-                  </Td>
-                  <Td>
-                    {f.assignment?.qaName ? (
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        <span className="h-2 w-2 rounded-full bg-blue-500" />
-                        {f.assignment.qaName}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-slate-400">Unassigned</span>
-                    )}
-                  </Td>
-                  <Td>
-                    {hasAssignment ? (
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditAssignment(f)}
-                          title="Edit assignment"
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRemoveFlat(f)
-                            setRemoveOpen(true)
-                          }}
-                          className="text-red-500 hover:bg-red-50"
-                          title="Remove assignment"
-                        >
-                          <X size={14} />
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
-                  </Td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </Table>
-      </div>
+      {/* Flat card list — mobile-first, no horizontal scroll */}
+      {filteredFlats.length === 0 ? (
+        <EmptyState title="No flats found" description="Try adjusting the filters above." />
+      ) : (
+        <div className="space-y-2">
+          {filteredFlats.map((f) => {
+            const isSelected    = selectedIds.has(f.id)
+            const hasAssignment = !!f.assignment
 
-      {filteredFlats.length === 0 && (
-        <div className="mt-4 rounded-xl border-2 border-dashed border-slate-200 py-12 text-center text-slate-400">
-          No flats match the current filters.
+            return (
+              <div
+                key={f.id}
+                className={cn(
+                  'rounded-2xl border bg-white shadow-sm transition-colors',
+                  isSelected ? 'border-primary bg-primary/5' : 'border-slate-200',
+                  !hasAssignment && !isSelected && 'border-amber-200 bg-amber-50/30'
+                )}
+              >
+                {/* Top row: checkbox + flat info + badge */}
+                <div className="flex items-start gap-3 p-4 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelect(f.id)}
+                    className="mt-0.5 flex min-h-[36px] min-w-[36px] touch-manipulation items-center justify-center rounded-lg active:bg-slate-100"
+                    aria-label={isSelected ? 'Deselect flat' : 'Select flat'}
+                  >
+                    {isSelected
+                      ? <CheckSquare size={20} className="text-primary" />
+                      : <Square size={20} className="text-slate-400" />}
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{f.flatNumber}</span>
+                      <Badge status={f.status} />
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {f.towerName || '—'} · {f.floorLabel || '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Assignment info */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-slate-100 px-4 py-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Engineer
+                    </p>
+                    {f.assignment?.engineerName ? (
+                      <p className="mt-0.5 flex items-center gap-1 text-sm font-medium text-slate-700">
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                        <span className="truncate">{f.assignment.engineerName}</span>
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-400">
+                        <UserX size={12} aria-hidden="true" /> Unassigned
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      QA Reviewer
+                    </p>
+                    {f.assignment?.qaName ? (
+                      <p className="mt-0.5 flex items-center gap-1 text-sm font-medium text-slate-700">
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                        <span className="truncate">{f.assignment.qaName}</span>
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 flex items-center gap-1 text-sm text-slate-400">
+                        <UserX size={12} aria-hidden="true" /> Unassigned
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 border-t border-slate-100 px-4 py-2.5">
+                  {hasAssignment ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openEditAssignment(f)}
+                      >
+                        <Pencil size={14} aria-hidden="true" /> Edit
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => { setRemoveFlat(f); setRemoveOpen(true) }}
+                      >
+                        <X size={14} aria-hidden="true" /> Remove
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => openQuickAssign(f)}
+                    >
+                      <UserCheck size={14} aria-hidden="true" /> Assign
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
       {/* Edit Assignment Modal */}
-      <Modal open={editOpen} onOpenChange={setEditOpen} title={`Edit Assignment — ${editFlat?.flatNumber}`}>
-        <div className="space-y-3">
+      <Modal open={editOpen} onOpenChange={setEditOpen} title={`Edit — ${editFlat?.flatNumber}`}>
+        <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Engineer</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Engineer</label>
             <Select value={editEngineerId} onChange={(e) => setEditEngineerId(e.target.value)}>
               <option value="">Select Engineer</option>
-              {engineers.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
+              {engineers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">QA Reviewer</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">QA Reviewer</label>
             <Select value={editQaId} onChange={(e) => setEditQaId(e.target.value)}>
               <option value="">Select QA</option>
-              {qas.map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
+              {qas.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           </div>
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1">Cancel</Button>
-            <Button onClick={saveEditAssignment} className="flex-1">Save Changes</Button>
+            <Button onClick={saveEditAssignment} className="flex-1">Save</Button>
           </div>
         </div>
       </Modal>
 
-      {/* Remove Assignment Confirmation */}
+      {/* Quick Assign Modal (for unassigned flats) */}
+      <Modal open={assignOpen} onOpenChange={setAssignOpen} title={`Assign — ${assignFlat?.flatNumber}`}>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Engineer</label>
+            <Select value={assignEngineerId} onChange={(e) => setAssignEngineerId(e.target.value)}>
+              <option value="">Select Engineer</option>
+              {engineers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">QA Reviewer</label>
+            <Select value={assignQaId} onChange={(e) => setAssignQaId(e.target.value)}>
+              <option value="">Select QA</option>
+              {qas.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </Select>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" onClick={() => setAssignOpen(false)} className="flex-1">Cancel</Button>
+            <Button
+              onClick={saveQuickAssign}
+              className="flex-1"
+              disabled={!assignEngineerId || !assignQaId}
+            >
+              Assign
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Remove Confirmation */}
       <ConfirmDialog
         open={removeOpen}
         onOpenChange={setRemoveOpen}
         title="Remove Assignment"
-        message={`Remove the engineer and QA assignment from flat "${removeFlat?.flatNumber}"? The flat will become unassigned.`}
+        message={`Remove engineer and QA from flat "${removeFlat?.flatNumber}"? It will become unassigned.`}
         confirmLabel="Remove"
         variant="danger"
         onConfirm={confirmRemoveAssignment}
