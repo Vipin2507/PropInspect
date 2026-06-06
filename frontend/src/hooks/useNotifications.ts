@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { notificationsApi } from '../utils/api'
 import { useNotificationStore } from '../store/notificationStore'
+import { getDb } from '../utils/db'
 import type { Notification } from '../types'
 
 export function useNotifications() {
@@ -8,14 +9,22 @@ export function useNotifications() {
   const fetchCount = useNotificationStore((s) => s.fetchCount)
 
   const refresh = useCallback(async () => {
-    const { data } = await notificationsApi.list()
-    setNotifications(data)
-    await fetchCount()
+    try {
+      const db = await getDb()
+      const cached = (await db.getAll('notifications')) as unknown as Notification[]
+      if (cached.length > 0) {
+        setNotifications(cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+      }
+      const { data } = await notificationsApi.list()
+      const tx = db.transaction('notifications', 'readwrite')
+      for (const n of data) await tx.store.put(n as unknown as Record<string, unknown>)
+      await tx.done
+      setNotifications(data)
+      await fetchCount()
+    } catch { /* keep cached */ }
   }, [fetchCount])
 
-  useEffect(() => {
-    refresh().catch(() => {})
-  }, [refresh])
+  useEffect(() => { refresh().catch(() => {}) }, [refresh])
 
   return { notifications, refresh }
 }

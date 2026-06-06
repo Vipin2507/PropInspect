@@ -2,18 +2,31 @@ import { useEffect, useState } from 'react'
 import { reportsApi } from '../utils/api'
 import type { DashboardData } from '../types'
 
+const CACHE_KEY = 'reports_overview_cache'
+
 export function useReportsOverview() {
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<DashboardData | null>(() => {
+    // Initialise from localStorage synchronously so first render shows data
+    try {
+      const cached = localStorage.getItem(CACHE_KEY)
+      return cached ? (JSON.parse(cached) as DashboardData) : null
+    } catch { return null }
+  })
+  const [loading, setLoading] = useState(!localStorage.getItem(CACHE_KEY))
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    reportsApi
-      .overview()
-      .then(({ data }) => { setData(data); setError(null) })
-      .catch(() => setError('Failed to load dashboard data'))
+    reportsApi.overview()
+      .then(({ data: fresh }) => {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(fresh))
+        setData(fresh)
+        setError(null)
+      })
+      .catch(() => {
+        if (!data) setError('No data available offline')
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { data, loading, error }
 }

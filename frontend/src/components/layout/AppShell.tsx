@@ -4,6 +4,7 @@ import { Navbar } from './Navbar'
 import { OfflineBanner } from './OfflineBanner'
 import { useEffect, useState } from 'react'
 import { initSyncListeners } from '../../utils/sync'
+import { prefetchAll } from '../../utils/prefetch'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
 import { Capacitor } from '@capacitor/core'
@@ -15,8 +16,6 @@ export function AppShell() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const location = useLocation()
 
-  // Keep status bar solid white with dark icons — Android manages the space above the WebView.
-  // safe-area-inset-top in the navbar header pushes content below the status bar on notched devices.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
@@ -29,6 +28,16 @@ export function AppShell() {
     fetchCount()
     return cleanup
   }, [user?.id, user?.role, fetchCount])
+
+  // Background prefetch — download ALL data to IndexedDB right after login
+  useEffect(() => {
+    if (!user) return
+    // Small delay so the dashboard renders first, then prefetch runs in background
+    const t = setTimeout(() => {
+      prefetchAll(user).catch(() => {})
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [user?.id]) // re-run only when the logged-in user changes
 
   useEffect(() => {
     setIsMobileMenuOpen(false)

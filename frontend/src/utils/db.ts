@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'snagdesk'
-const DB_VERSION = 2
+const DB_VERSION = 3  // bumped to add imageBlobs store
 
 interface SnagDeskDB extends DBSchema {
   users: { key: string; value: Record<string, unknown> }
@@ -38,6 +38,8 @@ interface SnagDeskDB extends DBSchema {
   reviews: { key: string; value: Record<string, unknown>; indexes: { 'by-inspection': string } }
   notifications: { key: string; value: Record<string, unknown>; indexes: { 'by-user': string } }
   pendingSync: { key: string; value: Record<string, unknown> }
+  // Stores base64 data URIs keyed by the server URL path (e.g. /uploads/xxx/yyy.jpg)
+  imageBlobs: { key: string; value: { url: string; base64: string } }
 }
 
 let dbPromise: Promise<IDBPDatabase<SnagDeskDB>> | null = null
@@ -97,6 +99,10 @@ export function getDb() {
         }
         if (!db.objectStoreNames.contains('pendingSync')) {
           db.createObjectStore('pendingSync', { keyPath: 'id' })
+        }
+        // v3: image blob cache keyed by URL path
+        if (!db.objectStoreNames.contains('imageBlobs')) {
+          db.createObjectStore('imageBlobs', { keyPath: 'url' })
         }
       },
     })

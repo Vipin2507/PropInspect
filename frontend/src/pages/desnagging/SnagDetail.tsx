@@ -1,6 +1,9 @@
 import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { snagsApi } from '../../utils/api'
+import { getDb } from '../../utils/db'
+import { resolveImageOffline } from '../../utils/imageCache'
+import { queueChange } from '../../utils/sync'
 import { SnagTimeline } from '../../components/desnagging/SnagTimeline'
 import { RectificationForm } from '../../components/desnagging/RectificationForm'
 import { Button } from '../../components/ui/Button'
@@ -12,6 +15,36 @@ import { Lightbox } from '../../components/ui/Lightbox'
 import { Badge } from '../../components/ui/Badge'
 import { ROUTES } from '../../constants/routes'
 import { Spinner } from '../../components/ui/Spinner'
+
+/** Single image thumbnail with offline fallback via IndexedDB */
+function OfflineThumb({ img, onClick }: { img: SnagImage; onClick: (src: string) => void }) {
+  const initial = img.localBlob || img.thumbnailUrl || img.url
+  const [src, setSrc] = useState<string | undefined>(initial)
+
+  useEffect(() => {
+    if (img.localBlob) return
+    const urlToCheck = img.thumbnailUrl || img.url
+    if (!urlToCheck) return
+    resolveImageOffline(urlToCheck).then((r) => { if (r) setSrc(r) })
+  }, [img.localBlob, img.thumbnailUrl, img.url])
+
+  const handleClick = async () => {
+    const fullUrl = img.localBlob || img.url
+    const resolved = await resolveImageOffline(fullUrl) ?? fullUrl
+    onClick(resolved)
+  }
+
+  if (!src) return null
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 active:scale-95 transition-transform sm:h-24 sm:w-24"
+    >
+      <img src={src} alt={img.caption || 'Photo'} className="h-full w-full object-cover" />
+    </button>
+  )
+}
 
 function ImageGrid({
   title,
@@ -28,18 +61,7 @@ function ImageGrid({
       <h3 className="mb-3 text-base font-semibold text-slate-800">{title}</h3>
       <div className="flex flex-wrap gap-2">
         {images.map((img) => (
-          <button
-            key={img.id}
-            type="button"
-            onClick={() => onImageClick(img.localBlob || img.url)}
-            className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 active:scale-95 transition-transform sm:h-24 sm:w-24"
-          >
-            <img
-              src={img.localBlob || img.thumbnailUrl || img.url}
-              alt={img.caption || title}
-              className="h-full w-full object-cover"
-            />
-          </button>
+          <OfflineThumb key={img.id} img={img} onClick={onImageClick} />
         ))}
       </div>
     </div>
@@ -48,33 +70,47 @@ function ImageGrid({
 
 export default function SnagDetail() {
   const { snagId } = useParams<{ snagId: string }>()
-  const [snag, setSnag]         = useState<Snag | null>(null)
+  const [snag, setSnag] = useState<Snag | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
-  const [remarks, setRemarks]   = useState('')
+  const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const user = useAuthStore((s) => s.user)
 
   useEffect(() => {
-    if (snagId) snagsApi.get(snagId).then(({ data }) => setSnag(data))
+    if (!snagId) return
+    ;(async () => {
+      // Serve from IndexedDB cache first
+      const db = await getDb()
+      const cached = await db.get('snags', snagId) as unknown as Snag | undefined
+      if (cached) setSnag(cached)
+      // Network refresh
+      try {
+        const { data } = await snagsApi.get(snagId)
+        await db.put('snags', data as unknown as Record<string, unknown>)
+        setSnag(data)
+      } catch { /* stay with cached */ }
+    })()
   }, [snagId])
 
   const handleRectify = async () => {
-    if (!snagId || !remarks.trim()) {
-      toast.error('Remarks are required')
-      return
-    }
+    if (!snagId || !remarks.trim()) { toast.error('Remarks are required'); return }
     setSubmitting(true)
     try {
       await snagsApi.rectify(snagId, { remarks })
       toast.success('Snag marked as rectified!')
       const { data } = await snagsApi.get(snagId)
+      const db = await getDb()
+      await db.put('snags', data as unknown as Record<string, unknown>)
       setSnag(data)
       setRemarks('')
     } catch {
-      toast.error('Failed to submit rectification.')
-    } finally {
-      setSubmitting(false)
+      // Queue for when back online — update local cache optimistically
+      await queueChange('update_snag', { snagId, changes: { status: 'in_rectification', remarks } })
+      setSnag((prev) => prev ? { ...prev, status: 'in_rectification', remarks } : prev)
+      setRemarks('')
+      toast.success('Saved offline — will sync when back online')
     }
+    finally { setSubmitting(false) }
   }
 
   const handleVerify = async (approved: boolean, comments?: string) => {
@@ -83,18 +119,19 @@ export default function SnagDetail() {
       await snagsApi.verifyClose(snagId, { approved, comments })
       toast.success(approved ? 'Snag closed.' : 'Snag re-opened.')
       const { data } = await snagsApi.get(snagId)
+      const db = await getDb()
+      await db.put('snags', data as unknown as Record<string, unknown>)
       setSnag(data)
     } catch {
-      toast.error('Failed to verify snag.')
+      const newStatus = approved ? 'closed' : 'open'
+      await queueChange('update_snag', { snagId, changes: { status: newStatus, remarks: comments ?? '' } })
+      setSnag((prev) => prev ? { ...prev, status: newStatus } : prev)
+      toast.success('Saved offline — will sync when back online')
     }
   }
 
   if (!snag) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-24">
-        <Spinner size="lg" />
-      </div>
-    )
+    return <div className="flex flex-1 items-center justify-center py-24"><Spinner size="lg" /></div>
   }
 
   const isEngineerActionable =
@@ -111,25 +148,21 @@ export default function SnagDetail() {
         Back to Snag List
       </Link>
 
-      {/* Main snag card */}
       <div className="rounded-2xl bg-white p-4 shadow-sm md:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-slate-900 md:text-2xl">{snag.itemLabel}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
+              <span className="flex items-center gap-1.5"><Layers size={14} /> {snag.category}</span>
               <span className="flex items-center gap-1.5">
-                <Layers size={14} aria-hidden="true" /> {snag.category}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Tag size={14} aria-hidden="true" />
-                <span className="truncate max-w-[140px] font-mono text-xs">{snag.id.slice(0, 8)}…</span>
+                <Tag size={14} />
+                <span className="font-mono text-xs">{snag.id.slice(0, 8)}…</span>
               </span>
             </div>
           </div>
           <Badge status={snag.status} className="self-start" />
         </div>
 
-        {/* Timeline */}
         <div className="my-6 overflow-x-auto">
           <SnagTimeline currentStatus={snag.status} />
         </div>
@@ -143,34 +176,17 @@ export default function SnagDetail() {
               </p>
             </div>
           )}
-
-          <ImageGrid
-            title="Before Rectification"
-            images={snag.beforeImages}
-            onImageClick={setLightboxSrc}
-          />
-
+          <ImageGrid title="Before Rectification" images={snag.beforeImages} onImageClick={setLightboxSrc} />
           {snag.afterImages.length > 0 && (
-            <ImageGrid
-              title="After Rectification"
-              images={snag.afterImages}
-              onImageClick={setLightboxSrc}
-            />
+            <ImageGrid title="After Rectification" images={snag.afterImages} onImageClick={setLightboxSrc} />
           )}
         </div>
       </div>
 
-      {/* Engineer: rectify */}
       {isEngineerActionable && (
-        <RectificationForm
-          remarks={remarks}
-          onRemarksChange={setRemarks}
-          onSubmit={handleRectify}
-          loading={submitting}
-        />
+        <RectificationForm remarks={remarks} onRemarksChange={setRemarks} onSubmit={handleRectify} loading={submitting} />
       )}
 
-      {/* QA: verify / re-open */}
       {isQaActionable && (
         <div className="rounded-2xl bg-white p-4 shadow-sm md:p-6">
           <h2 className="mb-4 text-base font-semibold text-slate-800">Verify Rectification</h2>
@@ -178,11 +194,7 @@ export default function SnagDetail() {
             <Button className="w-full sm:w-auto" onClick={() => handleVerify(true)}>
               Verify &amp; Close Snag
             </Button>
-            <Button
-              variant="danger"
-              className="w-full sm:w-auto"
-              onClick={() => handleVerify(false, 'Re-opened by QA.')}
-            >
+            <Button variant="danger" className="w-full sm:w-auto" onClick={() => handleVerify(false, 'Re-opened by QA.')}>
               Re-open Snag
             </Button>
           </div>

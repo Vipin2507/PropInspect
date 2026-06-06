@@ -1,5 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { resolveImageOffline } from '../../utils/imageCache'
+
+/** Resolves a list of server URL strings to base64/offline-safe URLs */
+function useResolvedImages(urls: string[]): string[] {
+  const [resolved, setResolved] = useState<string[]>(urls)
+
+  useEffect(() => {
+    if (!urls.length) return
+    let cancelled = false
+    Promise.all(
+      urls.map((u) =>
+        u.startsWith('data:') ? Promise.resolve(u) : resolveImageOffline(u).then((r) => r ?? u)
+      )
+    ).then((results) => {
+      if (!cancelled) setResolved(results)
+    })
+    return () => { cancelled = true }
+  }, [urls.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return resolved
+}
 
 export function Lightbox({
   src,
@@ -12,7 +33,9 @@ export function Lightbox({
   startIndex?: number
   onClose: () => void
 }) {
-  const allImages = images ?? (src ? [src] : [])
+  const rawImages = images ?? (src ? [src] : [])
+  const allImages = useResolvedImages(rawImages)
+
   const [index, setIndex] = useState(startIndex)
   const touchStartX = useRef<number | null>(null)
 
@@ -59,20 +82,14 @@ export function Lightbox({
           <button
             type="button"
             className="absolute left-2 z-20 flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full bg-black/40 text-white"
-            onClick={(e) => {
-              e.stopPropagation()
-              goPrev()
-            }}
+            onClick={(e) => { e.stopPropagation(); goPrev() }}
           >
             <ChevronLeft size={28} />
           </button>
           <button
             type="button"
             className="absolute right-2 z-20 flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full bg-black/40 text-white md:right-14"
-            onClick={(e) => {
-              e.stopPropagation()
-              goNext()
-            }}
+            onClick={(e) => { e.stopPropagation(); goNext() }}
           >
             <ChevronRight size={28} />
           </button>

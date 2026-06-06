@@ -1,10 +1,39 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Camera, X, ImageIcon } from 'lucide-react'
 import type { SnagImage } from '../../types'
 import { compressImage, blobToBase64 } from '../../utils/imageUtils'
 import { resolveMediaUrl } from '../../utils/api'
+import { resolveImageOffline } from '../../utils/imageCache'
 import { cn } from '../../utils/cn'
 import { Lightbox } from '../ui/Lightbox'
+
+/** Renders a single thumbnail, resolving via IndexedDB cache for offline support */
+function OfflineThumbnail({ img, onClick }: { img: SnagImage; onClick: () => void }) {
+  const initial = img.localBlob || resolveMediaUrl(img.thumbnailUrl) || resolveMediaUrl(img.url)
+  const [src, setSrc] = useState<string | undefined>(initial)
+
+  useEffect(() => {
+    if (img.localBlob) return
+    const urlToCheck = img.thumbnailUrl || img.url
+    if (!urlToCheck) return
+    resolveImageOffline(urlToCheck).then((resolved) => {
+      if (resolved) setSrc(resolved)
+    })
+  }, [img.thumbnailUrl, img.url, img.localBlob])
+
+  if (!src) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <ImageIcon size={20} className="text-slate-400" aria-hidden="true" />
+      </div>
+    )
+  }
+  return (
+    <button type="button" className="h-full w-full" onClick={onClick} aria-label="View image">
+      <img src={src} alt="Photo" className="h-full w-full object-cover" onError={() => setSrc(undefined)} />
+    </button>
+  )
+}
 
 const MAX = parseInt(import.meta.env.VITE_MAX_IMAGES_PER_ITEM || '5', 10)
 
@@ -50,37 +79,14 @@ export function ImageUploader({
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 py-1">
           {images.map((img, idx) => {
-          // Prefer base64 (localBlob), then remote URL resolved to full path
-            const src = img.localBlob || resolveMediaUrl(img.thumbnailUrl) || resolveMediaUrl(img.url)
             return (
               <div
                 key={img.id}
                 className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
               >
-                {src ? (
-                  <button
-                    type="button"
-                    className="h-full w-full"
-                    onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx) }}
-                    aria-label={`View image ${idx + 1}`}
-                  >
-                    <img
-                      src={src}
-                      alt={`Photo ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                      // Fallback: show icon if img fails to load
-                      onError={(ev) => {
-                        ;(ev.target as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
-                  </button>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <ImageIcon size={20} className="text-slate-400" aria-hidden="true" />
-                  </div>
-                )}
+                <OfflineThumbnail img={img} onClick={() => setLightboxIndex(idx)} />
 
-                {/* Remove button — always visible on touch (no hover needed) */}
+                {/* Remove button */}
                 {!readOnly && (
                   <button
                     type="button"

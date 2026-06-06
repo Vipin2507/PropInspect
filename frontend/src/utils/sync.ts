@@ -52,16 +52,16 @@ async function pushChanges(): Promise<void> {
 
 async function pullChanges(engineerId?: string): Promise<void> {
   const since = localStorage.getItem(LAST_PULL_KEY) || '1970-01-01T00:00:00.000Z'
-  const { data } = await syncApi.pull(since, engineerId)
-
-  if (data.flats?.length) await saveFlats(data.flats)
-  if (data.inspections?.length) {
-    for (const insp of data.inspections) {
-      await saveInspection(insp)
+  try {
+    const { data } = await syncApi.pull(since, engineerId)
+    if (data.flats?.length) await saveFlats(data.flats)
+    if (data.inspections?.length) {
+      for (const insp of data.inspections) await saveInspection(insp)
     }
+    localStorage.setItem(LAST_PULL_KEY, new Date().toISOString())
+  } catch {
+    // Offline — skip pull, cached data stays valid
   }
-
-  localStorage.setItem(LAST_PULL_KEY, new Date().toISOString())
 }
 
 export async function refreshPendingCount(): Promise<void> {
@@ -83,9 +83,7 @@ export async function queueChange(
   }
   await addPendingChange(change)
   await refreshPendingCount()
-  if (navigator.onLine) {
-    fullSync().catch(console.error)
-  }
+  fullSync().catch(() => {})
 }
 
 export function initSyncListeners(engineerId?: string): () => void {

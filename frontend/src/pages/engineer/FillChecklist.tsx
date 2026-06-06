@@ -7,6 +7,7 @@ import { ChecklistCategory } from '../../components/inspection/ChecklistCategory
 import { SubmitBar } from '../../components/inspection/SubmitBar'
 import { ROUTES } from '../../constants/routes'
 import { imagesApi } from '../../utils/api'
+import { queueChange } from '../../utils/sync'
 import type { InspectionResponse, SnagImage } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 
@@ -66,34 +67,39 @@ export default function FillChecklist() {
     )
     setInspection({ ...current, responses: optimisticResponses })
 
-    // Upload to server in background if online
-    if (navigator.onLine) {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('inspectionId', current.id)
-      fd.append('responseId', responseId)
-      fd.append('type', 'evidence')
-      try {
-        const { data } = await imagesApi.upload(fd)
-        // Replace local base64 with server URLs (keeps the same id)
-        const updatedResponses = inspectionRef.current?.responses.map((r) =>
-          r.id === responseId
-            ? {
-                ...r,
-                images: r.images.map((i) =>
-                  i.id === img.id
-                    ? { ...i, url: data.url, thumbnailUrl: data.thumbnailUrl, isLocal: false }
-                    : i
-                ),
-              }
-            : r
-        )
-        if (updatedResponses && inspectionRef.current) {
-          setInspection({ ...inspectionRef.current, responses: updatedResponses })
-        }
-      } catch {
-        // Image stays as local base64 — will sync later
+    // Try uploading to server — works online, queues offline
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('inspectionId', current.id)
+    fd.append('responseId', responseId)
+    fd.append('type', 'evidence')
+    try {
+      const { data } = await imagesApi.upload(fd)
+      // Replace local base64 with server URLs
+      const updatedResponses = inspectionRef.current?.responses.map((r) =>
+        r.id === responseId
+          ? {
+              ...r,
+              images: r.images.map((i) =>
+                i.id === img.id
+                  ? { ...i, url: data.url, thumbnailUrl: data.thumbnailUrl, isLocal: false }
+                  : i
+              ),
+            }
+          : r
+      )
+      if (updatedResponses && inspectionRef.current) {
+        setInspection({ ...inspectionRef.current, responses: updatedResponses })
       }
+    } catch {
+      // Queue upload for when back online — base64 stored in IndexedDB via saveInspection
+      await queueChange('upload_image', {
+        imageId: img.id,
+        inspectionId: current.id,
+        responseId,
+        base64,
+        type: 'evidence',
+      })
     }
   }
 

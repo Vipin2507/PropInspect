@@ -75,7 +75,10 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { newPassword } = z.object({ newPassword: z.string().min(6) }).parse(req.body)
     const hash = bcrypt.hashSync(newPassword, 10)
-    getDB().prepare('UPDATE users SET password = ?, updated_at = datetime("now") WHERE id = ?').run(hash, req.params.id)
+    
+    // FIX: Changed "now" to 'now' so SQLite treats it as a string literal
+    getDB().prepare("UPDATE users SET password = ?, updated_at = datetime('now') WHERE id = ?").run(hash, req.params.id)
+    
     res.json({ success: true })
   })
 )

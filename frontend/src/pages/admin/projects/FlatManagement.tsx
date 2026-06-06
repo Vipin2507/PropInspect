@@ -49,14 +49,60 @@ export default function FlatManagement() {
   const [assignEngineerId, setAssignEngineerId] = useState('')
   const [assignQaId, setAssignQaId]   = useState('')
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true)
-    Promise.all([
-      projectId ? flatsApi.byProject(projectId).then(({ data }) => setFlats(data)) : Promise.resolve(),
-      usersApi.list('engineer').then(({ data }) => setEngineers(data)),
-      usersApi.list('qa').then(({ data }) => setQas(data)),
-      projectId ? towersApi.list(projectId).then(({ data }) => setTowers(data)) : Promise.resolve(),
-    ]).finally(() => setLoading(false))
+    try {
+      const { getDb } = await import('../../../utils/db')
+      const db = await getDb()
+
+      // Serve from cache first so UI renders instantly offline
+      if (projectId) {
+        const cachedFlats = (await db.getAllFromIndex('flats', 'by-tower', '') // fallback
+          .catch(() => [])) as unknown as Flat[]
+        // Actually filter by projectId since there's no by-project index
+        const allCached = (await db.getAll('flats')) as unknown as Flat[]
+        const projectFlats = allCached.filter((f) => f.projectId === projectId)
+        if (projectFlats.length) setFlats(projectFlats)
+
+        const cachedTowers = (await db.getAllFromIndex('towers', 'by-project', projectId)) as unknown as Tower[]
+        if (cachedTowers.length) setTowers(cachedTowers)
+      }
+      const cachedUsers = (await db.getAll('users')) as unknown as User[]
+      if (cachedUsers.length) {
+        setEngineers(cachedUsers.filter((u) => u.role === 'engineer'))
+        setQas(cachedUsers.filter((u) => u.role === 'qa'))
+      }
+
+      // Network refresh
+      await Promise.allSettled([
+        projectId ? flatsApi.byProject(projectId).then(({ data }) => {
+          setFlats(data)
+          const tx = db.transaction('flats', 'readwrite')
+          data.forEach((f) => tx.store.put(f as unknown as Record<string, unknown>))
+          return tx.done
+        }) : Promise.resolve(),
+        usersApi.list('engineer').then(({ data }) => {
+          setEngineers(data)
+          const tx = db.transaction('users', 'readwrite')
+          data.forEach((u) => tx.store.put(u as unknown as Record<string, unknown>))
+          return tx.done
+        }),
+        usersApi.list('qa').then(({ data }) => {
+          setQas(data)
+          const tx = db.transaction('users', 'readwrite')
+          data.forEach((u) => tx.store.put(u as unknown as Record<string, unknown>))
+          return tx.done
+        }),
+        projectId ? towersApi.list(projectId).then(({ data }) => {
+          setTowers(data)
+          const tx = db.transaction('towers', 'readwrite')
+          data.forEach((t) => tx.store.put(t as unknown as Record<string, unknown>))
+          return tx.done
+        }) : Promise.resolve(),
+      ])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { loadData() }, [projectId])

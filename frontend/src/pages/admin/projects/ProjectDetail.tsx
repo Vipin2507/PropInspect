@@ -31,11 +31,22 @@ export default function ProjectDetail() {
   const [towerDeleteOpen, setTowerDeleteOpen] = useState(false)
   const [deleteTower, setDeleteTower] = useState<Tower | null>(null)
 
-  const loadProject = () => {
-    if (id) {
-      projectsApi.get(id)
-        .then(({ data }) => setProject(data))
-        .catch(() => projectsApi.list().then(({ data }) => setProject(data.find((p) => p.id === id) || null)))
+  const loadProject = async () => {
+    if (!id) return
+    // Cache first
+    try {
+      const db = await (await import('../../../utils/db')).getDb()
+      const cached = await db.get('projects', id) as any
+      if (cached) setProject(cached)
+    } catch { /* ignore */ }
+    // Network refresh
+    try {
+      const { data } = await projectsApi.get(id)
+      const db = await (await import('../../../utils/db')).getDb()
+      await db.put('projects', data as any)
+      setProject(data)
+    } catch {
+      // stay with cached
     }
   }
 

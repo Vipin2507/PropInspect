@@ -11,33 +11,33 @@ export function useInspection(flatId: string | undefined) {
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  // Keep a ref to the latest inspection so saveResponses doesn't need it as a dep
   const inspectionRef = useRef<Inspection | null>(null)
   inspectionRef.current = inspection
 
   const load = useCallback(async () => {
     if (!flatId) return
     setLoading(true)
+
+    // Always show cached first — instant render online and offline
+    const cached = await getInspection(flatId)
+    if (cached) {
+      setInspection(cached)
+      setLoading(false)
+    }
+
     try {
-      if (navigator.onLine) {
-        const { data } = await inspectionsApi.getByFlat(flatId)
-        setInspection(data)
-        await saveInspection(data)
-      } else {
-        const cached = await getInspection(flatId)
-        if (cached) setInspection(cached)
-      }
+      const { data } = await inspectionsApi.getByFlat(flatId)
+      setInspection(data)
+      await saveInspection(data)
     } catch {
-      const cached = await getInspection(flatId)
-      if (cached) setInspection(cached)
+      // Network unavailable — stay with cached
+      if (!cached) setInspection(null)
     } finally {
       setLoading(false)
     }
   }, [flatId])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
   const setGlobalSaveState = useInspectionUiStore((s) => s.setSaveState)
 
@@ -48,40 +48,27 @@ export function useInspection(flatId: string | undefined) {
     setGlobalSaveState('saving')
     const updated = { ...current, responses }
     setInspection(updated)
-    await saveInspection(updated)
-    if (navigator.onLine) {
-      try {
-        await inspectionsApi.save(current.id, responses)
-      } catch {
-        await queueChange('save_inspection', { inspectionId: current.id, responses })
-      }
-    } else {
+    await saveInspection(updated) // always persist locally first
+    try {
+      await inspectionsApi.save(current.id, responses)
+    } catch {
       await queueChange('save_inspection', { inspectionId: current.id, responses })
     }
     setSaveState('saved')
     setGlobalSaveState('saved')
-    setTimeout(() => {
-      setSaveState('idle')
-      setGlobalSaveState('idle')
-    }, 2000)
+    setTimeout(() => { setSaveState('idle'); setGlobalSaveState('idle') }, 2000)
   }, [setGlobalSaveState])
 
   const submit = async () => {
     if (!inspection) return
     try {
-      if (navigator.onLine) {
-        await inspectionsApi.submit(inspection.id)
-        toast.success('Inspection submitted for review')
-      } else {
-        await queueChange('submit_inspection', { inspectionId: inspection.id })
-        toast.success('Queued for sync when online')
-      }
-      await load()
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
-      toast.error(msg || 'Submit failed')
-      throw e
+      await inspectionsApi.submit(inspection.id)
+      toast.success('Inspection submitted for review')
+    } catch {
+      await queueChange('submit_inspection', { inspectionId: inspection.id })
+      toast.success('Saved offline — will submit when back online')
     }
+    await load()
   }
 
   return { inspection, loading, saveState, load, saveResponses, submit, setInspection }

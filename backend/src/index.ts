@@ -30,6 +30,7 @@ import syncRoutes from './routes/sync'
 dotenv.config()
 
 const app = express()
+app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '4000', 10)
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads')
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
@@ -41,16 +42,20 @@ seedDatabase()
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
+    const isWildcard = process.env.CORS_ORIGIN === '*';
+    
+    if (!origin || isWildcard || allowedOrigins.includes(origin)) {
+      callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'))
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
 }))
+
 app.use(morgan('dev'))
 app.use(express.json({ limit: '10mb' }))
+
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,

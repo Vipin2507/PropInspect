@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { reviewsApi } from '../../utils/api'
+import { queueChange } from '../../utils/sync'
 import { ReviewChecklist } from '../../components/review/ReviewChecklist'
 import { ReviewActions } from '../../components/review/ReviewActions'
 import { Lightbox } from '../../components/ui/Lightbox'
@@ -27,13 +28,33 @@ export default function ReviewDetail() {
   const [revisionDrawerOpen, setRevisionDrawerOpen] = useState(false)
   const [isSubmitting, setIsSubmitting]       = useState(false)
 
+  const [isOffline, setIsOffline] = useState(false)
+
   useEffect(() => {
-    if (inspectionId) {
-      reviewsApi.get(inspectionId).then(({ data }) => {
-        setData(data as any)
+    if (!inspectionId) return
+    const cacheKey = `review_detail_${inspectionId}`
+
+    // 1. Serve from localStorage cache immediately (populated by prefetch)
+    try {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        setData(JSON.parse(cached))
         setItemComments({})
+      }
+    } catch { /* ignore parse errors */ }
+
+    // 2. Refresh from network in background
+    reviewsApi.get(inspectionId)
+      .then(({ data: fresh }) => {
+        localStorage.setItem(cacheKey, JSON.stringify(fresh))
+        setData(fresh as any)
+        setItemComments({})
+        setIsOffline(false)
       })
-    }
+      .catch(() => {
+        // Network failed — show offline indicator if serving from cache
+        setIsOffline(true)
+      })
   }, [inspectionId])
 
   const submitReview = async (decision: 'approved' | 'revision_required' | 'rejected') => {
@@ -48,7 +69,10 @@ export default function ReviewDetail() {
       toast.success(`Inspection ${decision.replace('_', ' ')}.`)
       navigate(ROUTES.QA_REVIEWS)
     } catch {
-      toast.error('Failed to submit review. Please try again.')
+      // Queue for sync when back online
+      await queueChange('review_decision', { inspectionId, decision, overallComments, itemComments })
+      toast.success('Review saved offline — will sync when back online')
+      navigate(ROUTES.QA_REVIEWS)
     } finally {
       setIsSubmitting(false)
       setRevisionDrawerOpen(false)
@@ -78,6 +102,11 @@ export default function ReviewDetail() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">Review: {data.flatNumber}</h1>
         <p className="text-sm text-slate-500">Submitted by {data.engineerName}</p>
+        {isOffline && (
+          <p className="mt-1 text-xs font-medium text-amber-600">
+            ⚡ Showing cached data — connect to submit review
+          </p>
+        )}
       </div>
 
       <ReviewChecklist

@@ -1,13 +1,20 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { v4 as uuidv4 } from 'uuid'
+import path from 'path'
+import fs from 'fs'
+import sharp from 'sharp'
 import { getDB } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
 import { validateAndSubmitFromSync } from '../services/syncService'
+import { createNotification } from '../utils/notifications'
 
 const router = Router()
 router.use(authenticate)
+
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads')
 
 router.post(
   '/push',
@@ -23,6 +30,7 @@ router.post(
         const payload = change.payload as Record<string, unknown>
         const db = getDB()
 
+        // ── 1. Save checklist responses ──────────────────────────────────
         if (type === 'save_inspection') {
           const inspectionId = payload.inspectionId as string
           const responses = payload.responses as Array<{ id: string; status?: string; remarks?: string }>
@@ -35,21 +43,146 @@ router.post(
           }
           db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
           processed++
+
+        // ── 2. Submit / resubmit inspection ──────────────────────────────
         } else if (type === 'submit_inspection' || type === 'resubmit_inspection') {
           validateAndSubmitFromSync(payload.inspectionId as string, type === 'resubmit_inspection')
           processed++
+
+        // ── 3. QA review decision (queued offline) ───────────────────────
         } else if (type === 'review_decision') {
+          const {
+            inspectionId,
+            decision,
+            overallComments = '',
+            itemComments = {},
+          } = payload as {
+            inspectionId: string
+            decision: string
+            overallComments: string
+            itemComments: Record<string, string>
+          }
+
+          const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown> | undefined
+          if (!inspection) { errors.push(`Inspection ${inspectionId} not found`); failed++; continue }
+          if (!['submitted', 'approved', 'revision_required', 'rejected'].includes(inspection.status as string)) {
+            errors.push(`Inspection ${inspectionId} not in reviewable state`); failed++; continue
+          }
+
+          const reviewId = uuidv4()
+          db.prepare(
+            `INSERT OR IGNORE INTO reviews (id, inspection_id, flat_id, qa_id, decision, overall_comments, item_comments)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).run(reviewId, inspectionId, inspection.flat_id, req.user!.id, decision, overallComments, JSON.stringify(itemComments))
+
+          // Apply item comments to responses
+          for (const [itemId, comment] of Object.entries(itemComments)) {
+            db.prepare(`UPDATE responses SET qa_remarks = ? WHERE inspection_id = ? AND item_id = ?`)
+              .run(comment, inspectionId, itemId)
+          }
+
+          // Update flat + inspection status
+          const decisionToInspStatus: Record<string, string> = {
+            approved: 'approved',
+            revision_required: 'revision_required',
+            rejected: 'rejected',
+          }
+          const decisionToFlatStatus: Record<string, string> = {
+            approved: 'approved',
+            revision_required: 'revision_required',
+            rejected: 'rejected',
+          }
+          const inspStatus = decisionToInspStatus[decision] ?? decision
+          const flatStatus = decisionToFlatStatus[decision] ?? decision
+
+          db.prepare(`UPDATE inspections SET status = ? WHERE id = ?`).run(inspStatus, inspectionId)
+          db.prepare(`UPDATE flats SET status = ? WHERE id = ?`).run(flatStatus, inspection.flat_id)
+
+          // Notify the engineer
+          const notifType = decision === 'approved'
+            ? 'inspection_approved'
+            : decision === 'rejected' ? 'inspection_rejected' : 'revision_required'
+          createNotification(
+            inspection.engineer_id as string,
+            notifType,
+            `Inspection ${decision.replace('_', ' ')}`,
+            overallComments,
+            inspection.flat_id as string
+          )
           processed++
+
+        // ── 4. Upload image (base64 stored offline) ───────────────────────
+        } else if (type === 'upload_image') {
+          const {
+            inspectionId,
+            responseId,
+            base64,
+            type: imgType = 'evidence',
+          } = payload as {
+            inspectionId: string
+            responseId?: string
+            snagId?: string
+            base64: string
+            type?: string
+          }
+
+          if (!base64 || !inspectionId) { processed++; continue }
+
+          // Decode base64 data URI → buffer
+          const matches = base64.match(/^data:image\/\w+;base64,(.+)$/)
+          if (!matches) { processed++; continue }
+          const buffer = Buffer.from(matches[1], 'base64')
+
+          const dir = path.join(UPLOADS_DIR, inspectionId)
+          const thumbDir = path.join(dir, 'thumbs')
+          fs.mkdirSync(thumbDir, { recursive: true })
+
+          const fileId = uuidv4()
+          const filename = `${fileId}.jpg`
+          const filepath = path.join(dir, filename)
+          const thumbpath = path.join(thumbDir, filename)
+
+          await sharp(buffer).rotate().jpeg({ quality: 80 }).toFile(filepath)
+          await sharp(filepath).resize(200, 200, { fit: 'cover' }).jpeg({ quality: 80 }).toFile(thumbpath)
+
+          const url = `/uploads/${inspectionId}/${filename}`
+          const thumbnailUrl = `/uploads/${inspectionId}/thumbs/${filename}`
+          const id = uuidv4()
+
+          db.prepare(
+            `INSERT OR IGNORE INTO images (id, inspection_id, response_id, type, url, thumbnail_url, caption)
+             VALUES (?, ?, ?, ?, ?, ?, '')`
+          ).run(id, inspectionId, responseId || null, imgType, url, thumbnailUrl)
+
+          processed++
+
+        // ── 5. Update snag status/remarks ─────────────────────────────────
         } else if (type === 'update_snag') {
-          const { snagId, changes: snagChanges } = payload as { snagId: string; changes: Record<string, unknown> }
-          const snag = db.prepare('SELECT * FROM snags WHERE id = ?').get(snagId) as Record<string, unknown>
+          const { snagId, changes: snagChanges } = payload as {
+            snagId: string
+            changes: { status?: string; remarks?: string }
+          }
+          const snag = db.prepare('SELECT * FROM snags WHERE id = ?').get(snagId) as Record<string, unknown> | undefined
           if (snag) {
             db.prepare(
               `UPDATE snags SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`
-            ).run((snagChanges.status as string) ?? snag.status, (snagChanges.remarks as string) ?? snag.remarks, snagId)
+            ).run(snagChanges.status ?? snag.status, snagChanges.remarks ?? snag.remarks, snagId)
+
+            // Notify engineer if QA re-opened or closed snag
+            if (snagChanges.status === 'closed') {
+              createNotification(
+                snag.engineer_id as string || '',
+                'snag_rectified',
+                'Snag Closed',
+                'Your snag has been verified and closed.',
+                snagId
+              )
+            }
           }
           processed++
+
         } else {
+          // Unknown type — skip silently
           processed++
         }
       } catch (e) {
@@ -93,6 +226,20 @@ router.get(
         const placeholders = inspIds.map(() => '?').join(',')
         responses = db.prepare(`SELECT * FROM responses WHERE inspection_id IN (${placeholders})`).all(...inspIds)
         snags = db.prepare(`SELECT * FROM snags WHERE inspection_id IN (${placeholders})`).all(...inspIds)
+      }
+    }
+
+    if (user.role === 'qa' || user.role === 'admin') {
+      // QA/admin: return flats whose inspections changed since last pull
+      const changedInspections = db
+        .prepare(`SELECT DISTINCT flat_id FROM inspections WHERE last_updated > ?`)
+        .all(since) as { flat_id: string }[]
+      if (changedInspections.length) {
+        const placeholders = changedInspections.map(() => '?').join(',')
+        flats = (
+          db.prepare(`SELECT f.* FROM flats f WHERE f.id IN (${placeholders})`)
+            .all(...changedInspections.map((r) => r.flat_id)) as Record<string, unknown>[]
+        ).map(rowToFlat)
       }
     }
 

@@ -23,15 +23,37 @@ export default function TowerDetail() {
   const [editName, setEditName] = useState('')
 
   useEffect(() => {
-    if (towerId) {
-      flatsApi.byTower(towerId).then(({ data }) => setFlats(data))
-    }
-    if (projectId) {
-      towersApi.list(projectId).then(({ data }) => {
-        const found = data.find((t) => t.id === towerId)
-        if (found) setTower(found)
-      })
-    }
+    if (!towerId || !projectId) return
+    ;(async () => {
+      const { getDb } = await import('../../../utils/db')
+      const db = await getDb()
+
+      // Serve flats from cache
+      const cachedFlats = await db.getAllFromIndex('flats', 'by-tower', towerId) as unknown as Flat[]
+      if (cachedFlats.length) setFlats(cachedFlats)
+
+      // Serve tower from cache
+      const cachedTower = await db.get('towers', towerId) as unknown as Tower | undefined
+      if (cachedTower) setTower(cachedTower)
+
+      // Network refresh
+      try {
+        const { data: freshFlats } = await flatsApi.byTower(towerId)
+        setFlats(freshFlats)
+        const tx = db.transaction('flats', 'readwrite')
+        for (const f of freshFlats) await tx.store.put(f as unknown as Record<string, unknown>)
+        await tx.done
+      } catch { /* keep cached */ }
+
+      try {
+        const { data: towers } = await towersApi.list(projectId)
+        const found = towers.find((t) => t.id === towerId)
+        if (found) {
+          setTower(found)
+          await db.put('towers', found as unknown as Record<string, unknown>)
+        }
+      } catch { /* keep cached */ }
+    })()
   }, [towerId, projectId])
 
   const openEdit = () => {
