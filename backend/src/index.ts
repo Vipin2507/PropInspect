@@ -9,6 +9,7 @@ import dotenv from 'dotenv'
 import { getDB } from './db/database'
 import { seedDatabase } from './db/seed'
 import { errorHandler } from './middleware/errorHandler'
+import { DEFAULT_CHECKLIST_CATEGORIES } from './constants/checklist'
 
 import authRoutes from './routes/auth'
 import projectRoutes from './routes/projects'
@@ -38,6 +39,26 @@ const allowedOrigins = [CORS_ORIGIN, 'http://localhost', 'capacitor://localhost'
 
 getDB()
 seedDatabase()
+
+// Always sync the default checklist template with the current constant
+// so existing DBs get updated when categories change
+;(function updateDefaultTemplate() {
+  const db = getDB()
+  const row = db.prepare('SELECT id FROM checklist_templates WHERE is_default = 1 LIMIT 1').get() as { id: string } | undefined
+  if (!row) return
+  const sections = DEFAULT_CHECKLIST_CATEGORIES.map((cat) => ({
+    id: cat.id,
+    templateId: row.id,
+    name: cat.name,
+    icon: cat.icon,
+    sortOrder: cat.sortOrder,
+    items: cat.items,
+  }))
+  db.prepare(
+    `UPDATE checklist_templates SET name = 'Default Snagging Checklist', sections = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(JSON.stringify(sections), row.id)
+  console.log(`[startup] Default checklist template updated — ${DEFAULT_CHECKLIST_CATEGORIES.length} categories, ${DEFAULT_CHECKLIST_CATEGORIES.reduce((a, c) => a + c.items.length, 0)} items`)
+})()
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(cors({

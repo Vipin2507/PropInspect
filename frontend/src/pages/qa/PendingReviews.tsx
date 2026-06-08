@@ -40,7 +40,7 @@ export default function PendingReviews() {
         onSearchChange={(value) => setFilters((p) => ({ ...p, search: value }))}
       />
 
-      {loading ? (
+      {loading && (items as any[]).length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <Spinner size="lg" />
         </div>

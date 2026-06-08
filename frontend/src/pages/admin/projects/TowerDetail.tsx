@@ -97,8 +97,14 @@ export default function TowerDetail() {
 
       {/* Floor breakdown */}
       <div className="space-y-4">
-        {floors.map((floor) => {
-          const floorFlats = flats.filter((f) => f.floorId === floor.id)
+        {[...floors].sort((a, b) => a.floorNumber - b.floorNumber).map((floor) => {
+          const floorFlats = flats
+            .filter((f) => f.floorId === floor.id)
+            .sort((a, b) => {
+              const aNum = parseInt(a.flatNumber.replace(/\D/g, ''), 10) || 0
+              const bNum = parseInt(b.flatNumber.replace(/\D/g, ''), 10) || 0
+              return aNum - bNum
+            })
           return (
             <div key={floor.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="mb-3 font-semibold text-slate-700">{floor.label}</h3>

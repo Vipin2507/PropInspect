@@ -66,3 +66,13 @@ export async function getImagesForResponse(responseId: string) {
   const db = await getDb()
   return db.getAllFromIndex('images', 'by-response', responseId)
 }
+
+export async function getFlatById(flatId: string): Promise<Flat | undefined> {
+  const db = await getDb()
+  return (await db.get('flats', flatId)) as unknown as Flat | undefined
+}
+
+export async function saveSingleFlat(flat: Flat): Promise<void> {
+  const db = await getDb()
+  await db.put('flats', flat as unknown as Record<string, unknown>)
+}

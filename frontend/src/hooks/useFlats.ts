@@ -1,10 +1,40 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { flatsApi, projectsApi } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import { getDb } from '../utils/db'
 import type { Flat } from '../types'
 
-async function getCachedFlats(userId: string, role: string): Promise<Flat[]> {
+// ── Sort helper ───────────────────────────────────────────────────────────────
+// Order: tower name → floor number → flat number (natural numeric sort)
+// e.g. A-101, A-102, A-201, B-101 — not A-101, A-201, A-102
+function naturalNum(s: string): number {
+  const m = s.match(/\d+/)
+  return m ? parseInt(m[0], 10) : 0
+}
+
+export function sortFlats(flats: Flat[]): Flat[] {
+  return [...flats].sort((a, b) => {
+    // 1. Tower name alphabetically
+    const towerCmp = (a.towerName ?? '').localeCompare(b.towerName ?? '', undefined, { numeric: true })
+    if (towerCmp !== 0) return towerCmp
+    // 2. Floor number numerically
+    const floorCmp = (a.floor ?? 0) - (b.floor ?? 0)
+    if (floorCmp !== 0) return floorCmp
+    // 3. Flat number — natural numeric (A-101 before A-102)
+    return naturalNum(a.flatNumber) - naturalNum(b.flatNumber)
+  })
+}
+
+// ── Module-level memory cache ─────────────────────────────────────────────────
+// Survives component remounts — eliminates the blank flash between navigation.
+// Keyed by "{userId}:{projectId|all}"
+const memCache: Map<string, Flat[]> = new Map()
+
+function memKey(userId: string, projectId?: string) {
+  return `${userId}:${projectId ?? 'all'}`
+}
+
+async function readDb(userId: string, role: string): Promise<Flat[]> {
   try {
     const db = await getDb()
     if (role === 'admin') return (await db.getAll('flats')) as unknown as Flat[]
@@ -12,7 +42,7 @@ async function getCachedFlats(userId: string, role: string): Promise<Flat[]> {
   } catch { return [] }
 }
 
-async function cacheFlats(flats: Flat[]): Promise<void> {
+async function writeDb(flats: Flat[]): Promise<void> {
   try {
     const db = await getDb()
     const tx = db.transaction('flats', 'readwrite')
@@ -23,22 +53,35 @@ async function cacheFlats(flats: Flat[]): Promise<void> {
 
 export function useFlats(projectId?: string) {
   const user = useAuthStore((s) => s.user)
-  const [flats, setFlats] = useState<Flat[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // Initialise from memory cache synchronously — ZERO blank flash on remount
+  const key = user ? memKey(user.id, projectId) : ''
+  const initial = key ? (memCache.get(key) ?? []) : []
+
+  const [flats, setFlats] = useState<Flat[]>(initial)
+  const [loading, setLoading] = useState(initial.length === 0)
+
+  // Prevent stale setState after unmount
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const refresh = useCallback(async () => {
     if (!user) return
-    setLoading(true)
 
-    // 1. Serve cached data immediately so UI is never blank offline
-    const cached = await getCachedFlats(user.id, user.role)
-    if (cached.length > 0) {
-      const filtered = projectId ? cached.filter((f) => f.projectId === projectId) : cached
-      setFlats(filtered)
-      setLoading(false)
+    // Phase 1: IndexedDB (fast, persistent across app restarts)
+    if (memCache.get(key)?.length === 0 || !memCache.has(key)) {
+      const dbFlats = await readDb(user.id, user.role)
+      if (dbFlats.length > 0) {
+        const filtered = sortFlats(projectId ? dbFlats.filter((f) => f.projectId === projectId) : dbFlats)
+        memCache.set(key, filtered)
+        if (mounted.current) { setFlats(filtered); setLoading(false) }
+      }
     }
 
-    // 2. Try network refresh
+    // Phase 2: Network (always refresh silently)
     try {
       let fresh: Flat[] = []
       if (projectId) {
@@ -54,15 +97,16 @@ export function useFlats(projectId?: string) {
         const { data } = await flatsApi.byEngineer(user.id)
         fresh = data
       }
-      await cacheFlats(fresh)
-      setFlats(fresh)
+      await writeDb(fresh)
+      const sorted = sortFlats(fresh)
+      memCache.set(key, sorted)
+      if (mounted.current) setFlats(sorted)
     } catch {
-      // Network failed — cached data already shown above
-      if (cached.length === 0) setFlats([])
+      // Network failed — memory/db cache already shown
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
-  }, [user, projectId])
+  }, [user, projectId, key])
 
   useEffect(() => { refresh() }, [refresh])
 

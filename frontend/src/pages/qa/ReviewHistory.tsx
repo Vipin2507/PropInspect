@@ -10,7 +10,7 @@ export default function ReviewHistory() {
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Review History</h1>
 
-      {loading ? (
+      {loading && history.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <Spinner size="lg" />
         </div>

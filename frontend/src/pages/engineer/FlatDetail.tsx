@@ -1,10 +1,9 @@
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Eye, Wrench } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { flatsApi } from '../../utils/api'
 import { useInspection } from '../../hooks/useInspection'
 import { useAuthStore } from '../../store/authStore'
 import { useSnags } from '../../hooks/useSnags'
+import { useFlatDetail } from '../../hooks/useFlatDetail'
 import { ProgressBar } from '../../components/ui/ProgressBar'
 import { InspectionSummary } from '../../components/inspection/InspectionSummary'
 import { Button } from '../../components/ui/Button'
@@ -14,7 +13,6 @@ import { RevisionBanner } from '../../components/review/RevisionBanner'
 import { Spinner } from '../../components/ui/Spinner'
 import { cn } from '../../utils/cn'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
-import type { Flat } from '../../types'
 
 export default function FlatDetail() {
   const { flatId }  = useParams<{ flatId: string }>()
@@ -23,13 +21,9 @@ export default function FlatDetail() {
   const isAdmin     = user?.role === 'admin'
 
   const { inspection, loading } = useInspection(flatId)
-  const [flat, setFlat] = useState<Flat | null>(null)
+  const flat = useFlatDetail(flatId)
   const { snags } = useSnags({ flatId })
   const openSnagCount = snags.filter((s) => ['open', 'assigned', 'in_rectification'].includes(s.status)).length
-
-  useEffect(() => {
-    if (flatId) flatsApi.get(flatId).then(({ data }) => setFlat(data))
-  }, [flatId])
 
   const responses  = inspection?.responses || []
   const doneCount  = responses.filter((r) => r.status !== 'pending').length

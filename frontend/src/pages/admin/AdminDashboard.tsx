@@ -7,7 +7,7 @@ import { Spinner } from '../../components/ui/Spinner'
 export default function AdminDashboard() {
   const { data, loading } = useReportsOverview()
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />

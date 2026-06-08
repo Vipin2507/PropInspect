@@ -34,7 +34,7 @@ export default function Reports() {
     URL.revokeObjectURL(url)
   }
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />

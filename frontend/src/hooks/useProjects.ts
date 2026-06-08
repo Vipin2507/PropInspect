@@ -1,47 +1,48 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { projectsApi } from '../utils/api'
 import { getDb } from '../utils/db'
 import type { Project } from '../types'
 
-async function getCachedProjects(): Promise<Project[]> {
-  try {
-    const db = await getDb()
-    return (await db.getAll('projects')) as unknown as Project[]
-  } catch { return [] }
-}
-
-async function cacheProjects(projects: Project[]): Promise<void> {
-  try {
-    const db = await getDb()
-    const tx = db.transaction('projects', 'readwrite')
-    for (const p of projects) await tx.store.put(p as unknown as Record<string, unknown>)
-    await tx.done
-  } catch { /* non-fatal */ }
-}
+// Module-level memory cache — survives remounts
+let memCache: Project[] = []
 
 export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
+  const [projects, setProjects] = useState<Project[]>(memCache)
+  const [loading, setLoading] = useState(memCache.length === 0)
   const [error, setError] = useState<string | null>(null)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const refresh = useCallback(async () => {
-    setLoading(true)
-
-    const cached = await getCachedProjects()
-    if (cached.length > 0) {
-      setProjects(cached)
-      setLoading(false)
+    // Phase 1: IndexedDB if memory is empty
+    if (memCache.length === 0) {
+      try {
+        const db = await getDb()
+        const cached = (await db.getAll('projects')) as unknown as Project[]
+        if (cached.length > 0) {
+          memCache = cached
+          if (mounted.current) { setProjects(cached); setLoading(false) }
+        }
+      } catch { /* ignore */ }
     }
 
+    // Phase 2: Network
     try {
       const { data } = await projectsApi.list()
-      await cacheProjects(data)
-      setProjects(data)
-      setError(null)
+      const db = await getDb()
+      const tx = db.transaction('projects', 'readwrite')
+      for (const p of data) await tx.store.put(p as unknown as Record<string, unknown>)
+      await tx.done
+      memCache = data
+      if (mounted.current) { setProjects(data); setError(null) }
     } catch {
-      if (cached.length === 0) setError('No projects available offline')
+      if (memCache.length === 0 && mounted.current) setError('No projects available offline')
     } finally {
-      setLoading(false)
+      if (mounted.current) setLoading(false)
     }
   }, [])
 

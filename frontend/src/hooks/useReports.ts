@@ -5,8 +5,8 @@ import type { DashboardData } from '../types'
 const CACHE_KEY = 'reports_overview_cache'
 
 export function useReportsOverview() {
+  // Initialise synchronously — dashboard renders from cache with zero delay
   const [data, setData] = useState<DashboardData | null>(() => {
-    // Initialise from localStorage synchronously so first render shows data
     try {
       const cached = localStorage.getItem(CACHE_KEY)
       return cached ? (JSON.parse(cached) as DashboardData) : null

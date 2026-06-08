@@ -4,6 +4,7 @@ import type { InspectionResponse } from '../../types'
 import { Textarea } from '../ui/Textarea'
 import { Camera } from 'lucide-react'
 import { resolveImageOffline } from '../../utils/imageCache'
+import { Lightbox } from '../ui/Lightbox'
 
 export function ReviewItemRow({
   index,
@@ -18,11 +19,13 @@ export function ReviewItemRow({
   response: InspectionResponse
   qaComment: string
   onQaComment: (v: string) => void
-  onImageClick: (url: string) => void
+  onImageClick: (url: string) => void   // kept for backward compat but we handle lightbox internally
 }) {
   const hasImages = response.images.length > 0
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [resolvedUrls, setResolvedUrls] = useState<string[]>([])
 
-  // Pre-resolve the first image URL for the thumbnail/click
+  // Thumbnail for the button preview
   const [firstImgSrc, setFirstImgSrc] = useState<string | undefined>(
     response.images[0]?.localBlob || response.images[0]?.thumbnailUrl || response.images[0]?.url
   )
@@ -35,12 +38,16 @@ export function ReviewItemRow({
     resolveImageOffline(urlToCheck).then((r) => { if (r) setFirstImgSrc(r) })
   }, [response.images])
 
+  // Resolve ALL image full-size URLs when lightbox is opened
   const handleViewImages = async () => {
-    const img = response.images[0]
-    if (!img) return
-    const fullUrl = img.localBlob || img.url
-    const resolved = await resolveImageOffline(fullUrl) ?? fullUrl
-    onImageClick(resolved)
+    const urls = await Promise.all(
+      response.images.map(async (img) => {
+        const fullUrl = img.localBlob || img.url
+        return (await resolveImageOffline(fullUrl)) ?? fullUrl
+      })
+    )
+    setResolvedUrls(urls.filter(Boolean))
+    setLightboxOpen(true)
   }
 
   return (
@@ -96,6 +103,15 @@ export function ReviewItemRow({
           className="w-full text-sm"
         />
       </div>
+
+      {/* Lightbox — shows all images with swipe navigation */}
+      {lightboxOpen && resolvedUrls.length > 0 && (
+        <Lightbox
+          images={resolvedUrls}
+          startIndex={0}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   )
 }

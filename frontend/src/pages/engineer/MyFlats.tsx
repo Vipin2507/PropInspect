@@ -132,7 +132,7 @@ export default function MyFlats() {
       </div>
 
       {/* Content */}
-      {loading ? (
+      {loading && flats.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <Spinner size="lg" />
         </div>

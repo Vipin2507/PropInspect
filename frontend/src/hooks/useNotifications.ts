@@ -9,13 +9,21 @@ export function useNotifications() {
   const fetchCount = useNotificationStore((s) => s.fetchCount)
 
   const refresh = useCallback(async () => {
+    // 1. Serve cached immediately
     try {
       const db = await getDb()
       const cached = (await db.getAll('notifications')) as unknown as Notification[]
       if (cached.length > 0) {
-        setNotifications(cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+        setNotifications(
+          cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        )
       }
+    } catch { /* ignore */ }
+
+    // 2. Network refresh
+    try {
       const { data } = await notificationsApi.list()
+      const db = await getDb()
       const tx = db.transaction('notifications', 'readwrite')
       for (const n of data) await tx.store.put(n as unknown as Record<string, unknown>)
       await tx.done

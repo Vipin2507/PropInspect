@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSnags } from '../../hooks/useSnags'
+import { useFlats } from '../../hooks/useFlats'
 import { SnagCard } from '../../components/desnagging/SnagCard'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useProjects } from '../../hooks/useProjects'
@@ -26,6 +27,14 @@ export default function SnagList() {
   }, [projects])
 
   const { snags, loading: snagsLoading } = useSnags({ projectId: filters.project || undefined })
+  const { flats } = useFlats(filters.project || undefined)
+
+  // Build a flatId → flatNumber lookup so SnagCard shows flat numbers not UUIDs
+  const flatNumberMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const f of flats) map[f.id] = f.flatNumber
+    return map
+  }, [flats])
 
   const filteredSnags = useMemo(() => {
     return snags
@@ -69,7 +78,7 @@ export default function SnagList() {
         onSearchChange={(value) => setFilters((p) => ({ ...p, search: value }))}
       />
 
-      {loading ? (
+      {loading && filteredSnags.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
@@ -78,7 +87,7 @@ export default function SnagList() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredSnags.map((s) => (
-            <SnagCard key={s.id} snag={s} />
+            <SnagCard key={s.id} snag={s} flatNumber={flatNumberMap[s.flatId]} />
           ))}
         </div>
       )}

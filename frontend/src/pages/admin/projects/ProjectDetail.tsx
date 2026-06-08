@@ -135,7 +135,7 @@ export default function ProjectDetail() {
         <h2 className="mb-3 text-base font-semibold text-slate-700">
           Towers ({towers.length})
         </h2>
-        {loading ? (
+        {loading && towers.length === 0 ? (
           <div className="flex justify-center py-10"><Spinner /></div>
         ) : towers.length === 0 ? (
           <EmptyState title="No Towers" description='Click "Add Tower" to get started.' />

@@ -177,7 +177,10 @@ export const syncApi = {
 }
 
 export const templatesApi = {
-  list: () => api.get<ChecklistTemplate[]>('/templates'),
+  list:   () => api.get<ChecklistTemplate[]>('/templates'),
+  create: (data: { name: string; sections: unknown[] }) =>
+    api.post<ChecklistTemplate>('/templates', data),
   update: (id: string, data: { name?: string; sections?: unknown[] }) =>
     api.put<ChecklistTemplate>(`/templates/${id}`, data),
+  delete: (id: string) => api.delete(`/templates/${id}`),
 }

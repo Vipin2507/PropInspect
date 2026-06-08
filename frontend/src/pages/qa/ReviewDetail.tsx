@@ -88,7 +88,7 @@ export default function ReviewDetail() {
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-[300px] md:pb-6">
+    <div className="flex flex-col gap-4 pb-[160px] md:pb-6">
       {/* Header */}
       <button
         type="button"
@@ -116,18 +116,18 @@ export default function ReviewDetail() {
         onImageClick={setLightboxImage}
       />
 
-      {/* Fixed bottom actions panel */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-safe backdrop-blur-sm lg:left-60">
+      {/* Fixed bottom actions panel — compact on mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-safe backdrop-blur-sm lg:left-60">
         <div className="mx-auto max-w-2xl">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Overall Comments
-          </label>
+          {/* Overall comments — single line on mobile, expands on focus */}
           <Textarea
             value={overallComments}
             onChange={(e) => setOverallComments(e.target.value)}
-            rows={2}
-            className="mb-2 text-sm"
-            placeholder="Add overall comments for revision or rejection…"
+            rows={1}
+            className="mb-2 text-sm resize-none"
+            placeholder="Overall comments (required for revision/rejection)…"
+            onFocus={(e) => { e.target.rows = 3 }}
+            onBlur={(e) => { if (!overallComments) e.target.rows = 1 }}
           />
           <ReviewActions
             onApprove={() => submitReview('approved')}

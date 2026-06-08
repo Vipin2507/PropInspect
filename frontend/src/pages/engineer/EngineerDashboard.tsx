@@ -17,7 +17,7 @@ export default function EngineerDashboard() {
   const navigate = useNavigate()
   const { flats, loading } = useFlats()
 
-  if (loading) {
+  if (loading && flats.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />

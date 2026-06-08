@@ -7,14 +7,12 @@ import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
 import { cn } from '../../../utils/cn'
-import {
-  Pencil, Plus, Trash2, ChevronDown, ChevronUp, Camera,
-} from 'lucide-react'
+import { Pencil, Plus, Trash2, ChevronDown, ChevronUp, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const uid = () => crypto.randomUUID().slice(0, 8)
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────
 interface EditItem {
   id: string
   label: string
@@ -28,39 +26,30 @@ interface EditCategory {
   items: EditItem[]
 }
 
-// ── Template Editor Modal ────────────────────────────────────────────────────
+// ── Template Editor (used for both create and edit) ───────────────────────
 function TemplateEditor({
-  template,
+  initialName,
+  initialCategories,
   onSave,
   onClose,
+  templateId,
 }: {
-  template: ChecklistTemplate
+  initialName: string
+  initialCategories: EditCategory[]
   onSave: () => void
   onClose: () => void
+  templateId?: string   // undefined = create new
 }) {
-  const [name, setName] = useState(template.name)
-  const [categories, setCategories] = useState<EditCategory[]>(() =>
-    (template.categories ?? []).map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      icon: c.icon || 'ClipboardList',
-      sortOrder: c.sortOrder ?? 0,
-      items: (c.items ?? []).map((i: any) => ({
-        id: i.id,
-        label: i.label,
-        isMandatoryImage: Boolean(i.isMandatoryImage),
-      })),
-    }))
-  )
-  const [expanded, setExpanded] = useState<string | null>(categories[0]?.id ?? null)
-  const [saving, setSaving] = useState(false)
+  const [name, setName]           = useState(initialName)
+  const [categories, setCategories] = useState<EditCategory[]>(initialCategories)
+  const [expanded, setExpanded]   = useState<string | null>(initialCategories[0]?.id ?? null)
+  const [saving, setSaving]       = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [addingCat, setAddingCat] = useState(false)
 
   const toggleExpand = (id: string) =>
     setExpanded((prev) => (prev === id ? null : id))
 
-  // ── Item operations ──────────────────────────────────────────────────────
   const updateItem = (catId: string, itemId: string, patch: Partial<EditItem>) =>
     setCategories((prev) =>
       prev.map((c) =>
@@ -81,22 +70,13 @@ function TemplateEditor({
     setCategories((prev) =>
       prev.map((c) =>
         c.id === catId
-          ? {
-              ...c,
-              items: [
-                ...c.items,
-                { id: `item_${uid()}`, label: '', isMandatoryImage: false },
-              ],
-            }
+          ? { ...c, items: [...c.items, { id: `item_${uid()}`, label: '', isMandatoryImage: false }] }
           : c
       )
     )
 
-  // ── Category operations ─────────────────────────────────────────────────
   const updateCatName = (catId: string, val: string) =>
-    setCategories((prev) =>
-      prev.map((c) => (c.id === catId ? { ...c, name: val } : c))
-    )
+    setCategories((prev) => prev.map((c) => (c.id === catId ? { ...c, name: val } : c)))
 
   const removeCat = (catId: string) =>
     setCategories((prev) => prev.filter((c) => c.id !== catId))
@@ -114,11 +94,10 @@ function TemplateEditor({
     setAddingCat(false)
   }
 
-  // ── Save ────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Template name is required'); return }
     for (const c of categories) {
-      if (!c.name.trim()) { toast.error(`Category name cannot be empty`); return }
+      if (!c.name.trim()) { toast.error('Category name cannot be empty'); return }
       for (const i of c.items) {
         if (!i.label.trim()) { toast.error(`Item label cannot be empty in "${c.name}"`); return }
       }
@@ -126,19 +105,18 @@ function TemplateEditor({
     setSaving(true)
     try {
       const sections = categories.map((c, idx) => ({
-        id: c.id,
-        name: c.name,
-        icon: c.icon,
-        sortOrder: idx,
+        id: c.id, name: c.name, icon: c.icon, sortOrder: idx,
         items: c.items.map((i, iIdx) => ({
-          id: i.id,
-          label: i.label,
-          isMandatoryImage: i.isMandatoryImage,
-          sortOrder: iIdx,
+          id: i.id, label: i.label, isMandatoryImage: i.isMandatoryImage, sortOrder: iIdx,
         })),
       }))
-      await templatesApi.update(template.id, { name, sections: sections as any })
-      toast.success('Template saved')
+
+      if (templateId) {
+        await templatesApi.update(templateId, { name, sections: sections as any })
+      } else {
+        await templatesApi.create({ name, sections: sections as any })
+      }
+      toast.success(templateId ? 'Template updated' : 'Template created')
       onSave()
     } catch {
       toast.error('Failed to save template')
@@ -151,10 +129,10 @@ function TemplateEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Template name */}
+      {/* Name */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-slate-700">Template Name</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Finishing Inspection" />
       </div>
 
       <p className="text-xs text-slate-500">
@@ -164,37 +142,35 @@ function TemplateEditor({
       {/* Category list */}
       <div className="space-y-2">
         {categories.map((cat) => (
-          <div key={cat.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            {/* Category header */}
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50">
+          <div key={cat.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            {/* Header */}
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2.5">
               <button
                 type="button"
                 onClick={() => toggleExpand(cat.id)}
-                className="flex flex-1 items-center gap-2 touch-manipulation text-left min-h-[40px]"
+                className="flex min-h-[40px] flex-1 touch-manipulation items-center gap-2 text-left"
               >
                 {expanded === cat.id
                   ? <ChevronUp size={16} className="shrink-0 text-slate-400" />
-                  : <ChevronDown size={16} className="shrink-0 text-slate-400" />
-                }
-                <span className="flex-1 text-sm font-semibold text-slate-800 truncate">
+                  : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
+                <span className="flex-1 truncate text-sm font-semibold text-slate-800">
                   {cat.name || 'Unnamed category'}
                 </span>
-                <span className="text-xs text-slate-400">{cat.items.length} items</span>
+                <span className="text-xs text-slate-400">{cat.items.length}</span>
               </button>
               <button
                 type="button"
                 onClick={() => removeCat(cat.id)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 active:bg-red-50 active:text-fail touch-manipulation"
+                className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg text-slate-400 active:bg-red-50 active:text-fail"
                 aria-label="Remove category"
               >
                 <Trash2 size={15} aria-hidden="true" />
               </button>
             </div>
 
-            {/* Expanded: category name edit + items */}
+            {/* Body */}
             {expanded === cat.id && (
-              <div className="px-3 pb-3 pt-2 space-y-3">
-                {/* Category name input */}
+              <div className="space-y-3 px-3 pb-3 pt-2">
                 <Input
                   value={cat.name}
                   onChange={(e) => updateCatName(cat.id, e.target.value)}
@@ -202,30 +178,27 @@ function TemplateEditor({
                   className="text-sm"
                 />
 
-                {/* Items */}
                 {cat.items.length === 0 && (
-                  <p className="text-center text-xs text-slate-400 py-2">No items yet</p>
+                  <p className="py-2 text-center text-xs text-slate-400">No items yet</p>
                 )}
+
                 <div className="space-y-2">
                   {cat.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-2">
-                      {/* Mandatory image toggle */}
+                      {/* Mandatory photo toggle */}
                       <button
                         type="button"
                         onClick={() => updateItem(cat.id, item.id, { isMandatoryImage: !item.isMandatoryImage })}
                         className={cn(
-                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg touch-manipulation transition-colors',
-                          item.isMandatoryImage
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-slate-300 active:bg-slate-100'
+                          'flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg transition-colors',
+                          item.isMandatoryImage ? 'bg-primary/10 text-primary' : 'text-slate-300 active:bg-slate-100'
                         )}
-                        title={item.isMandatoryImage ? 'Photo required (tap to toggle)' : 'Photo optional (tap to make required)'}
+                        title={item.isMandatoryImage ? 'Photo required (tap to toggle)' : 'Photo optional'}
                         aria-label="Toggle mandatory photo"
                       >
-                        <Camera size={16} aria-hidden="true" />
+                        <Camera size={15} aria-hidden="true" />
                       </button>
 
-                      {/* Label input */}
                       <Input
                         value={item.label}
                         onChange={(e) => updateItem(cat.id, item.id, { label: e.target.value })}
@@ -233,11 +206,10 @@ function TemplateEditor({
                         className="flex-1 text-sm"
                       />
 
-                      {/* Remove item */}
                       <button
                         type="button"
                         onClick={() => removeItem(cat.id, item.id)}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 active:bg-red-50 active:text-fail touch-manipulation"
+                        className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg text-slate-400 active:bg-red-50 active:text-fail"
                         aria-label="Remove item"
                       >
                         <Trash2 size={15} aria-hidden="true" />
@@ -246,18 +218,15 @@ function TemplateEditor({
                   ))}
                 </div>
 
-                {/* Add item */}
                 <button
                   type="button"
                   onClick={() => addItem(cat.id)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-medium text-slate-500 active:border-primary active:text-primary touch-manipulation"
+                  className="flex w-full touch-manipulation items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-sm font-medium text-slate-500 active:border-primary active:text-primary"
                 >
-                  <Plus size={15} aria-hidden="true" />
-                  Add Item
+                  <Plus size={15} aria-hidden="true" /> Add Item
                 </button>
 
-                {/* Legend */}
-                <p className="text-xs text-slate-400 flex items-center gap-1">
+                <p className="flex items-center gap-1 text-xs text-slate-400">
                   <Camera size={11} aria-hidden="true" />
                   Blue camera = photo required on Fail
                 </p>
@@ -285,33 +254,33 @@ function TemplateEditor({
         <button
           type="button"
           onClick={() => setAddingCat(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 py-3 text-sm font-medium text-slate-500 active:border-primary active:text-primary touch-manipulation"
+          className="flex w-full touch-manipulation items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 py-3 text-sm font-medium text-slate-500 active:border-primary active:text-primary"
         >
-          <Plus size={16} aria-hidden="true" />
-          Add Category
+          <Plus size={16} aria-hidden="true" /> Add Category
         </button>
       )}
 
-      {/* Actions */}
+      {/* Save / Cancel */}
       <div className="flex gap-3 pt-1">
         <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
-        <Button onClick={handleSave} loading={saving} className="flex-1">Save Template</Button>
+        <Button onClick={handleSave} loading={saving} className="flex-1">
+          {templateId ? 'Save Changes' : 'Create Template'}
+        </Button>
       </div>
     </div>
   )
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Main Page ─────────────────────────────────────────────────────────────
 export default function ChecklistTemplates() {
-  const [templates, setTemplates] = useState<ChecklistTemplate[]>([])
-  const [loading, setLoading] = useState(true)
+  const [templates, setTemplates]   = useState<ChecklistTemplate[]>([])
+  const [loading, setLoading]       = useState(true)
   const [editTarget, setEditTarget] = useState<ChecklistTemplate | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const load = () => {
     setLoading(true)
-    templatesApi.list()
-      .then(({ data }) => setTemplates(data))
-      .finally(() => setLoading(false))
+    templatesApi.list().then(({ data }) => setTemplates(data)).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -320,11 +289,19 @@ export default function ChecklistTemplates() {
     return <div className="flex flex-1 items-center justify-center py-24"><Spinner size="lg" /></div>
   }
 
+  const customTemplates = templates.filter((t) => !t.isDefault)
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Checklist Templates</h1>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Checklist Templates</h1>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus size={16} aria-hidden="true" /> New Template
+        </Button>
+      </div>
 
-      {/* Default template (read-only display) */}
+      {/* Default template — read-only */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -354,31 +331,76 @@ export default function ChecklistTemplates() {
       </div>
 
       {/* Custom templates */}
-      {templates.filter((t) => !t.isDefault).length === 0 && (
-        <p className="text-center text-sm text-slate-400 py-4">No custom templates yet.</p>
+      {customTemplates.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 py-10 text-center">
+          <p className="text-sm text-slate-400">No custom templates yet.</p>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="mt-2 text-sm font-medium text-primary active:underline"
+          >
+            Create your first template
+          </button>
+        </div>
+      ) : (
+        customTemplates.map((t) => {
+          const itemCount = (t.categories ?? []).reduce(
+            (s: number, c: any) => s + (c.items?.length ?? 0), 0
+          )
+          return (
+            <div key={t.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-slate-800">{t.name}</h2>
+                  <p className="text-sm text-slate-500">
+                    {t.categories?.length ?? 0} categories · {itemCount} items
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setEditTarget(t)}>
+                  <Pencil size={14} aria-hidden="true" /> Edit
+                </Button>
+              </div>
+
+              {/* Category list preview */}
+              {(t.categories ?? []).length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {(t.categories as any[]).slice(0, 5).map((c: any, i: number) => (
+                    <div
+                      key={c.id ?? i}
+                      className={cn(
+                        'flex items-center justify-between rounded-xl px-3 py-2',
+                        i % 2 === 0 ? 'bg-slate-50' : 'bg-white'
+                      )}
+                    >
+                      <span className="text-sm text-slate-700">{c.name}</span>
+                      <span className="text-xs text-slate-400">{c.items?.length ?? 0} items</span>
+                    </div>
+                  ))}
+                  {(t.categories ?? []).length > 5 && (
+                    <p className="pl-3 text-xs text-slate-400">
+                      +{(t.categories ?? []).length - 5} more categories
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })
       )}
 
-      {templates.filter((t) => !t.isDefault).map((t) => (
-        <div key={t.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="font-semibold text-slate-800">{t.name}</h2>
-              <p className="text-sm text-slate-500">
-                {t.categories?.length ?? 0} categories ·{' '}
-                {(t.categories ?? []).reduce((s: number, c: any) => s + (c.items?.length ?? 0), 0)} items
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditTarget(t)}
-            >
-              <Pencil size={14} aria-hidden="true" />
-              Edit
-            </Button>
-          </div>
-        </div>
-      ))}
+      {/* Create Modal */}
+      <Modal
+        open={createOpen}
+        onOpenChange={(open) => { if (!open) setCreateOpen(false) }}
+        title="New Checklist Template"
+      >
+        <TemplateEditor
+          initialName=""
+          initialCategories={[]}
+          onSave={() => { setCreateOpen(false); load() }}
+          onClose={() => setCreateOpen(false)}
+        />
+      </Modal>
 
       {/* Edit Modal */}
       <Modal
@@ -388,7 +410,19 @@ export default function ChecklistTemplates() {
       >
         {editTarget && (
           <TemplateEditor
-            template={editTarget}
+            templateId={editTarget.id}
+            initialName={editTarget.name}
+            initialCategories={(editTarget.categories ?? []).map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              icon: c.icon || 'ClipboardList',
+              sortOrder: c.sortOrder ?? 0,
+              items: (c.items ?? []).map((i: any) => ({
+                id: i.id,
+                label: i.label,
+                isMandatoryImage: Boolean(i.isMandatoryImage),
+              })),
+            }))}
             onSave={() => { setEditTarget(null); load() }}
             onClose={() => setEditTarget(null)}
           />
