@@ -59,8 +59,24 @@ export interface Flat {
   createdAt: string
   towerName?: string
   floorLabel?: string
+  /** Engineer who last worked on this flat (from inspection record) */
+  engineerName?: string | null
+  /** Kept for backward compat but no longer populated by backend */
   assignment?: Assignment | null
-  inspection?: { id: string; status: string } | null
+  inspection?: {
+    id: string
+    status: string
+    engineerId?: string
+    engineerName?: string
+    submittedAt?: string
+    lastUpdated?: string
+  } | null
+  lastReview?: {
+    qaId: string
+    reviewerName: string
+    decision: string
+    reviewedAt: string
+  } | null
 }
 
 export type FlatStatus =
@@ -229,6 +245,20 @@ export interface Notification {
   relatedId: string
   isRead: boolean
   createdAt: string
+}
+
+export interface ActivityEntry {
+  activityType: 'inspection_update' | 'review'
+  userId: string
+  userName: string
+  userRole: string
+  inspectionId: string
+  inspectionStatus: string
+  flatNumber: string
+  towerName: string
+  projectName: string
+  activityAt: string
+  comments?: string
 }
 
 export type PendingChangeType =

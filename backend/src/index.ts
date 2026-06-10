@@ -27,6 +27,7 @@ import userRoutes from './routes/users'
 import notificationRoutes from './routes/notifications'
 import reportRoutes from './routes/reports'
 import syncRoutes from './routes/sync'
+import bulkUploadRoutes from './routes/bulkUpload'
 
 dotenv.config()
 
@@ -106,6 +107,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/sync', syncRoutes)
+app.use('/api/bulk-upload', bulkUploadRoutes)
 
 app.use(errorHandler)
 

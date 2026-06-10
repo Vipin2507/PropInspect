@@ -77,25 +77,32 @@ router.get(
   asyncHandler(async (req, res) => {
     const db = getDB()
     const flatId = param(req, 'flatId')
+    const role = req.user!.role
+
+    // Verify the flat exists
+    const flat = db.prepare('SELECT id FROM flats WHERE id = ?').get(flatId)
+    if (!flat) {
+      res.status(404).json({ error: 'Flat not found' })
+      return
+    }
+
     let row = db.prepare('SELECT * FROM inspections WHERE flat_id = ?').get(flatId) as Record<string, unknown>
 
     if (!row) {
-      if (req.user!.role !== 'engineer') {
+      if (role !== 'engineer') {
+        // QA/admin: no inspection yet means nothing to review
         res.status(404).json({ error: 'No inspection for this flat' })
         return
       }
-      const assignment = db.prepare('SELECT engineer_id FROM assignments WHERE flat_id = ?').get(flatId) as { engineer_id: string }
-      if (!assignment || assignment.engineer_id !== req.user!.id) {
-        res.status(403).json({ error: 'Not assigned to this flat' })
-        return
-      }
+      // Any engineer can start an inspection on any flat
       const inspection = createDraftInspection(flatId, req.user!.id)
       res.json(inspection)
       return
     }
 
-    if (req.user!.role === 'engineer' && row.engineer_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not your inspection' })
+    // QA can only view inspections that have been submitted for review
+    if (role === 'qa' && !['submitted', 'approved', 'rejected', 'revision_required'].includes(row.status as string)) {
+      res.status(403).json({ error: 'Flat has not been submitted for review' })
       return
     }
 
@@ -111,8 +118,8 @@ router.put(
     const db = getDB()
     const inspectionId = param(req, 'id')
     const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown>
-    if (!inspection || inspection.engineer_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not authorized' })
+    if (!inspection) {
+      res.status(404).json({ error: 'Inspection not found' })
       return
     }
     if (!['draft', 'revision_required'].includes(inspection.status as string)) {
@@ -196,10 +203,11 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
   db.prepare(`UPDATE inspections SET status = 'submitted', submitted_at = datetime('now'), last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
   db.prepare(`UPDATE flats SET status = 'submitted' WHERE id = ?`).run(inspection.flat_id)
 
-  const assignment = db.prepare('SELECT qa_id FROM assignments WHERE flat_id = ?').get(inspection.flat_id) as { qa_id: string }
-  if (assignment) {
+  // Notify all QA users that a flat is ready for review
+  const qaUsers = db.prepare(`SELECT id FROM users WHERE role = 'qa' AND is_active = 1`).all() as { id: string }[]
+  for (const qa of qaUsers) {
     createNotification(
-      assignment.qa_id,
+      qa.id,
       'inspection_submitted',
       'Inspection Submitted',
       'A flat inspection is ready for your review',
@@ -215,9 +223,9 @@ router.post(
   requireRole('engineer'),
   asyncHandler(async (req, res) => {
     const inspectionId = param(req, 'id')
-    const inspection = getDB().prepare('SELECT engineer_id FROM inspections WHERE id = ?').get(inspectionId) as { engineer_id: string }
-    if (!inspection || inspection.engineer_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not authorized' })
+    const inspection = getDB().prepare('SELECT id FROM inspections WHERE id = ?').get(inspectionId)
+    if (!inspection) {
+      res.status(404).json({ error: 'Inspection not found' })
       return
     }
     const result = validateAndSubmit(inspectionId, false)
@@ -230,9 +238,9 @@ router.post(
   requireRole('engineer'),
   asyncHandler(async (req, res) => {
     const inspectionId = param(req, 'id')
-    const inspection = getDB().prepare('SELECT engineer_id FROM inspections WHERE id = ?').get(inspectionId) as { engineer_id: string }
-    if (!inspection || inspection.engineer_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not authorized' })
+    const inspection = getDB().prepare('SELECT id FROM inspections WHERE id = ?').get(inspectionId)
+    if (!inspection) {
+      res.status(404).json({ error: 'Inspection not found' })
       return
     }
     const result = validateAndSubmit(inspectionId, true)

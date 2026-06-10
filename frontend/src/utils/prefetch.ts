@@ -56,23 +56,17 @@ export async function prefetchAll(user: User): Promise<void> {
     ).flat()
     await putMany('floors', allFloors)
 
-    // 3. Flats
-    let allFlats: any[] = []
-    if (user.role === 'engineer') {
-      const { data } = await flatsApi.byEngineer(user.id)
-      allFlats = data
-    } else {
-      allFlats = (
-        await Promise.all(
-          projects.map((p) => flatsApi.byProject(p.id as string).then((r) => r.data).catch(() => []))
-        )
-      ).flat()
-    }
+    // 3. Flats — all roles fetch by project; backend filters by role
+    const allFlats: any[] = (
+      await Promise.all(
+        projects.map((p) => flatsApi.byProject(p.id as string).then((r) => r.data).catch(() => []))
+      )
+    ).flat()
     await saveFlats(allFlats)
 
     // 4. Inspections + responses + evidence images
-    const flatsToSync = user.role === 'engineer'
-      ? allFlats
+    const flatsToSync = user.role === 'qa'
+      ? allFlats  // QA already receives only submitted+ flats from backend
       : allFlats.filter((f: any) =>
           ['in_progress', 'submitted', 'revision_required', 'desnagging'].includes(f.status)
         )
@@ -109,7 +103,7 @@ export async function prefetchAll(user: User): Promise<void> {
       await putMany('notifications', notifs)
     } catch { /* ignore */ }
 
-    // 7. Users (for admin assignments)
+    // 7. Users (for user management)
     if (user.role === 'admin') {
       try {
         const { usersApi: ua } = await import('./api')

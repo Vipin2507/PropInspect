@@ -24,20 +24,16 @@ router.get(
       JOIN towers t ON t.id = i.tower_id
       JOIN projects p ON p.id = i.project_id
       JOIN users u ON u.id = i.engineer_id
-      JOIN assignments a ON a.flat_id = i.flat_id
       WHERE i.status = 'submitted'
     `
-    // QA only sees their own queue; admin sees all
-    if (req.user!.role === 'qa') {
-      sql += ` AND a.qa_id = '${req.user!.id}'`
-    }
+    const params: unknown[] = []
     if (filter === 'today') {
       sql += ` AND date(i.submitted_at) = date('now')`
     } else if (filter === 'overdue') {
       sql += ` AND datetime(i.submitted_at) < datetime('now', '-2 days')`
     }
     sql += ` ORDER BY i.submitted_at DESC`
-    const rows = db.prepare(sql).all() as Record<string, unknown>[]
+    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
     res.json(
       rows.map((r) => ({
         inspectionId: r.id,
@@ -58,10 +54,16 @@ router.get(
   requireRole('qa', 'admin'),
   asyncHandler(async (req, res) => {
     const db = getDB()
-    // Admin sees all history; QA sees only their own
-    const rows = req.user!.role === 'admin'
-      ? db.prepare(`SELECT r.*, f.flat_number FROM reviews r JOIN flats f ON f.id = r.flat_id ORDER BY r.reviewed_at DESC LIMIT 100`).all() as Record<string, unknown>[]
-      : db.prepare(`SELECT r.*, f.flat_number FROM reviews r JOIN flats f ON f.id = r.flat_id WHERE r.qa_id = ? ORDER BY r.reviewed_at DESC LIMIT 50`).all(req.user!.id) as Record<string, unknown>[]
+    // Both QA and admin see all review history (with reviewer info for admin visibility)
+    const rows = db.prepare(`
+      SELECT r.*, f.flat_number, u.name as reviewer_name, ui.name as engineer_name, i.engineer_id
+      FROM reviews r
+      JOIN flats f ON f.id = r.flat_id
+      JOIN users u ON u.id = r.qa_id
+      JOIN inspections i ON i.id = r.inspection_id
+      JOIN users ui ON ui.id = i.engineer_id
+      ORDER BY r.reviewed_at DESC LIMIT 100
+    `).all() as Record<string, unknown>[]
     res.json(
       rows.map((r) => ({
         id: r.id,
@@ -69,6 +71,9 @@ router.get(
         flatId: r.flat_id,
         flatNumber: r.flat_number,
         qaId: r.qa_id,
+        reviewerName: r.reviewer_name,
+        engineerId: r.engineer_id,
+        engineerName: r.engineer_name,
         decision: r.decision,
         overallComments: r.overall_comments,
         itemComments: JSON.parse(r.item_comments as string),
@@ -130,13 +135,6 @@ router.post(
     const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(body.inspectionId) as Record<string, unknown>
     if (!inspection || inspection.status !== 'submitted') {
       res.status(400).json({ error: 'Inspection not available for review' })
-      return
-    }
-
-    const assignment = db.prepare('SELECT qa_id FROM assignments WHERE flat_id = ?').get(inspection.flat_id) as { qa_id: string }
-    // Admin can review any inspection; QA must be the assigned reviewer
-    if (req.user!.role !== 'admin' && assignment.qa_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not assigned QA for this flat' })
       return
     }
 

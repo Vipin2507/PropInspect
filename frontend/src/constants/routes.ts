@@ -24,6 +24,7 @@ export const ROUTES = {
   ADMIN_TEMPLATES: '/admin/templates',
   ADMIN_REPORTS: '/admin/reports',
   ADMIN_MONITORING: '/admin/monitoring',
+  ADMIN_ACTIVITY: '/admin/activity',
   DESNAGGING: '/desnagging',
   DESNAGGING_DETAIL: (snagId: string) => `/desnagging/${snagId}`,
   PROFILE: '/profile',

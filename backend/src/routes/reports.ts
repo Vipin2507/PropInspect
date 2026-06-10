@@ -54,10 +54,10 @@ router.get(
     const engineerLeaderboard = db
       .prepare(
         `SELECT u.id as engineer_id, u.name,
-         (SELECT COUNT(*) FROM assignments WHERE engineer_id = u.id) as assigned,
          (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status != 'draft') as submitted,
          (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'approved') as approved,
-         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'rejected') as rejected
+         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'rejected') as rejected,
+         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'revision_required') as revisionRequired
          FROM users u WHERE u.role = 'engineer' ORDER BY submitted DESC`
       )
       .all() as Record<string, unknown>[]
@@ -75,10 +75,10 @@ router.get(
       engineerLeaderboard: engineerLeaderboard.map((e) => ({
         engineerId: e.engineer_id,
         name: e.name,
-        assigned: e.assigned,
         submitted: e.submitted,
         approved: e.approved,
         rejected: e.rejected,
+        revisionRequired: e.revisionRequired,
       })),
     })
   })
@@ -110,10 +110,10 @@ router.get(
     const rows = getDB()
       .prepare(
         `SELECT u.id as engineer_id, u.name,
-         (SELECT COUNT(*) FROM assignments WHERE engineer_id = u.id) as assigned,
          (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status != 'draft') as submitted,
          (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'approved') as approved,
-         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'rejected') as rejected
+         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'rejected') as rejected,
+         (SELECT COUNT(*) FROM inspections WHERE engineer_id = u.id AND status = 'revision_required') as revisionRequired
          FROM users u WHERE u.role = 'engineer' ORDER BY submitted DESC`
       )
       .all() as Record<string, unknown>[]
@@ -121,10 +121,10 @@ router.get(
       rows.map((e) => ({
         engineerId: e.engineer_id,
         name: e.name,
-        assigned: e.assigned,
         submitted: e.submitted,
         approved: e.approved,
         rejected: e.rejected,
+        revisionRequired: e.revisionRequired,
       }))
     )
   })
@@ -177,6 +177,82 @@ router.get(
     res.setHeader('Content-Type', 'text/csv')
     res.setHeader('Content-Disposition', `attachment; filename="export-${type}.csv"`)
     res.send(csv)
+  })
+)
+
+router.get(
+  '/activity',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const db = getDB()
+    const limit = Math.min(parseInt(req.query.limit as string || '100'), 200)
+
+    // Recent inspection changes by engineers
+    const engineerActivity = db.prepare(`
+      SELECT
+        'inspection_update' as activity_type,
+        u.id as user_id,
+        u.name as user_name,
+        u.role as user_role,
+        i.id as inspection_id,
+        i.status as inspection_status,
+        f.flat_number,
+        t.name as tower_name,
+        p.name as project_name,
+        i.last_updated as activity_at
+      FROM inspections i
+      JOIN users u ON u.id = i.engineer_id
+      JOIN flats f ON f.id = i.flat_id
+      JOIN towers t ON t.id = i.tower_id
+      JOIN projects p ON p.id = i.project_id
+      ORDER BY i.last_updated DESC LIMIT ?
+    `).all(limit) as Record<string, unknown>[]
+
+    // Recent reviews by checkers/QA
+    const checkerActivity = db.prepare(`
+      SELECT
+        'review' as activity_type,
+        u.id as user_id,
+        u.name as user_name,
+        u.role as user_role,
+        r.inspection_id,
+        r.decision as inspection_status,
+        f.flat_number,
+        t.name as tower_name,
+        p.name as project_name,
+        r.reviewed_at as activity_at,
+        r.overall_comments
+      FROM reviews r
+      JOIN users u ON u.id = r.qa_id
+      JOIN flats f ON f.id = r.flat_id
+      JOIN towers t ON t.id = f.tower_id
+      JOIN projects p ON p.id = f.project_id
+      ORDER BY r.reviewed_at DESC LIMIT ?
+    `).all(limit) as Record<string, unknown>[]
+
+    // Merge and sort by date
+    const combined = [...engineerActivity, ...checkerActivity]
+      .sort((a, b) => {
+        const dateA = new Date(utcTs(a.activity_at) || 0).getTime()
+        const dateB = new Date(utcTs(b.activity_at) || 0).getTime()
+        return dateB - dateA
+      })
+      .slice(0, limit)
+      .map((r) => ({
+        activityType: r.activity_type,
+        userId: r.user_id,
+        userName: r.user_name,
+        userRole: r.user_role,
+        inspectionId: r.inspection_id,
+        inspectionStatus: r.inspection_status,
+        flatNumber: r.flat_number,
+        towerName: r.tower_name,
+        projectName: r.project_name,
+        activityAt: utcTs(r.activity_at),
+        comments: r.overall_comments || undefined,
+      }))
+
+    res.json(combined)
   })
 )
 

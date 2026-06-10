@@ -36,6 +36,8 @@ import UserManagement from './pages/admin/users/UserManagement'
 import ChecklistTemplates from './pages/admin/templates/ChecklistTemplates'
 import Reports from './pages/admin/reports/Reports'
 
+import ActivityLog from './pages/admin/ActivityLog'
+
 function HomeRedirect() {
   const user  = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
@@ -89,6 +91,7 @@ export default function App() {
               <Route path={ROUTES.ADMIN_TEMPLATES}   element={<ChecklistTemplates />} />
               <Route path={ROUTES.ADMIN_REPORTS}     element={<Reports />} />
               <Route path={ROUTES.ADMIN_MONITORING}  element={<FlatMonitoring />} />
+              <Route path={ROUTES.ADMIN_ACTIVITY}    element={<ActivityLog />} />
             </Route>
 
             {/* ── De-Snagging — all roles ── */}

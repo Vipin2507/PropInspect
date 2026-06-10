@@ -14,6 +14,7 @@ import {
   History,
   Bell,
   MonitorDot,
+  Activity,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { useAuthStore } from '../../store/authStore'
@@ -32,6 +33,7 @@ const adminNav: NavItem[] = [
   { to: ROUTES.QA_HISTORY,        label: 'Review History', icon: History },
   { to: ROUTES.DESNAGGING,        label: 'De-Snagging',    icon: Wrench },
   { to: ROUTES.ADMIN_MONITORING,  label: 'Monitoring',     icon: MonitorDot },
+  { to: ROUTES.ADMIN_ACTIVITY,    label: 'Activity Log',   icon: Activity },
   { to: ROUTES.ADMIN_USERS,       label: 'Users',          icon: Users },
   { to: ROUTES.ADMIN_TEMPLATES,   label: 'Templates',      icon: ListChecks },
   { to: ROUTES.ADMIN_REPORTS,     label: 'Reports',        icon: FileText },
@@ -41,7 +43,7 @@ const navByRole: Record<string, NavItem[]> = {
   admin: adminNav,
   engineer: [
     { to: ROUTES.ENGINEER_DASHBOARD,    label: 'Dashboard',      icon: LayoutDashboard },
-    { to: ROUTES.ENGINEER_FLATS,        label: 'My Flats',       icon: Building2 },
+    { to: ROUTES.ENGINEER_FLATS,        label: 'All Flats',      icon: Building2 },
     { to: ROUTES.DESNAGGING,            label: 'De-Snagging',    icon: Wrench },
     { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
   ],

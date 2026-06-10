@@ -12,8 +12,9 @@ import { Spinner } from '../../../components/ui/Spinner'
 import { EmptyState } from '../../../components/ui/EmptyState'
 import { ROUTES } from '../../../constants/routes'
 import type { Project, Tower } from '../../../types'
-import { Pencil, Trash2, Plus, MapPin, ArrowLeft, ChevronRight } from 'lucide-react'
+import { Pencil, Trash2, Plus, MapPin, ArrowLeft, ChevronRight, FileUp } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { BulkStatusUploadModal } from '../../../components/BulkStatusUploadModal'
 
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -30,6 +31,7 @@ export default function ProjectDetail() {
   const [towerEditName, setTowerEditName] = useState('')
   const [towerDeleteOpen, setTowerDeleteOpen] = useState(false)
   const [deleteTower, setDeleteTower] = useState<Tower | null>(null)
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
 
   const loadProject = async () => {
     if (!id) return
@@ -128,6 +130,14 @@ export default function ProjectDetail() {
         <Link to={ROUTES.ADMIN_FLATS(id!)} className="flex-1 sm:flex-none">
           <Button variant="outline" className="w-full">Manage Flats &amp; Assignments</Button>
         </Link>
+        <Button
+          variant="outline"
+          className="flex-1 sm:flex-none gap-2"
+          onClick={() => setBulkUploadOpen(true)}
+        >
+          <FileUp size={16} aria-hidden="true" />
+          Bulk Update Statuses
+        </Button>
       </div>
 
       {/* Towers list */}
@@ -245,6 +255,14 @@ export default function ProjectDetail() {
         title="Delete Tower"
         message={`Delete "${deleteTower?.name}"? All flats and assignments will be removed.`}
         confirmLabel="Delete" variant="danger" onConfirm={confirmDeleteTower}
+      />
+
+      <BulkStatusUploadModal
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        projectId={id!}
+        projectName={project.name}
+        onSuccess={loadProject}
       />
     </div>
   )

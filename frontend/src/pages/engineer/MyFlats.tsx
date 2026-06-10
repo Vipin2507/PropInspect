@@ -74,7 +74,7 @@ export default function MyFlats() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-slate-900 md:text-2xl">
-          {isAdmin ? 'All Flats' : 'My Flats'}
+          {isAdmin ? 'All Flats' : 'All Flats'}
         </h1>
         {isAdmin && (
           <span className="text-sm text-slate-500">{flats.length} total</span>
@@ -161,9 +161,9 @@ export default function MyFlats() {
                       <p className="truncate text-sm text-slate-500">
                         {flat.towerName} · {flat.floorLabel}
                       </p>
-                      {isAdmin && flat.assignment?.engineerName && (
+                      {isAdmin && flat.inspection?.engineerName && (
                         <p className="truncate text-xs text-slate-400">
-                          Eng: {flat.assignment.engineerName}
+                          Eng: {flat.inspection.engineerName}
                         </p>
                       )}
                     </div>

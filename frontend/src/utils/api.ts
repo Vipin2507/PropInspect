@@ -10,6 +10,7 @@ import type {
   Snag,
   Notification,
   DashboardData,
+  ActivityEntry,
   Assignment,
   ChecklistTemplate,
   Review,
@@ -166,8 +167,27 @@ export const notificationsApi = {
 
 export const reportsApi = {
   overview: () => api.get<DashboardData>('/reports/overview'),
+  activity: (limit?: number) => api.get<ActivityEntry[]>('/reports/activity', { params: { limit } }),
   export: (projectId: string, type: string) =>
     api.get(`/reports/export?projectId=${projectId}&type=${type}&format=csv`, { responseType: 'blob' }),
+}
+
+export const bulkUploadApi = {
+  /** Download a pre-filled Excel checklist template for the project */
+  downloadTemplate: (projectId: string) =>
+    api.get(`/bulk-upload/checklist/template?projectId=${projectId}`, { responseType: 'blob' }),
+  /** Upload filled Excel to bulk-update inspection responses */
+  uploadChecklist: (projectId: string, file: File) => {
+    const fd = new FormData()
+    fd.append('projectId', projectId)
+    fd.append('file', file)
+    return api.post<{
+      responsesUpdated: number
+      flatsAffected: number
+      skipped: Array<{ row: number; label: string; reason: string }>
+      unknownItems: string[]
+    }>('/bulk-upload/checklist', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
 }
 
 export const syncApi = {

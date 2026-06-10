@@ -148,7 +148,7 @@ export default function FlatMonitoring() {
                         {openSnags > 0 ? openSnags : '—'}
                       </span>
                       <span className="truncate text-sm text-slate-600">
-                        {flat.assignment?.engineerName || '—'}
+                        {flat.inspection?.engineerName || flat.engineerName || '—'}
                       </span>
                     </button>
                   </li>
@@ -193,12 +193,12 @@ export default function FlatMonitoring() {
 
                     {/* Engineer + snags row */}
                     <div className="mt-1.5 flex items-center gap-3 text-xs">
-                      {flat.assignment?.engineerName && (
+                      {flat.inspection?.engineerName || flat.engineerName ? (
                         <span className="flex items-center gap-1 text-slate-500">
                           <User size={11} aria-hidden="true" />
-                          {flat.assignment.engineerName}
+                          {flat.inspection?.engineerName || flat.engineerName}
                         </span>
-                      )}
+                      ) : null}
                       {openSnags > 0 && (
                         <span className="flex items-center gap-1 font-semibold text-fail">
                           <AlertTriangle size={11} aria-hidden="true" />

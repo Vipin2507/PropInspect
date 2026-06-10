@@ -56,7 +56,7 @@ export default function EngineerDashboard() {
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label={isAdmin ? 'Total Flats' : 'Assigned'}
+          label={isAdmin ? 'Total Flats' : 'Total Flats'}
           value={total}
           icon={Building2}
         />
@@ -86,7 +86,7 @@ export default function EngineerDashboard() {
           <h2 className="mb-3 text-base font-semibold text-slate-800">Status Breakdown</h2>
           {total === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400">
-              {isAdmin ? 'No flats in the system yet.' : 'No flats assigned yet.'}
+              No flats in the system yet.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
@@ -127,7 +127,7 @@ export default function EngineerDashboard() {
                     <p className="truncate text-sm font-medium text-slate-800">{f.flatNumber}</p>
                     <p className="truncate text-xs text-slate-500">
                       {f.towerName}
-                      {isAdmin && f.assignment?.engineerName && ` · ${f.assignment.engineerName}`}
+                      {isAdmin && f.inspection?.engineerName && ` · ${f.inspection.engineerName}`}
                     </p>
                   </div>
                   <Badge status={f.status} />

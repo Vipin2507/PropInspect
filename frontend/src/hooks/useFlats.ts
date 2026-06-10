@@ -37,8 +37,9 @@ function memKey(userId: string, projectId?: string) {
 async function readDb(userId: string, role: string): Promise<Flat[]> {
   try {
     const db = await getDb()
-    if (role === 'admin') return (await db.getAll('flats')) as unknown as Flat[]
-    return (await db.getAllFromIndex('flats', 'by-engineer', userId)) as unknown as Flat[]
+    // All roles read all locally cached flats; role-based filtering is done server-side
+    void userId; void role
+    return (await db.getAll('flats')) as unknown as Flat[]
   } catch { return [] }
 }
 
@@ -87,15 +88,14 @@ export function useFlats(projectId?: string) {
       if (projectId) {
         const { data } = await flatsApi.byProject(projectId)
         fresh = data
-      } else if (user.role === 'admin') {
+      } else {
+        // All roles (engineer, qa, admin) fetch flats by project — no assignment filter.
+        // The backend enforces role-based visibility (QA only sees submitted+ flats).
         const { data: projects } = await projectsApi.list()
         const results = await Promise.all(
           projects.map((p) => flatsApi.byProject(p.id).then((r) => r.data))
         )
         fresh = results.flat()
-      } else {
-        const { data } = await flatsApi.byEngineer(user.id)
-        fresh = data
       }
       await writeDb(fresh)
       const sorted = sortFlats(fresh)

@@ -123,10 +123,10 @@ router.post(
       }
     }
 
-    const snag = db.prepare('SELECT flat_id, project_id FROM snags WHERE id = ?').get(snagId) as { flat_id: string }
-    const assignment = db.prepare('SELECT qa_id FROM assignments WHERE flat_id = ?').get(snag.flat_id) as { qa_id: string }
-    if (assignment) {
-      createNotification(assignment.qa_id, 'snag_rectified', 'Snag Rectified', 'A snag has been marked rectified and needs verification', snagId)
+    const snag = db.prepare('SELECT flat_id FROM snags WHERE id = ?').get(snagId) as { flat_id: string }
+    const qaUsers = db.prepare(`SELECT id FROM users WHERE role = 'qa' AND is_active = 1`).all() as { id: string }[]
+    for (const qa of qaUsers) {
+      createNotification(qa.id, 'snag_rectified', 'Snag Rectified', 'A snag has been marked rectified and needs verification', snagId)
     }
 
     res.json(loadSnag(snagId))
