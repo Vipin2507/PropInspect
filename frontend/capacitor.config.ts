@@ -5,12 +5,12 @@ const config: CapacitorConfig = {
   appName: 'PropInspect',
   webDir: 'dist',
   server: {
-    androidScheme: 'http',
-    cleartext: true, // required since backend is HTTP not HTTPS
+    androidScheme: 'https',
+    cleartext: false,
   },
   android: {
     backgroundColor: '#ffffff',
-    allowMixedContent: true,
+    allowMixedContent: false,  // HTTPS only — no mixed content needed
     captureInput: true,
     webContentsDebuggingEnabled: false,
   },

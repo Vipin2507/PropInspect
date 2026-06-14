@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-  <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="false">147.93.30.96</domain>
-  </domain-config>
+    <!--
+        Trust our self-signed certificate for the VPS IP.
+        The snagdesk.crt file must be placed in res/raw/snagdesk.crt
+        after copying it from the VPS:
+          scp user@147.93.30.96:/etc/ssl/certs/snagdesk.crt
+               android/app/src/main/res/raw/snagdesk.crt
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">147.93.30.96</domain>
+        <trust-anchors>
+            <!-- System CAs -->
+            <certificates src="system" />
+            <!-- Our self-signed cert -->
+            <certificates src="@raw/snagdesk" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Local dev: allow cleartext to localhost only -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
 </network-security-config>

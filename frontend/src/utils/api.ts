@@ -18,7 +18,7 @@ import type {
 
 const getBaseURL = () => {
   if (Capacitor.isNativePlatform()) {
-    return 'http://147.93.30.96/api'; // your live VPS
+    return 'https://147.93.30.96/api'; // VPS behind Nginx HTTPS proxy
   }
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 };
@@ -168,6 +168,24 @@ export const notificationsApi = {
 export const reportsApi = {
   overview: () => api.get<DashboardData>('/reports/overview'),
   activity: (limit?: number) => api.get<ActivityEntry[]>('/reports/activity', { params: { limit } }),
+  flats: (params: {
+    projectId?: string
+    engineerId?: string
+    status?: string
+    dateFrom?: string
+    dateTo?: string
+  }) => api.get<{
+    summary: {
+      total: number; notStarted: number; inProgress: number; submitted: number
+      approved: number; rejected: number; revisionRequired: number; desnagging: number; openSnags: number
+    }
+    flats: Array<{
+      flatId: string; flatNumber: string; flatStatus: string; towerName: string
+      projectName: string; projectId: string; engineerName: string; engineerId: string
+      inspectionStatus: string; submittedAt: string; lastUpdated: string
+      passCount: number; failCount: number; pendingCount: number; openSnags: number
+    }>
+  }>('/reports/flats', { params }),
   export: (projectId: string, type: string) =>
     api.get(`/reports/export?projectId=${projectId}&type=${type}&format=csv`, { responseType: 'blob' }),
 }
