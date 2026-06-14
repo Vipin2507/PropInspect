@@ -84,6 +84,88 @@ router.get(
   })
 )
 
+// ── Filtered flat-level dashboard query ─────────────────────────────────────
+// Supports: projectId, engineerId, status, dateFrom, dateTo
+router.get(
+  '/flats',
+  asyncHandler(async (req, res) => {
+    const db = getDB()
+    const { projectId, engineerId, status, dateFrom, dateTo } = req.query as Record<string, string>
+
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (projectId) { conditions.push('f.project_id = ?'); params.push(projectId) }
+    if (engineerId) { conditions.push('a.engineer_id = ?'); params.push(engineerId) }
+    if (status) { conditions.push('f.status = ?'); params.push(status) }
+    if (dateFrom) { conditions.push("date(i.last_updated) >= date(?)"); params.push(dateFrom) }
+    if (dateTo)   { conditions.push("date(i.last_updated) <= date(?)"); params.push(dateTo) }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    const rows = db.prepare(`
+      SELECT
+        f.id as flat_id,
+        f.flat_number,
+        f.status as flat_status,
+        t.name as tower_name,
+        p.name as project_name,
+        p.id as project_id,
+        u.name as engineer_name,
+        u.id as engineer_id,
+        i.status as inspection_status,
+        i.submitted_at,
+        i.last_updated,
+        (SELECT COUNT(*) FROM responses r WHERE r.inspection_id = i.id AND r.status = 'pass') as pass_count,
+        (SELECT COUNT(*) FROM responses r WHERE r.inspection_id = i.id AND r.status = 'fail') as fail_count,
+        (SELECT COUNT(*) FROM responses r WHERE r.inspection_id = i.id AND r.status = 'pending') as pending_count,
+        (SELECT COUNT(*) FROM snags s WHERE s.flat_id = f.id AND s.status NOT IN ('closed','verified')) as open_snags
+      FROM flats f
+      JOIN projects p ON p.id = f.project_id
+      JOIN towers t ON t.id = f.tower_id
+      LEFT JOIN assignments a ON a.flat_id = f.id
+      LEFT JOIN users u ON u.id = a.engineer_id
+      LEFT JOIN inspections i ON i.flat_id = f.id
+      ${where}
+      ORDER BY p.name, t.name, f.flat_number
+    `).all(...params) as Record<string, unknown>[]
+
+    // Summary counts for the filtered set
+    const summary = {
+      total: rows.length,
+      notStarted: rows.filter((r) => r.flat_status === 'not_started').length,
+      inProgress: rows.filter((r) => r.flat_status === 'in_progress').length,
+      submitted: rows.filter((r) => r.flat_status === 'submitted').length,
+      approved: rows.filter((r) => r.flat_status === 'approved').length,
+      rejected: rows.filter((r) => r.flat_status === 'rejected').length,
+      revisionRequired: rows.filter((r) => r.flat_status === 'revision_required').length,
+      desnagging: rows.filter((r) => r.flat_status === 'desnagging').length,
+      openSnags: rows.reduce((acc, r) => acc + (Number(r.open_snags) || 0), 0),
+    }
+
+    res.json({
+      summary,
+      flats: rows.map((r) => ({
+        flatId: r.flat_id,
+        flatNumber: r.flat_number,
+        flatStatus: r.flat_status,
+        towerName: r.tower_name,
+        projectName: r.project_name,
+        projectId: r.project_id,
+        engineerName: r.engineer_name,
+        engineerId: r.engineer_id,
+        inspectionStatus: r.inspection_status,
+        submittedAt: utcTs(r.submitted_at),
+        lastUpdated: utcTs(r.last_updated),
+        passCount: Number(r.pass_count) || 0,
+        failCount: Number(r.fail_count) || 0,
+        pendingCount: Number(r.pending_count) || 0,
+        openSnags: Number(r.open_snags) || 0,
+      })),
+    })
+  })
+)
+
 router.get(
   '/projects/:id',
   asyncHandler(async (req, res) => {
