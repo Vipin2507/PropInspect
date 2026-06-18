@@ -196,7 +196,8 @@ export const reportsApi = {
   }) => api.get<{
     summary: {
       total: number; notStarted: number; inProgress: number; submitted: number
-      approved: number; rejected: number; revisionRequired: number; desnagging: number; openSnags: number
+      approved: number; rejected: number; revisionRequired: number; desnagging: number
+      handedOver: number; openSnags: number
     }
     flats: Array<{
       flatId: string; flatNumber: string; flatStatus: string; towerName: string
