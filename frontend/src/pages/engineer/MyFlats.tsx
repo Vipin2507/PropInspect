@@ -13,15 +13,17 @@ import { Spinner } from '../../components/ui/Spinner'
 import { cn } from '../../utils/cn'
 
 const TABS = [
-  { id: 'all',       label: 'All' },
-  { id: 'pending',   label: 'Pending' },
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'revision',  label: 'Revision' },
-  { id: 'approved',  label: 'Approved' },
+  { id: 'all',        label: 'All' },
+  { id: 'pending',    label: 'Pending' },
+  { id: 'submitted',  label: 'Submitted' },
+  { id: 'revision',   label: 'Revision' },
+  { id: 'approved',   label: 'Approved' },
+  { id: 'handed_over', label: 'Handed Over' },
 ]
 
 function flatProgress(flat: { status: string }) {
-  if (['approved', 'submitted'].includes(flat.status)) return 100
+  if (['approved', 'handed_over'].includes(flat.status)) return 100
+  if (flat.status === 'submitted') return 100
   if (flat.status === 'in_progress') return 40
   return 0
 }
@@ -45,20 +47,22 @@ export default function MyFlats() {
   }, [isAdmin])
 
   const getTabCount = (tabId: string) => {
-    if (tabId === 'all')       return flats.length
-    if (tabId === 'pending')   return flats.filter((f) => ['not_started', 'in_progress'].includes(f.status)).length
-    if (tabId === 'submitted') return flats.filter((f) => f.status === 'submitted').length
-    if (tabId === 'revision')  return flats.filter((f) => f.status === 'revision_required').length
-    if (tabId === 'approved')  return flats.filter((f) => f.status === 'approved').length
+    if (tabId === 'all')         return flats.length
+    if (tabId === 'pending')     return flats.filter((f) => ['not_started', 'in_progress'].includes(f.status)).length
+    if (tabId === 'submitted')   return flats.filter((f) => f.status === 'submitted').length
+    if (tabId === 'revision')    return flats.filter((f) => f.status === 'revision_required').length
+    if (tabId === 'approved')    return flats.filter((f) => f.status === 'approved').length
+    if (tabId === 'handed_over') return flats.filter((f) => f.status === 'handed_over').length
     return 0
   }
 
   const filteredFlats = useMemo(() => {
     let list = flats
-    if (tab === 'pending')   list = list.filter((f) => ['not_started', 'in_progress'].includes(f.status))
-    if (tab === 'submitted') list = list.filter((f) => f.status === 'submitted')
-    if (tab === 'revision')  list = list.filter((f) => f.status === 'revision_required')
-    if (tab === 'approved')  list = list.filter((f) => f.status === 'approved')
+    if (tab === 'pending')     list = list.filter((f) => ['not_started', 'in_progress'].includes(f.status))
+    if (tab === 'submitted')   list = list.filter((f) => f.status === 'submitted')
+    if (tab === 'revision')    list = list.filter((f) => f.status === 'revision_required')
+    if (tab === 'approved')    list = list.filter((f) => f.status === 'approved')
+    if (tab === 'handed_over') list = list.filter((f) => f.status === 'handed_over')
     if (search) {
       const q = search.toLowerCase()
       list = list.filter((f) =>

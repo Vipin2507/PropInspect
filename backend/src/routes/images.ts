@@ -12,12 +12,11 @@ import { rowToImage } from '../utils/mappers'
 
 const router = Router()
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads')
-const MAX_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10) * 1024 * 1024)
-
+const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB — files >= this are rejected
 const storage = multer.memoryStorage()
 const upload = multer({
   storage,
-  limits: { fileSize: MAX_SIZE },
+  limits: { fileSize: MAX_SIZE_BYTES },
   fileFilter: (_req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
     if (allowed.includes(file.mimetype) || file.mimetype.startsWith('image/')) {
@@ -38,7 +37,14 @@ router.post(
       res.status(400).json({ error: 'No file uploaded' })
       return
     }
-    const { inspectionId, responseId, snagId, itemId, type = 'evidence', caption = '' } = req.body
+    // Req 7.2 — strict < 10 MB (multer limit catches oversized but we double-check)
+    if (req.file.size >= 10 * 1024 * 1024) {
+      res.status(400).json({ error: 'File must be less than 10 MB' })
+      return
+    }
+    const { inspectionId, responseId, snagId, itemId, caption = '' } = req.body
+    // Req 7.4 — QA uploads are always type='evidence'
+    const type = req.user!.role === 'qa' ? 'evidence' : (req.body.type || 'evidence')
     if (!inspectionId) {
       res.status(400).json({ error: 'inspectionId required' })
       return

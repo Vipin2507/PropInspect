@@ -9,6 +9,7 @@ const statusStyles: Record<string, string> = {
   rejected:          'bg-red-100 text-fail',
   revision_required: 'bg-orange-100 text-secondary-dark',
   desnagging:        'bg-purple-100 text-purple-700',
+  handed_over:       'bg-teal-100 text-teal-700',
   pass:              'bg-green-100 text-pass',
   fail:              'bg-red-100 text-fail',
   na:                'bg-slate-100 text-slate-600',

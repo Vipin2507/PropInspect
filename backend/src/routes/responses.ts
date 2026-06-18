@@ -3,12 +3,69 @@ import { z } from 'zod'
 import { getDB } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
-import { asyncHandler } from '../middleware/errorHandler'
+import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToResponse, rowToImage } from '../utils/mappers'
+import { createNotification } from '../utils/notifications'
 
 const router = Router()
 router.use(authenticate)
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function getImagesForResponse(responseId: string) {
+  return (
+    getDB()
+      .prepare('SELECT * FROM images WHERE response_id = ?')
+      .all(responseId) as Record<string, unknown>[]
+  ).map(rowToImage)
+}
+
+/**
+ * Calculate completion percentage for an inspection.
+ * Returns a value 0–100 (integer).
+ */
+export function calcCompletionPct(inspectionId: string): number {
+  const db = getDB()
+  const row = db
+    .prepare(
+      `SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status IN ('pass','fail','na') THEN 1 ELSE 0 END) as done
+       FROM responses WHERE inspection_id = ?`
+    )
+    .get(inspectionId) as { total: number; done: number }
+  if (!row || row.total === 0) return 0
+  return Math.round((row.done / row.total) * 100)
+}
+
+/**
+ * Fire a flat_completion notification the first time an inspection reaches 100%.
+ * Idempotent — guarded by the completion_notified column.
+ */
+function maybeNotifyCompletion(inspectionId: string): void {
+  const db = getDB()
+  const inspection = db
+    .prepare('SELECT id, flat_id, engineer_id, completion_notified FROM inspections WHERE id = ?')
+    .get(inspectionId) as { id: string; flat_id: string; engineer_id: string; completion_notified: number } | undefined
+  if (!inspection || inspection.completion_notified) return
+
+  const pct = calcCompletionPct(inspectionId)
+  if (pct < 100) return
+
+  db.prepare(`UPDATE inspections SET completion_notified = 1 WHERE id = ?`).run(inspectionId)
+
+  createNotification(
+    inspection.engineer_id,
+    'flat_completion',
+    'Flat 100% Complete',
+    'All checklist items are done — you can now submit for QA review.',
+    inspection.flat_id
+  )
+}
+
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
+/** GET /responses?inspectionId=... */
 router.get(
   '/',
   asyncHandler(async (req, res) => {
@@ -17,45 +74,140 @@ router.get(
       res.status(400).json({ error: 'inspectionId required' })
       return
     }
-    const rows = getDB().prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
-    const responses = rows.map((r) => {
-      const images = (
-        getDB().prepare('SELECT * FROM images WHERE response_id = ?').all(r.id) as Record<string, unknown>[]
-      ).map(rowToImage)
-      return rowToResponse(r, images)
-    })
-    res.json(responses)
+    const rows = getDB()
+      .prepare('SELECT * FROM responses WHERE inspection_id = ?')
+      .all(inspectionId) as Record<string, unknown>[]
+    res.json(rows.map((r) => rowToResponse(r, getImagesForResponse(r.id as string))))
   })
 )
 
+/**
+ * PATCH /responses/:id
+ * Engineer single-task status update.
+ * Req 1 (task status management) & Req 2 (reset / correction).
+ */
 router.patch(
   '/:id',
   requireRole('engineer'),
   asyncHandler(async (req, res) => {
-    const body = z.object({ status: z.enum(['pass', 'fail', 'na', 'pending']).optional(), remarks: z.string().optional() }).parse(req.body)
+    const body = z
+      .object({
+        status: z.enum(['pass', 'fail', 'na', 'pending']).optional(),
+        remarks: z.string().optional(),
+      })
+      .parse(req.body)
+
     const db = getDB()
-    const response = db.prepare('SELECT * FROM responses WHERE id = ?').get(req.params.id) as Record<string, unknown>
-    if (!response) {
-      res.status(404).json({ error: 'Response not found' })
-      return
+    const response = db
+      .prepare('SELECT * FROM responses WHERE id = ?')
+      .get(req.params.id) as Record<string, unknown>
+    if (!response) throw new AppError('Response not found', 404)
+
+    const inspection = db
+      .prepare('SELECT id, flat_id, engineer_id, status FROM inspections WHERE id = ?')
+      .get(response.inspection_id) as { id: string; flat_id: string; engineer_id: string; status: string }
+    if (!inspection) throw new AppError('Inspection not found', 404)
+
+    // Only the assigned engineer may edit
+    if (inspection.engineer_id !== req.user!.id) {
+      throw new AppError('Not authorized', 403)
     }
-    const inspection = db.prepare('SELECT engineer_id, status FROM inspections WHERE id = ?').get(response.inspection_id) as { engineer_id: string; status: string }
-    if (!inspection || inspection.engineer_id !== req.user!.id) {
-      res.status(403).json({ error: 'Not authorized' })
-      return
-    }
+
+    // Req 1.4 / 2.4 — inspection must be editable
     if (!['draft', 'revision_required'].includes(inspection.status)) {
-      res.status(400).json({ error: 'Cannot edit after submission' })
-      return
+      throw new AppError('Inspection is locked and cannot be edited in its current status', 400)
     }
-    db.prepare(`UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`).run(
-      body.status ?? response.status,
-      body.remarks ?? response.remarks,
-      req.params.id
-    )
-    const updated = db.prepare('SELECT * FROM responses WHERE id = ?').get(req.params.id) as Record<string, unknown>
-    const images = db.prepare('SELECT * FROM images WHERE response_id = ?').all(req.params.id) as Record<string, unknown>[]
-    res.json(rowToResponse(updated, images.map(rowToImage)))
+
+    const newStatus = body.status ?? (response.status as string)
+    let newRemarks = body.remarks ?? (response.remarks as string)
+
+    // Req 1.3 — fail requires non-empty remarks
+    if (newStatus === 'fail' && !newRemarks?.trim()) {
+      throw new AppError('A remark is required when marking a task as Fail', 400)
+    }
+
+    // Req 2.1 — reset to pending clears remarks
+    if (newStatus === 'pending') {
+      newRemarks = ''
+    }
+
+    db.prepare(
+      `UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(newStatus, newRemarks, req.params.id)
+
+    // Keep flat status in sync
+    db.prepare(
+      `UPDATE flats SET status = 'in_progress' WHERE id = ? AND status = 'not_started'`
+    ).run(inspection.flat_id)
+
+    // Touch inspection last_updated
+    db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspection.id)
+
+    // Req 3.6 — recalculate completion pct; fire flat_completion if newly 100%
+    maybeNotifyCompletion(inspection.id)
+    const completionPct = calcCompletionPct(inspection.id)
+
+    const updated = db
+      .prepare('SELECT * FROM responses WHERE id = ?')
+      .get(req.params.id as string) as Record<string, unknown>
+    res.json({
+      ...rowToResponse(updated, getImagesForResponse(req.params.id as string)),
+      completionPct,
+    })
+  })
+)
+
+/**
+ * PATCH /responses/:id/qa-decision
+ * Checker per-task decision: approved | rejected | revision_required.
+ * Req 6 (per-task review).
+ */
+router.patch(
+  '/:id/qa-decision',
+  requireRole('qa', 'admin'),
+  asyncHandler(async (req, res) => {
+    const body = z
+      .object({
+        qaDecision: z.enum(['approved', 'rejected', 'revision_required']),
+        qaRemark: z.string().optional(),
+      })
+      .parse(req.body)
+
+    const db = getDB()
+    const response = db
+      .prepare('SELECT * FROM responses WHERE id = ?')
+      .get(req.params.id) as Record<string, unknown>
+    if (!response) throw new AppError('Response not found', 404)
+
+    const inspection = db
+      .prepare('SELECT id, status FROM inspections WHERE id = ?')
+      .get(response.inspection_id) as { id: string; status: string }
+    if (!inspection) throw new AppError('Inspection not found', 404)
+
+    // Req 6.1 — inspection must be submitted
+    if (inspection.status !== 'submitted') {
+      throw new AppError('Inspection is not available for per-task review', 400)
+    }
+
+    // Req 6.3 — reject / revision requires non-empty remark
+    if (
+      ['rejected', 'revision_required'].includes(body.qaDecision) &&
+      !body.qaRemark?.trim()
+    ) {
+      throw new AppError(
+        'A QA remark is required when rejecting or requesting revision on a task',
+        400
+      )
+    }
+
+    db.prepare(
+      `UPDATE responses SET qa_decision = ?, qa_remarks = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(body.qaDecision, body.qaRemark ?? '', req.params.id)
+
+    const updated = db
+      .prepare('SELECT * FROM responses WHERE id = ?')
+      .get(req.params.id as string) as Record<string, unknown>
+    res.json(rowToResponse(updated, getImagesForResponse(req.params.id as string)))
   })
 )
 

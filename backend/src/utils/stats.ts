@@ -27,12 +27,13 @@ export function getProjectStats(projectId: string, projectName: string) {
     notStarted: map.not_started || 0,
     inProgress: map.in_progress || 0,
     submitted: map.submitted || 0,
-    approved: approved,
+    approved: map.approved || 0,
     rejected: map.rejected || 0,
     revisionRequired: map.revision_required || 0,
     desnagging: map.desnagging || 0,
+    handedOver: map.handed_over || 0,
     openSnags,
     closedSnags,
-    completionPct: totalFlats ? Math.round((approved / totalFlats) * 100) : 0,
+    completionPct: totalFlats ? Math.round(((approved + (map.handed_over || 0)) / totalFlats) * 100) : 0,
   }
 }

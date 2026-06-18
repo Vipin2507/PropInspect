@@ -246,6 +246,7 @@ export default function FlatManagement() {
           <option value="rejected">Rejected</option>
           <option value="revision_required">Revision Required</option>
           <option value="desnagging">Desnagging</option>
+          <option value="handed_over">Handed Over to Client</option>
         </Select>
         <Select
           value={filterAssignment}

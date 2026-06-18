@@ -19,13 +19,17 @@ function isReviewable(r: InspectionResponse): boolean {
 
 export function ReviewChecklist({
   responses,
+  inspectionId,
   itemComments,
   onItemCommentChange,
+  onResponseUpdate,
   onImageClick,
 }: {
   responses: InspectionResponse[]
+  inspectionId: string
   itemComments: Record<string, string>
   onItemCommentChange: (itemId: string, v: string) => void
+  onResponseUpdate?: (responseId: string, updated: Partial<InspectionResponse>) => void
   onImageClick: (url: string) => void
 }) {
   const [expandedCats, setExpandedCats] = useState<Set<string>>(() => {
@@ -135,9 +139,10 @@ export function ReviewChecklist({
                         index={i + 1}
                         label={item.label}
                         response={response!}
+                        inspectionId={inspectionId}
+                        onResponseUpdate={(updated) => onResponseUpdate?.(response!.id, updated)}
                         qaComment={itemComments[response!.id] || response!.qaRemarks || ''}
                         onQaComment={(v) => onItemCommentChange(response!.id, v)}
-                        onImageClick={onImageClick}
                       />
                     ))}
                   </div>

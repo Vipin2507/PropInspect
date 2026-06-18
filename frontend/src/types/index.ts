@@ -59,6 +59,7 @@ export interface Flat {
   createdAt: string
   towerName?: string
   floorLabel?: string
+  completionPct?: number
   /** Engineer who last worked on this flat (from inspection record) */
   engineerName?: string | null
   /** Kept for backward compat but no longer populated by backend */
@@ -87,6 +88,7 @@ export type FlatStatus =
   | 'rejected'
   | 'revision_required'
   | 'desnagging'
+  | 'handed_over'
 
 export interface Assignment {
   id: string
@@ -136,6 +138,7 @@ export interface InspectionResponse {
   status: ResponseStatus
   remarks: string
   qaRemarks: string
+  qaDecision?: 'approved' | 'rejected' | 'revision_required'
   images: SnagImage[]
   snagId?: string
   updatedAt: string
@@ -165,6 +168,7 @@ export interface Inspection {
   passCount?: number
   failCount?: number
   naCount?: number
+  completionPct?: number
 }
 
 export type SnagStatus =
@@ -232,6 +236,7 @@ export type NotificationType =
   | 'inspection_approved'
   | 'inspection_rejected'
   | 'revision_required'
+  | 'flat_completion'
   | 'snag_assigned'
   | 'snag_rectified'
   | 'overdue_reminder'
@@ -291,6 +296,7 @@ export interface ProjectStats {
   rejected: number
   revisionRequired: number
   desnagging: number
+  handedOver: number
   openSnags: number
   closedSnags: number
   completionPct: number

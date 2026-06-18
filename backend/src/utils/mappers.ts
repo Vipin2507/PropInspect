@@ -71,6 +71,7 @@ export function rowToResponse(row: Record<string, unknown>, images: unknown[] = 
     status: row.status,
     remarks: row.remarks,
     qaRemarks: row.qa_remarks,
+    qaDecision: row.qa_decision || undefined,
     snagId: row.snag_id || undefined,
     images,
     updatedAt: utc(row.updated_at),

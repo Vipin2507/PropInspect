@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!--
-        Trust our self-signed certificate for the VPS IP.
-        The snagdesk.crt file must be placed in res/raw/snagdesk.crt
-        after copying it from the VPS:
-          scp user@147.93.30.96:/etc/ssl/certs/snagdesk.crt
-               android/app/src/main/res/raw/snagdesk.crt
+        If the VPS uses a self-signed certificate, place the cert file at
+        res/raw/snagdesk.crt (copy from the server) and restore the
+        <certificates src="@raw/snagdesk" /> line below.
+
+        scp user@147.93.30.96:/etc/ssl/certs/snagdesk.crt \
+            android/app/src/main/res/raw/snagdesk.crt
     -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">147.93.30.96</domain>
         <trust-anchors>
-            <!-- System CAs -->
+            <!-- System / CA-signed certificates (e.g. Let's Encrypt via Nginx) -->
             <certificates src="system" />
-            <!-- Our self-signed cert -->
-            <certificates src="@raw/snagdesk" />
         </trust-anchors>
     </domain-config>
 

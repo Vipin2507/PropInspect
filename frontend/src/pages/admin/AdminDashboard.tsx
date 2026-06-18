@@ -12,7 +12,7 @@ import { cn } from '../../utils/cn'
 import {
   Home, CheckCircle, Clock, AlertTriangle,
   Send, RotateCcw, XCircle, Filter, X, TrendingUp,
-  Users, ChevronDown, ChevronUp, Download, Building2,
+  Users, ChevronDown, ChevronUp, Download, Building2, PackageCheck,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -35,7 +35,8 @@ interface FlatRow {
 
 interface Summary {
   total: number; notStarted: number; inProgress: number; submitted: number
-  approved: number; rejected: number; revisionRequired: number; desnagging: number; openSnags: number
+  approved: number; rejected: number; revisionRequired: number; desnagging: number
+  handedOver: number; openSnags: number
 }
 
 const FLAT_STATUS_OPTIONS = [
@@ -47,6 +48,7 @@ const FLAT_STATUS_OPTIONS = [
   { value: 'revision_required', label: 'Revision Required' },
   { value: 'rejected',          label: 'Rejected' },
   { value: 'desnagging',        label: 'Desnagging' },
+  { value: 'handed_over',       label: 'Handed Over to Client' },
 ]
 
 const STATUS_COLOR: Record<string, string> = {
@@ -57,6 +59,7 @@ const STATUS_COLOR: Record<string, string> = {
   rejected:          '#DC2626',
   desnagging:        '#7c3aed',
   not_started:       '#94a3b8',
+  handed_over:       '#0d9488',
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -139,10 +142,10 @@ export default function AdminDashboard() {
   // ── Bar chart — group filtered flats by project ───────────────────────
   const barData = useMemo(() => {
     if (!result?.flats.length) return []
-    const map = new Map<string, { name: string; Approved:number; Submitted:number; InProgress:number; Revision:number; Rejected:number; Desnagging:number; NotStarted:number }>()
+    const map = new Map<string, { name: string; Approved:number; Submitted:number; InProgress:number; Revision:number; Rejected:number; Desnagging:number; NotStarted:number; HandedOver:number }>()
     for (const f of result.flats) {
       if (!map.has(f.projectId)) {
-        map.set(f.projectId, { name: f.projectName.slice(0,16), Approved:0, Submitted:0, InProgress:0, Revision:0, Rejected:0, Desnagging:0, NotStarted:0 })
+        map.set(f.projectId, { name: f.projectName.slice(0,16), Approved:0, Submitted:0, InProgress:0, Revision:0, Rejected:0, Desnagging:0, NotStarted:0, HandedOver:0 })
       }
       const entry = map.get(f.projectId)!
       if (f.flatStatus === 'approved')          entry.Approved++
@@ -152,6 +155,7 @@ export default function AdminDashboard() {
       else if (f.flatStatus === 'rejected')     entry.Rejected++
       else if (f.flatStatus === 'desnagging')   entry.Desnagging++
       else if (f.flatStatus === 'not_started')  entry.NotStarted++
+      else if (f.flatStatus === 'handed_over')  entry.HandedOver++
     }
     return Array.from(map.values())
   }, [result])
@@ -160,13 +164,14 @@ export default function AdminDashboard() {
   const donutData = useMemo(() => {
     if (!s) return []
     return [
-      { name: 'Approved',    value: s.approved,         fill: STATUS_COLOR.approved },
-      { name: 'Submitted',   value: s.submitted,        fill: STATUS_COLOR.submitted },
-      { name: 'In Progress', value: s.inProgress,       fill: STATUS_COLOR.in_progress },
-      { name: 'Revision',    value: s.revisionRequired, fill: STATUS_COLOR.revision_required },
-      { name: 'Rejected',    value: s.rejected,         fill: STATUS_COLOR.rejected },
-      { name: 'Desnagging',  value: s.desnagging,       fill: STATUS_COLOR.desnagging },
-      { name: 'Not Started', value: s.notStarted,       fill: STATUS_COLOR.not_started },
+      { name: 'Handed Over', value: s.handedOver ?? 0,      fill: STATUS_COLOR.handed_over },
+      { name: 'Approved',    value: s.approved,             fill: STATUS_COLOR.approved },
+      { name: 'Submitted',   value: s.submitted,            fill: STATUS_COLOR.submitted },
+      { name: 'In Progress', value: s.inProgress,           fill: STATUS_COLOR.in_progress },
+      { name: 'Revision',    value: s.revisionRequired,     fill: STATUS_COLOR.revision_required },
+      { name: 'Rejected',    value: s.rejected,             fill: STATUS_COLOR.rejected },
+      { name: 'Desnagging',  value: s.desnagging,           fill: STATUS_COLOR.desnagging },
+      { name: 'Not Started', value: s.notStarted,           fill: STATUS_COLOR.not_started },
     ].filter(d => d.value > 0)
   }, [s])
 
@@ -202,7 +207,9 @@ export default function AdminDashboard() {
   const engineerLabel = engineers.find(e => e.id === filters.engineerId)?.name
   const statusLabel   = FLAT_STATUS_OPTIONS.find(o => o.value === filters.status)?.label
 
-  const completionPct = s?.total ? Math.round((s.approved / s.total) * 100) : 0
+  const completionPct = s?.total
+    ? Math.round(((s.approved + (s.handedOver ?? 0)) / s.total) * 100)
+    : 0
 
   return (
     <div className="space-y-5 pb-8">
@@ -303,14 +310,15 @@ export default function AdminDashboard() {
       ) : s ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Total Flats"  value={s.total}            icon={Home} />
-            <StatCard label="Approved"     value={s.approved}         icon={CheckCircle}  colorClass="text-pass bg-green-100" />
-            <StatCard label="Submitted"    value={s.submitted}        icon={Send}         colorClass="text-amber-600 bg-amber-100" />
-            <StatCard label="In Progress"  value={s.inProgress}       icon={Clock}        colorClass="text-info bg-sky-100" />
-            <StatCard label="Not Started"  value={s.notStarted}       icon={Building2}    colorClass="text-slate-500 bg-slate-100" />
-            <StatCard label="Revision Req" value={s.revisionRequired} icon={RotateCcw}    colorClass="text-secondary bg-orange-100" />
-            <StatCard label="Rejected"     value={s.rejected}         icon={XCircle}      colorClass="text-fail bg-red-100" />
-            <StatCard label="Open Snags"   value={s.openSnags}        icon={AlertTriangle} colorClass="text-fail bg-red-100" />
+            <StatCard label="Total Flats"   value={s.total}              icon={Home} />
+            <StatCard label="Approved"      value={s.approved}           icon={CheckCircle}  colorClass="text-pass bg-green-100" />
+            <StatCard label="Submitted"     value={s.submitted}          icon={Send}         colorClass="text-amber-600 bg-amber-100" />
+            <StatCard label="In Progress"   value={s.inProgress}         icon={Clock}        colorClass="text-info bg-sky-100" />
+            <StatCard label="Not Started"   value={s.notStarted}         icon={Building2}    colorClass="text-slate-500 bg-slate-100" />
+            <StatCard label="Revision Req"  value={s.revisionRequired}   icon={RotateCcw}    colorClass="text-secondary bg-orange-100" />
+            <StatCard label="Rejected"      value={s.rejected}           icon={XCircle}      colorClass="text-fail bg-red-100" />
+            <StatCard label="Handed Over"   value={s.handedOver ?? 0}    icon={PackageCheck} colorClass="text-teal-600 bg-teal-100" />
+            <StatCard label="Open Snags"    value={s.openSnags}          icon={AlertTriangle} colorClass="text-fail bg-red-100" />
           </div>
 
           {/* Completion progress bar */}
@@ -394,6 +402,7 @@ export default function AdminDashboard() {
                 <Bar dataKey="Revision"   stackId="a" fill={STATUS_COLOR.revision_required} name="Revision" />
                 <Bar dataKey="Rejected"   stackId="a" fill={STATUS_COLOR.rejected}          name="Rejected" />
                 <Bar dataKey="Desnagging" stackId="a" fill={STATUS_COLOR.desnagging}        name="Desnagging" />
+                <Bar dataKey="HandedOver" stackId="a" fill={STATUS_COLOR.handed_over}       name="Handed Over" />
                 <Bar dataKey="NotStarted" stackId="a" fill={STATUS_COLOR.not_started}       name="Not Started" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>

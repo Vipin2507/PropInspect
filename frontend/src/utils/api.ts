@@ -96,6 +96,12 @@ export const flatsApi = {
   byProject: (projectId: string) => api.get<Flat[]>(`/flats?projectId=${projectId}`),
   byTower: (towerId: string) => api.get<Flat[]>(`/flats?towerId=${towerId}`),
   get: (id: string) => api.get<Flat>(`/flats/${id}`),
+  checkerList: (params?: { projectId?: string; towerId?: string }) =>
+    api.get<Flat[]>('/flats/checker', { params }),
+  setStatus: (id: string, status: string) =>
+    api.patch<Flat>(`/flats/${id}/status`, { status }),
+  handover: (id: string) =>
+    api.post<Flat>(`/flats/${id}/handover`),
 }
 
 export const inspectionsApi = {
@@ -104,6 +110,19 @@ export const inspectionsApi = {
     api.put<Inspection>(`/inspections/${id}`, { responses }),
   submit: (id: string) => api.post<{ inspection: Inspection; snags: Snag[] }>(`/inspections/${id}/submit`),
   resubmit: (id: string) => api.post(`/inspections/${id}/resubmit`),
+}
+
+export const responsesApi = {
+  /** Engineer single-task status update (Req 1 & 2) */
+  updateStatus: (
+    responseId: string,
+    body: { status: 'pass' | 'fail' | 'na' | 'pending'; remarks?: string }
+  ) => api.patch(`/responses/${responseId}`, body),
+  /** Checker per-task decision (Req 6) */
+  setQaDecision: (
+    responseId: string,
+    body: { qaDecision: 'approved' | 'rejected' | 'revision_required'; qaRemark?: string }
+  ) => api.patch(`/responses/${responseId}/qa-decision`, body),
 }
 
 export const imagesApi = {

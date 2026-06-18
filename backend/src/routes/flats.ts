@@ -5,14 +5,80 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
+import { calcCompletionPct } from './responses'
 
 const router = Router()
 router.use(authenticate)
 
+/**
+ * GET /flats/checker
+ * Req 5 — Checker flat progress view.
+ * Returns flats in submitted/reviewed statuses with completionPct, sorted by submittedAt DESC.
+ */
+router.get(
+  '/checker',
+  requireRole('qa', 'admin'),
+  asyncHandler(async (req, res) => {
+    const { projectId, towerId } = req.query
+    const db = getDB()
+
+    let sql = `
+      SELECT
+        f.id, f.flat_number, f.status, f.tower_id, f.project_id, f.floor_id, f.floor, f.created_at,
+        t.name  AS tower_name,
+        fl.label AS floor_label,
+        i.id    AS inspection_id,
+        i.submitted_at,
+        u.name  AS engineer_name
+      FROM flats f
+      LEFT JOIN towers t  ON t.id  = f.tower_id
+      LEFT JOIN floors fl ON fl.id = f.floor_id
+      LEFT JOIN inspections i ON i.flat_id = f.id
+      LEFT JOIN users u   ON u.id  = i.engineer_id
+      WHERE f.status IN ('submitted','approved','rejected','revision_required','desnagging','handed_over')
+    `
+    const params: unknown[] = []
+
+    if (towerId) {
+      sql += ` AND f.tower_id = ?`
+      params.push(towerId)
+    } else if (projectId) {
+      sql += ` AND f.project_id = ?`
+      params.push(projectId)
+    }
+
+    sql += ` ORDER BY i.submitted_at DESC NULLS LAST`
+
+    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
+
+    const result = rows.map((row) => {
+      const inspectionId = row.inspection_id as string | undefined
+      const completionPct = inspectionId ? calcCompletionPct(inspectionId) : 0
+      return {
+        id: row.id,
+        flatNumber: row.flat_number,
+        status: row.status,
+        towerId: row.tower_id,
+        projectId: row.project_id,
+        floorId: row.floor_id,
+        floor: row.floor,
+        towerName: row.tower_name,
+        floorLabel: row.floor_label,
+        inspectionId: inspectionId || null,
+        engineerName: row.engineer_name || null,
+        submittedAt: utcTs(row.submitted_at),
+        completionPct,
+        createdAt: utcTs(row.created_at),
+      }
+    })
+
+    res.json(result)
+  })
+)
+
 router.get(
   '/',
-  asyncHandler(async (req, res) => {
-    const { towerId, projectId } = req.query
+  asyncHandler(async (req, res) => {    const { towerId, projectId } = req.query
     const db = getDB()
     let rows: Record<string, unknown>[] = []
 
@@ -31,7 +97,7 @@ router.get(
     if (role === 'qa') {
       rows = rows.filter((row) => {
         const status = row.status as string
-        return ['submitted', 'approved', 'rejected', 'revision_required', 'desnagging'].includes(status)
+        return ['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)
       })
     }
 
@@ -51,7 +117,7 @@ router.get(
     // QA can only see flats that have been submitted for review or are in a reviewed state
     if (req.user!.role === 'qa') {
       const status = row.status as string
-      if (!['submitted', 'approved', 'rejected', 'revision_required', 'desnagging'].includes(status)) {
+      if (!['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)) {
         res.status(403).json({ error: 'Flat has not been submitted for review' })
         return
       }
@@ -68,13 +134,35 @@ router.patch(
       .object({
         status: z.enum([
           'not_started', 'in_progress', 'submitted', 'approved',
-          'rejected', 'revision_required', 'desnagging',
+          'rejected', 'revision_required', 'desnagging', 'handed_over',
         ]),
       })
       .parse(req.body)
     getDB().prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, req.params.id)
     const row = getDB().prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
     res.json(enrichFlat(row))
+  })
+)
+
+// Dedicated handover endpoint — accessible by admin and qa
+router.post(
+  '/:id/handover',
+  requireRole('admin', 'qa'),
+  asyncHandler(async (req, res) => {
+    const db = getDB()
+    const flat = db.prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
+    if (!flat) {
+      res.status(404).json({ error: 'Flat not found' })
+      return
+    }
+    // Can only hand over an approved or desnagging flat
+    if (!['approved', 'desnagging'].includes(flat.status as string)) {
+      res.status(400).json({ error: 'Flat must be approved or desnagging before handover' })
+      return
+    }
+    db.prepare(`UPDATE flats SET status = 'handed_over' WHERE id = ?`).run(req.params.id)
+    const updated = db.prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
+    res.json(enrichFlat(updated))
   })
 )
 
@@ -121,6 +209,7 @@ function enrichFlat(row: Record<string, unknown>) {
       : null,
     // engineerName at flat level for admin monitoring — pulled from inspection
     engineerName: inspection?.engineer_name ?? null,
+    completionPct: inspection ? calcCompletionPct(inspection.id) : 0,
   }
 }
 

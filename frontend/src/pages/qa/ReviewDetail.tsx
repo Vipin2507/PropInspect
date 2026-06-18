@@ -30,6 +30,21 @@ export default function ReviewDetail() {
 
   const [isOffline, setIsOffline] = useState(false)
 
+  const handleResponseUpdate = (responseId: string, updated: Partial<Inspection['responses'][0]>) => {
+    setData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        inspection: {
+          ...prev.inspection,
+          responses: prev.inspection.responses.map((r) =>
+            r.id === responseId ? { ...r, ...updated } : r
+          ),
+        },
+      }
+    })
+  }
+
   useEffect(() => {
     if (!inspectionId) return
     const cacheKey = `review_detail_${inspectionId}`
@@ -111,8 +126,10 @@ export default function ReviewDetail() {
 
       <ReviewChecklist
         responses={data.inspection.responses}
+        inspectionId={data.inspection.id}
         itemComments={itemComments}
         onItemCommentChange={(id, value) => setItemComments((c) => ({ ...c, [id]: value }))}
+        onResponseUpdate={handleResponseUpdate}
         onImageClick={setLightboxImage}
       />
 

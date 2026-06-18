@@ -6,7 +6,7 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToImage, rowToSnag } from '../utils/mappers'
-import { createNotification } from '../utils/notifications'
+import { createNotification, createNotifications } from '../utils/notifications'
 
 const router = Router()
 router.use(authenticate)
@@ -175,11 +175,37 @@ router.post(
         : body.decision === 'rejected'
           ? 'inspection_rejected'
           : 'revision_required'
+
+    // Build engineer notification message
+    let engineerMessage = body.overallComments || `Your inspection has been ${body.decision.replace('_', ' ')}.`
+    if (body.decision === 'revision_required') {
+      // Req 8.5 — list tasks that need revision
+      const revisionTasks = db
+        .prepare(`SELECT item_id FROM responses WHERE inspection_id = ? AND qa_decision = 'revision_required'`)
+        .all(body.inspectionId) as { item_id: string }[]
+      if (revisionTasks.length > 0) {
+        engineerMessage += ` Tasks requiring revision: ${revisionTasks.map((t) => t.item_id).join(', ')}.`
+      }
+    }
+
+    // Notify the engineer
     createNotification(
       inspection.engineer_id as string,
       notifType,
-      `Inspection ${body.decision.replace('_', ' ')}`,
-      body.overallComments,
+      `Inspection ${body.decision.replace(/_/g, ' ')}`,
+      engineerMessage,
+      inspection.flat_id as string
+    )
+
+    // Notify all admin users about the review outcome
+    const adminUsers = db
+      .prepare(`SELECT id FROM users WHERE role = 'admin' AND is_active = 1`)
+      .all() as { id: string }[]
+    createNotifications(
+      adminUsers.map((u) => u.id),
+      notifType,
+      `Inspection ${body.decision.replace(/_/g, ' ')}`,
+      `A flat inspection has been ${body.decision.replace(/_/g, ' ')} by QA.`,
       inspection.flat_id as string
     )
 

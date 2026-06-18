@@ -8,8 +8,9 @@ import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToSnag, rowToImage } from '../utils/mappers'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { getItemMandatoryImage } from '../constants/checklist'
-import { createNotification } from '../utils/notifications'
+import { createNotification, createNotifications } from '../utils/notifications'
 import { param } from '../utils/params'
+import { calcCompletionPct } from './responses'
 
 const router = Router()
 router.use(authenticate)
@@ -33,6 +34,7 @@ function loadInspection(inspectionId: string) {
   const passCount = responses.filter((r) => r.status === 'pass').length
   const failCount = responses.filter((r) => r.status === 'fail').length
   const naCount = responses.filter((r) => r.status === 'na').length
+  const completionPct = calcCompletionPct(inspectionId)
   return {
     ...insp,
     responses,
@@ -40,6 +42,7 @@ function loadInspection(inspectionId: string) {
     passCount,
     failCount,
     naCount,
+    completionPct,
   }
 }
 
@@ -140,6 +143,23 @@ router.put(
     db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
     db.prepare(`UPDATE flats SET status = 'in_progress' WHERE id = ? AND status = 'not_started'`).run(inspection.flat_id)
 
+    // Fire flat_completion notification the first time we hit 100%
+    const insp100 = db.prepare('SELECT id, flat_id, engineer_id, completion_notified FROM inspections WHERE id = ?')
+      .get(inspectionId) as { id: string; flat_id: string; engineer_id: string; completion_notified: number }
+    if (insp100 && !insp100.completion_notified) {
+      const pct = calcCompletionPct(inspectionId)
+      if (pct === 100) {
+        db.prepare(`UPDATE inspections SET completion_notified = 1 WHERE id = ?`).run(inspectionId)
+        createNotification(
+          insp100.engineer_id,
+          'flat_completion',
+          'Flat 100% Complete',
+          'All checklist items are done — you can now submit for QA review.',
+          insp100.flat_id
+        )
+      }
+    }
+
     res.json(loadInspection(inspectionId))
   })
 )
@@ -157,6 +177,12 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
   }
 
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
+
+  // Req 4.1 / 10.1 — 100% completion gate
+  const pendingCount = responses.filter((r) => r.status === 'pending').length
+  if (pendingCount > 0) {
+    throw new AppError(`${pendingCount} task${pendingCount !== 1 ? 's' : ''} still pending — complete all items before submitting`, 400)
+  }
 
   // Only validate mandatory-image rule for fail items — pending items are allowed
   for (const r of responses) {
@@ -203,17 +229,34 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
   db.prepare(`UPDATE inspections SET status = 'submitted', submitted_at = datetime('now'), last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
   db.prepare(`UPDATE flats SET status = 'submitted' WHERE id = ?`).run(inspection.flat_id)
 
-  // Notify all QA users that a flat is ready for review
+  // Req 4.4 — notify all QA users
   const qaUsers = db.prepare(`SELECT id FROM users WHERE role = 'qa' AND is_active = 1`).all() as { id: string }[]
-  for (const qa of qaUsers) {
-    createNotification(
-      qa.id,
-      'inspection_submitted',
-      'Inspection Submitted',
-      'A flat inspection is ready for your review',
-      inspection.flat_id as string
-    )
-  }
+  createNotifications(
+    qaUsers.map((u) => u.id),
+    'inspection_submitted',
+    'Flat Ready for Review',
+    `A flat inspection has been submitted and is ready for your review.`,
+    inspection.flat_id as string
+  )
+
+  // Req 4.5 — notify all admin users
+  const adminUsers = db.prepare(`SELECT id FROM users WHERE role = 'admin' AND is_active = 1`).all() as { id: string }[]
+  createNotifications(
+    adminUsers.map((u) => u.id),
+    'inspection_submitted',
+    'Flat Submitted',
+    `A flat inspection has been submitted for QA review.`,
+    inspection.flat_id as string
+  )
+
+  // Req 4.6 — notify the engineer
+  createNotification(
+    inspection.engineer_id as string,
+    'inspection_submitted',
+    'Inspection Submitted',
+    'Your inspection has been successfully submitted for QA review.',
+    inspection.flat_id as string
+  )
 
   return { inspection: loadInspection(inspectionId), snags }
 }
