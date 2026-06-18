@@ -48,11 +48,21 @@ export function useInspection(flatId: string | undefined) {
     setGlobalSaveState('saving')
     const updated = { ...current, responses }
     setInspection(updated)
-    await saveInspection(updated) // always persist locally first
+    await saveInspection(updated) // persist full data locally (with images)
+
+    // Strip images/localBlob before sending — server only needs id/status/remarks
+    // Sending base64 images in this payload causes entity.parse.failed errors
+    const slim = responses.map(({ id, itemId, categoryId, status, remarks }) => ({
+      id, itemId, categoryId, status, remarks,
+    }))
+
     try {
-      await inspectionsApi.save(current.id, responses)
+      await inspectionsApi.save(current.id, slim as any)
     } catch {
-      await queueChange('save_inspection', { inspectionId: current.id, responses })
+      await queueChange('save_inspection', {
+        inspectionId: current.id,
+        responses: slim,
+      })
     }
     setSaveState('saved')
     setGlobalSaveState('saved')

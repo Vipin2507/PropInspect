@@ -33,7 +33,22 @@ async function pushChanges(): Promise<void> {
   const toProcess = [...pending]
   for (const change of toProcess) {
     try {
-      await syncApi.push([change])
+      // Sanitize: strip localBlob/images from responses before sending
+      // to prevent entity.parse.failed on large base64 payloads
+      let sanitized = change
+      if (change.type === 'save_inspection') {
+        const p = change.payload as { inspectionId: string; responses: any[] }
+        sanitized = {
+          ...change,
+          payload: {
+            inspectionId: p.inspectionId,
+            responses: (p.responses || []).map(({ id, itemId, categoryId, status, remarks }: any) => ({
+              id, itemId, categoryId, status, remarks,
+            })),
+          },
+        }
+      }
+      await syncApi.push([sanitized])
       await clearPendingChange(change.id)
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status
