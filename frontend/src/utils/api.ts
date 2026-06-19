@@ -18,10 +18,10 @@ import type {
 
 const getBaseURL = () => {
   if (Capacitor.isNativePlatform()) {
-    return 'https://147.93.30.96/api'; // VPS behind Nginx HTTPS proxy
+    return 'http://147.93.30.96/api'  // HTTP — self-signed cert not trusted in Android WebView
   }
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-};
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+}
 
 // Base URL for static media (uploads). Relative paths from the server
 // need to be prefixed with the VPS host when running as a native app,

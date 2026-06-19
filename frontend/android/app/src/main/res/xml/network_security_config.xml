@@ -1,22 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!--
-        If the VPS uses a self-signed certificate, place the cert file at
-        res/raw/snagdesk.crt (copy from the server) and restore the
-        <certificates src="@raw/snagdesk" /> line below.
-
-        scp user@147.93.30.96:/etc/ssl/certs/snagdesk.crt \
-            android/app/src/main/res/raw/snagdesk.crt
-    -->
-    <domain-config cleartextTrafficPermitted="false">
+    <!-- VPS: allow both HTTP and HTTPS (self-signed cert, no CA trust needed) -->
+    <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">147.93.30.96</domain>
-        <trust-anchors>
-            <!-- System / CA-signed certificates (e.g. Let's Encrypt via Nginx) -->
-            <certificates src="system" />
-        </trust-anchors>
     </domain-config>
 
-    <!-- Local dev: allow cleartext to localhost only -->
+    <!-- Local dev -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>

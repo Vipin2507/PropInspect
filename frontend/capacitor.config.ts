@@ -6,11 +6,11 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: false,
+    cleartext: true,  // allow HTTP to VPS IP (self-signed cert workaround)
   },
   android: {
     backgroundColor: '#ffffff',
-    allowMixedContent: false,  // HTTPS only — no mixed content needed
+    allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
   },
