@@ -36,7 +36,13 @@ app.set('trust proxy', 1);
 const PORT = parseInt(process.env.PORT || '4000', 10)
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads')
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
-const allowedOrigins = [CORS_ORIGIN, 'http://localhost', 'capacitor://localhost']
+const allowedOrigins = [
+  CORS_ORIGIN,
+  'http://localhost',
+  'https://localhost',       // Capacitor Android (androidScheme: https)
+  'capacitor://localhost', // Capacitor iOS
+  'ionic://localhost',
+]
 
 getDB()
 seedDatabase()

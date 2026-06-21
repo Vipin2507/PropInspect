@@ -15,8 +15,10 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
   },
   plugins: {
+    // Keep disabled — CapacitorHttp intercepts axios and can drop POST bodies on Android.
+    // CORS allows https://localhost (Capacitor WebView origin).
     CapacitorHttp: {
-      enabled: true,
+      enabled: false,
     },
     SplashScreen: {
       launchShowDuration: 1500,

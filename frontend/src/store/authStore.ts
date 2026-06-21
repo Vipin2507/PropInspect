@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthStore>()(
       },
       setOtpMobile: (mobile) => set({ otpMobile: mobile }),
       login: async (email, password) => {
-        const { data } = await authApi.login(email, password)
+        const { data } = await authApi.login(email.trim(), password.trim())
         get().setAuth(data.user, data.token)
         return dashboardForRole(data.user.role)
       },

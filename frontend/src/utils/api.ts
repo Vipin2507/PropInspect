@@ -16,23 +16,23 @@ import type {
   Review,
 } from '../types'
 
+const DEFAULT_API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+
+// Native apps use HTTP when the server has a self-signed cert (Android WebView won't trust it).
+// Set VITE_NATIVE_API_BASE_URL in .env.production to override.
 const getBaseURL = () => {
   if (Capacitor.isNativePlatform()) {
-    return 'http://147.93.30.96/api'  // HTTP — self-signed cert not trusted in Android WebView
+    return import.meta.env.VITE_NATIVE_API_BASE_URL || DEFAULT_API.replace(/^https:/, 'http:')
   }
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+  return DEFAULT_API
 }
 
 // Base URL for static media (uploads). Relative paths from the server
 // need to be prefixed with the VPS host when running as a native app,
 // because capacitor://localhost cannot resolve /uploads/... paths.
 export const getMediaBaseURL = () => {
-  if (Capacitor.isNativePlatform()) {
-    return 'http://147.93.30.96';
-  }
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-  return apiBase.replace(/\/api$/, '');
-};
+  return getBaseURL().replace(/\/api$/, '')
+}
 
 // Resolve a relative server path like /uploads/... to a full URL on native.
 export function resolveMediaUrl(url: string | undefined | null): string | undefined {
@@ -44,6 +44,10 @@ export function resolveMediaUrl(url: string | undefined | null): string | undefi
 export const api = axios.create({
   baseURL: getBaseURL(),
   timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
 })
 
 // Log actual base URL on startup — helps debug wrong URL in APK
