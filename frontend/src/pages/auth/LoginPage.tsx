@@ -27,10 +27,13 @@ export default function LoginPage() {
       toast.success('Welcome back!')
       navigate(redirect, { replace: true })
     } catch (err) {
+      const axiosErr = err as any
+      // Show the actual error for debugging — network errors show differently than auth errors
+      const serverMsg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message
+      const networkErr = axiosErr?.code || axiosErr?.message
       toast.error(
-        (err as any)?.response?.data?.error ||
-        (err as any)?.response?.data?.message ||
-        'Invalid credentials. Please try again.'
+        serverMsg ||
+        (networkErr ? `Network error: ${networkErr}` : 'Login failed. Check connection.')
       )
     } finally {
       setLoading(false)

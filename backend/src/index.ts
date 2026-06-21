@@ -79,10 +79,19 @@ app.use(morgan('dev'))
 app.use(express.json({ limit: '50mb' })) 
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
+// Rate limit — skip for trusted internal traffic (Nginx proxy)
+// Trust proxy is set above so req.ip is the real client IP, not 127.0.0.1
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 500,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 2000,                 // 2000 requests per window per real IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting for requests coming from localhost / same machine
+    skip: (req) => {
+      const ip = req.ip || ''
+      return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
+    },
   })
 )
 

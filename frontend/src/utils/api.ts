@@ -46,11 +46,32 @@ export const api = axios.create({
   timeout: 30000,
 })
 
+// Log actual base URL on startup — helps debug wrong URL in APK
+if (typeof window !== 'undefined') {
+  console.log('[API] Base URL:', getBaseURL())
+  console.log('[API] isNative:', Capacitor.isNativePlatform())
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('snagdesk_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
+
+// Log errors to help debug network issues on Android
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('[API] Error:', {
+      url: error?.config?.url,
+      baseURL: error?.config?.baseURL,
+      status: error?.response?.status,
+      code: error?.code,
+      message: error?.message,
+    })
+    return Promise.reject(error)
+  }
+)
 
 export const authApi = {
   login: (email: string, password: string) =>
