@@ -9,6 +9,7 @@ import { rowToInspection, rowToResponse, rowToSnag, rowToImage } from '../utils/
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { getItemMandatoryImage } from '../constants/checklist'
 import { createNotification, createNotifications } from '../utils/notifications'
+import { logFlatHistory } from '../utils/flatHistory'
 import { param } from '../utils/params'
 import { calcCompletionPct } from './responses'
 
@@ -70,6 +71,14 @@ function createDraftInspection(flatId: string, engineerId: string) {
       insertResponse.run(responseId, inspectionId, item.id, cat.id)
     }
   }
+
+  logFlatHistory({
+    flatId,
+    eventType: 'inspection_started',
+    actorId: engineerId,
+    title: 'Inspection started',
+    description: 'Snagging inspection checklist created for this flat.',
+  })
 
   return loadInspection(inspectionId)!
 }
@@ -178,13 +187,7 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
 
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
 
-  // Req 4.1 / 10.1 — 100% completion gate
-  const pendingCount = responses.filter((r) => r.status === 'pending').length
-  if (pendingCount > 0) {
-    throw new AppError(`${pendingCount} task${pendingCount !== 1 ? 's' : ''} still pending — complete all items before submitting`, 400)
-  }
-
-  // Only validate mandatory-image rule for fail items — pending items are allowed
+  // Fail items with mandatory images still require evidence before submit
   for (const r of responses) {
     if (r.status === 'fail') {
       const mandatory = getItemMandatoryImage(r.item_id as string)
@@ -228,6 +231,17 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
 
   db.prepare(`UPDATE inspections SET status = 'submitted', submitted_at = datetime('now'), last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
   db.prepare(`UPDATE flats SET status = 'submitted' WHERE id = ?`).run(inspection.flat_id)
+
+  logFlatHistory({
+    flatId: inspection.flat_id as string,
+    eventType: isResubmit ? 'inspection_resubmitted' : 'inspection_submitted',
+    actorId: inspection.engineer_id as string,
+    title: isResubmit ? 'Resubmitted for QA review' : 'Submitted for QA review',
+    description: isResubmit
+      ? 'Engineer addressed revisions and sent the inspection back to QA.'
+      : 'Inspection sent to QA for review.',
+    metadata: { inspectionId },
+  })
 
   // Req 4.4 — notify all QA users
   const qaUsers = db.prepare(`SELECT id FROM users WHERE role = 'qa' AND is_active = 1`).all() as { id: string }[]

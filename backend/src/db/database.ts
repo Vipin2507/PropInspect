@@ -319,6 +319,21 @@ export function runMigrations(database: SnagDeskDatabase): void {
     );
     CREATE INDEX IF NOT EXISTS idx_audit_user   ON audit_logs(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
+
+    CREATE TABLE IF NOT EXISTS flat_history (
+      id          TEXT PRIMARY KEY,
+      flat_id     TEXT NOT NULL REFERENCES flats(id) ON DELETE CASCADE,
+      event_type  TEXT NOT NULL,
+      actor_id    TEXT REFERENCES users(id),
+      actor_name  TEXT,
+      actor_role  TEXT,
+      title       TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      metadata    TEXT NOT NULL DEFAULT '{}',
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_flat_history_flat    ON flat_history(flat_id);
+    CREATE INDEX IF NOT EXISTS idx_flat_history_created ON flat_history(flat_id, created_at);
   `)
 }
 

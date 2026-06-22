@@ -9,8 +9,9 @@ import { Modal } from '../../../components/ui/Modal'
 import { cn } from '../../../utils/cn'
 import { Pencil, Plus, Trash2, ChevronDown, ChevronUp, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { generateId } from '../../../utils/id'
 
-const uid = () => crypto.randomUUID().slice(0, 8)
+const uid = () => generateId().slice(0, 8)
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface EditItem {

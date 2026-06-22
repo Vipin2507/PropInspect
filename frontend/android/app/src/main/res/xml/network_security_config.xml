@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- VPS: allow both HTTP and HTTPS (self-signed cert, no CA trust needed) -->
-    <domain-config cleartextTrafficPermitted="true">
+    <!-- VPS: trust pinned self-signed cert for HTTPS -->
+    <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">147.93.30.96</domain>
+        <trust-anchors>
+            <certificates src="@raw/snagdesk" />
+        </trust-anchors>
     </domain-config>
 
     <!-- Local dev -->

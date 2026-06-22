@@ -22,10 +22,8 @@ export function useResponses() {
       try {
         const { data } = await responsesApi.updateStatus(responseId, { status, remarks })
         return data as Partial<InspectionResponse> & { completionPct?: number }
-      } catch (err: unknown) {
-        // Offline — queue for later sync
+      } catch {
         await queueChange('save_inspection', { responseId, status, remarks })
-        // Return an optimistic patch so the UI updates immediately
         return { id: responseId, status, remarks: status === 'pending' ? '' : (remarks ?? '') }
       }
     },

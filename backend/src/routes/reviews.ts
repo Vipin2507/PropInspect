@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToImage, rowToSnag } from '../utils/mappers'
 import { createNotification, createNotifications } from '../utils/notifications'
+import { logFlatHistory } from '../utils/flatHistory'
 
 const router = Router()
 router.use(authenticate)
@@ -133,8 +134,14 @@ router.post(
 
     const db = getDB()
     const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(body.inspectionId) as Record<string, unknown>
-    if (!inspection || inspection.status !== 'submitted') {
-      res.status(400).json({ error: 'Inspection not available for review' })
+    if (!inspection) {
+      res.status(404).json({ error: 'Inspection not found' })
+      return
+    }
+    if (inspection.status !== 'submitted') {
+      res.status(400).json({
+        error: `This inspection cannot be reviewed right now (status: ${inspection.status}). Pull to refresh and try again.`,
+      })
       return
     }
 
@@ -168,6 +175,30 @@ router.post(
 
     db.prepare(`UPDATE inspections SET status = ? WHERE id = ?`).run(inspectionStatus, body.inspectionId)
     db.prepare(`UPDATE flats SET status = ? WHERE id = ?`).run(flatStatus, inspection.flat_id)
+
+    const reviewEventMap = {
+      approved: 'review_approved',
+      rejected: 'review_rejected',
+      revision_required: 'review_revision_required',
+    } as const
+    const reviewTitleMap = {
+      approved: 'Approved by QA',
+      rejected: 'Rejected by QA',
+      revision_required: 'Revision requested by QA',
+    } as const
+
+    logFlatHistory({
+      flatId: inspection.flat_id as string,
+      eventType: reviewEventMap[body.decision],
+      actorId: req.user!.id,
+      title: reviewTitleMap[body.decision],
+      description: body.overallComments || `QA marked this flat as ${body.decision.replace(/_/g, ' ')}.`,
+      metadata: {
+        reviewId,
+        inspectionId: body.inspectionId,
+        decision: body.decision,
+      },
+    })
 
     const notifType =
       body.decision === 'approved'

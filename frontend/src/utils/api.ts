@@ -14,18 +14,11 @@ import type {
   Assignment,
   ChecklistTemplate,
   Review,
+  FlatHistoryEntry,
 } from '../types'
 
-const DEFAULT_API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
-
-// Native apps use HTTP when the server has a self-signed cert (Android WebView won't trust it).
-// Set VITE_NATIVE_API_BASE_URL in .env.production to override.
-const getBaseURL = () => {
-  if (Capacitor.isNativePlatform()) {
-    return import.meta.env.VITE_NATIVE_API_BASE_URL || DEFAULT_API.replace(/^https:/, 'http:')
-  }
-  return DEFAULT_API
-}
+const getBaseURL = () =>
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
 
 // Base URL for static media (uploads). Relative paths from the server
 // need to be prefixed with the VPS host when running as a native app,
@@ -57,6 +50,7 @@ if (typeof window !== 'undefined') {
 }
 
 api.interceptors.request.use((config) => {
+  config.baseURL = getBaseURL()
   const token = localStorage.getItem('snagdesk_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
@@ -121,6 +115,7 @@ export const flatsApi = {
   byProject: (projectId: string) => api.get<Flat[]>(`/flats?projectId=${projectId}`),
   byTower: (towerId: string) => api.get<Flat[]>(`/flats?towerId=${towerId}`),
   get: (id: string) => api.get<Flat>(`/flats/${id}`),
+  history: (id: string) => api.get<FlatHistoryEntry[]>(`/flats/${id}/history`),
   checkerList: (params?: { projectId?: string; towerId?: string }) =>
     api.get<Flat[]>('/flats/checker', { params }),
   setStatus: (id: string, status: string) =>

@@ -3,6 +3,7 @@ import { getItemMandatoryImage } from '../constants/checklist'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { createNotification } from '../utils/notifications'
+import { logFlatHistory } from '../utils/flatHistory'
 
 export function validateAndSubmitFromSync(inspectionId: string, isResubmit: boolean): void {
   const db = getDB()
@@ -12,7 +13,6 @@ export function validateAndSubmitFromSync(inspectionId: string, isResubmit: bool
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
 
   for (const r of responses) {
-    if (r.status === 'pending') throw new Error('All items must be answered')
     if (r.status === 'fail') {
       const mandatory = getItemMandatoryImage(r.item_id as string)
       const imageCount = (db.prepare('SELECT COUNT(*) as c FROM images WHERE response_id = ?').get(r.id) as { c: number }).c
@@ -35,6 +35,15 @@ export function validateAndSubmitFromSync(inspectionId: string, isResubmit: bool
 
   db.prepare(`UPDATE inspections SET status = 'submitted', submitted_at = datetime('now') WHERE id = ?`).run(inspectionId)
   db.prepare(`UPDATE flats SET status = 'submitted' WHERE id = ?`).run(inspection.flat_id)
+
+  logFlatHistory({
+    flatId: inspection.flat_id as string,
+    eventType: isResubmit ? 'inspection_resubmitted' : 'inspection_submitted',
+    actorId: inspection.engineer_id as string,
+    title: isResubmit ? 'Resubmitted for QA review' : 'Submitted for QA review',
+    description: 'Inspection synced and submitted for QA review.',
+    metadata: { inspectionId },
+  })
 
   const assignment = db.prepare('SELECT qa_id FROM assignments WHERE flat_id = ?').get(inspection.flat_id) as { qa_id: string }
   if (assignment) {

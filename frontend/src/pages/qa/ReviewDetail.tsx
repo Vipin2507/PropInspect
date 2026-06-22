@@ -73,21 +73,68 @@ export default function ReviewDetail() {
   }, [inspectionId])
 
   const submitReview = async (decision: 'approved' | 'revision_required' | 'rejected') => {
-    if (!inspectionId) return
+    if (!inspectionId || !data) return
     if (decision !== 'approved' && !overallComments.trim()) {
       toast.error('Overall comments are required for revision or rejection.')
       return
     }
     setIsSubmitting(true)
+
+    const itemCommentsPayload: Record<string, string> = { ...itemComments }
+    for (const r of data.inspection.responses) {
+      if (r.qaRemarks?.trim() && !itemCommentsPayload[r.itemId]) {
+        itemCommentsPayload[r.itemId] = r.qaRemarks.trim()
+      }
+    }
+
     try {
-      await reviewsApi.submit({ inspectionId, decision, overallComments, itemComments })
+      await reviewsApi.submit({
+        inspectionId,
+        decision,
+        overallComments,
+        itemComments: itemCommentsPayload,
+      })
+      localStorage.removeItem(`review_detail_${inspectionId}`)
       toast.success(`Inspection ${decision.replace('_', ' ')}.`)
       navigate(ROUTES.QA_REVIEWS)
-    } catch {
-      // Queue for sync when back online
-      await queueChange('review_decision', { inspectionId, decision, overallComments, itemComments })
-      toast.success('Review saved offline — will sync when back online')
-      navigate(ROUTES.QA_REVIEWS)
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { status?: number; data?: { error?: string } }
+        message?: string
+        code?: string
+      }
+      const status = axiosErr?.response?.status
+      const serverMsg = axiosErr?.response?.data?.error
+      const isNetwork =
+        !status ||
+        status >= 500 ||
+        axiosErr?.code === 'ERR_NETWORK' ||
+        axiosErr?.message === 'Network Error'
+
+      if (isNetwork) {
+        try {
+          await queueChange('review_decision', {
+            inspectionId,
+            decision,
+            overallComments,
+            itemComments: itemCommentsPayload,
+          })
+          toast.success('Review saved offline — will sync when back online')
+          navigate(ROUTES.QA_REVIEWS)
+        } catch {
+          toast.error('Failed to save review offline. Please try again.')
+        }
+      } else {
+        toast.error(serverMsg || 'Failed to submit review')
+        try {
+          const { data: fresh } = await reviewsApi.get(inspectionId)
+          localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(fresh))
+          setData(fresh as typeof data)
+          setIsOffline(false)
+        } catch {
+          setIsOffline(true)
+        }
+      }
     } finally {
       setIsSubmitting(false)
       setRevisionDrawerOpen(false)

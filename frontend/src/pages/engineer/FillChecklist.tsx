@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { App } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
 import { useInspection } from '../../hooks/useInspection'
 import { ChecklistCategory } from '../../components/inspection/ChecklistCategory'
@@ -8,6 +10,8 @@ import { SubmitBar } from '../../components/inspection/SubmitBar'
 import { ROUTES } from '../../constants/routes'
 import { imagesApi } from '../../utils/api'
 import { queueChange } from '../../utils/sync'
+import { saveInspection } from '../../utils/storage'
+import { generateId } from '../../utils/id'
 import type { InspectionResponse, SnagImage } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 
@@ -18,56 +22,68 @@ export default function FillChecklist() {
   const catIndex = DEFAULT_CHECKLIST_CATEGORIES.findIndex((c) => c.id === (categoryId || 'civil'))
   const category = DEFAULT_CHECKLIST_CATEGORIES[catIndex >= 0 ? catIndex : 0]
 
-  const { inspection, loading, saveResponses, setInspection } = useInspection(flatId)
+  const {
+    inspection,
+    loading,
+    saveResponses,
+    updateResponse,
+    flushPendingSaves,
+    setInspection,
+  } = useInspection(flatId)
 
   const inspectionRef = useRef(inspection)
   inspectionRef.current = inspection
 
   const handleChange = useCallback(
     (itemId: string, patch: Partial<InspectionResponse>) => {
-      if (!inspectionRef.current) return
-      const responses = inspectionRef.current.responses.map((r) =>
-        r.itemId === itemId ? { ...r, ...patch, updatedAt: new Date().toISOString() } : r
-      )
-      setInspection({ ...inspectionRef.current, responses })
+      updateResponse(itemId, patch)
     },
-    [setInspection]
+    [updateResponse]
+  )
+
+  const navigateAway = useCallback(
+    async (to: string) => {
+      await flushPendingSaves()
+      if (inspectionRef.current) {
+        await saveResponses(inspectionRef.current.responses)
+      }
+      navigate(to)
+    },
+    [flushPendingSaves, saveResponses, navigate]
   )
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (inspectionRef.current) saveResponses(inspectionRef.current.responses)
-    }, 30000)
-    return () => {
-      clearInterval(timer)
-      if (inspectionRef.current) saveResponses(inspectionRef.current.responses)
-    }
-  }, [saveResponses])
+    if (!Capacitor.isNativePlatform() || !flatId) return
+    let handle: { remove: () => void } | undefined
+    App.addListener('backButton', () => {
+      navigateAway(ROUTES.ENGINEER_FLAT(flatId))
+    }).then((h) => { handle = h })
+    return () => { handle?.remove() }
+  }, [flatId, navigateAway])
 
-  // base64 is a data: URI — guaranteed to render in Android WebView
   const handleImageAdd = async (responseId: string, file: File, base64: string) => {
     if (!inspectionRef.current) return
     const current = inspectionRef.current
 
     const img: SnagImage = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       inspectionId: current.id,
       responseId,
       type: 'evidence',
-      url: base64,         // base64 as fallback URL
+      url: base64,
       caption: '',
       uploadedAt: new Date().toISOString(),
       isLocal: true,
-      localBlob: base64,   // stored as base64 — renders everywhere
+      localBlob: base64,
     }
 
-    // Optimistically update UI immediately so image is visible right away
     const optimisticResponses = current.responses.map((r) =>
       r.id === responseId ? { ...r, images: [...r.images, img] } : r
     )
-    setInspection({ ...current, responses: optimisticResponses })
+    const updated = { ...current, responses: optimisticResponses, lastUpdated: new Date().toISOString() }
+    setInspection(updated)
+    await saveInspection(updated)
 
-    // Try uploading to server — works online, queues offline
     const fd = new FormData()
     fd.append('file', file)
     fd.append('inspectionId', current.id)
@@ -75,7 +91,6 @@ export default function FillChecklist() {
     fd.append('type', 'evidence')
     try {
       const { data } = await imagesApi.upload(fd)
-      // Replace local base64 with server URLs
       const updatedResponses = inspectionRef.current?.responses.map((r) =>
         r.id === responseId
           ? {
@@ -89,10 +104,11 @@ export default function FillChecklist() {
           : r
       )
       if (updatedResponses && inspectionRef.current) {
-        setInspection({ ...inspectionRef.current, responses: updatedResponses })
+        const withServerUrls = { ...inspectionRef.current, responses: updatedResponses }
+        setInspection(withServerUrls)
+        await saveInspection(withServerUrls)
       }
     } catch {
-      // Queue upload for when back online — base64 stored in IndexedDB via saveInspection
       await queueChange('upload_image', {
         imageId: img.id,
         inspectionId: current.id,
@@ -103,12 +119,14 @@ export default function FillChecklist() {
     }
   }
 
-  const handleImageRemove = (responseId: string, imageId: string) => {
+  const handleImageRemove = async (responseId: string, imageId: string) => {
     if (!inspectionRef.current) return
     const responses = inspectionRef.current.responses.map((r) =>
       r.id === responseId ? { ...r, images: r.images.filter((i) => i.id !== imageId) } : r
     )
-    setInspection({ ...inspectionRef.current, responses })
+    const updated = { ...inspectionRef.current, responses, lastUpdated: new Date().toISOString() }
+    setInspection(updated)
+    await saveInspection(updated)
   }
 
   if (loading || !inspection) {
@@ -126,12 +144,11 @@ export default function FillChecklist() {
 
   return (
     <div className="flex flex-col pb-28 md:pb-0">
-      {/* Sticky header */}
       <div className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(ROUTES.ENGINEER_FLAT(flatId!))}
+            onClick={() => navigateAway(ROUTES.ENGINEER_FLAT(flatId!))}
             className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full active:bg-slate-100"
             aria-label="Back"
           >
@@ -155,7 +172,6 @@ export default function FillChecklist() {
         </div>
       </div>
 
-      {/* Checklist items */}
       <div className="space-y-3 p-4">
         <ChecklistCategory
           category={category}
@@ -167,14 +183,8 @@ export default function FillChecklist() {
       </div>
 
       <SubmitBar
-        onNext={() => {
-          saveResponses(inspection.responses)
-          navigate(ROUTES.ENGINEER_CHECKLIST(flatId!, nextCat.id))
-        }}
-        onSummary={() => {
-          saveResponses(inspection.responses)
-          navigate(ROUTES.ENGINEER_INSPECTION_SUMMARY(flatId!))
-        }}
+        onNext={() => navigateAway(ROUTES.ENGINEER_CHECKLIST(flatId!, nextCat.id))}
+        onSummary={() => navigateAway(ROUTES.ENGINEER_INSPECTION_SUMMARY(flatId!))}
         isLastCategory={isLast}
         isComplete={done === category.items.length}
         doneCount={done}

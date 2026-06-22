@@ -266,6 +266,30 @@ export interface ActivityEntry {
   comments?: string
 }
 
+export type FlatHistoryEventType =
+  | 'inspection_started'
+  | 'inspection_submitted'
+  | 'inspection_resubmitted'
+  | 'review_approved'
+  | 'review_rejected'
+  | 'review_revision_required'
+  | 'handed_over'
+  | 'engineer_assigned'
+  | 'status_changed'
+
+export interface FlatHistoryEntry {
+  id: string
+  flatId: string
+  eventType: FlatHistoryEventType
+  actorId?: string
+  actorName?: string
+  actorRole?: string
+  title: string
+  description: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
 export type PendingChangeType =
   | 'save_inspection'
   | 'submit_inspection'

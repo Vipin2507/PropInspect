@@ -2,6 +2,7 @@ import { syncApi } from './api'
 import { getPendingChanges, clearPendingChange, saveFlats, saveInspection } from './storage'
 import { useSyncStore } from '../store/syncStore'
 import type { PendingChange } from '../types'
+import { generateId } from './id'
 
 const LAST_PULL_KEY = 'snagdesk_last_pull'
 
@@ -90,7 +91,7 @@ export async function queueChange(
 ): Promise<void> {
   const { addPendingChange } = await import('./storage')
   const change: PendingChange = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type,
     payload,
     timestamp: Date.now(),

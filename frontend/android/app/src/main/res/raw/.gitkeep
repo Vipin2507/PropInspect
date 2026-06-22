@@ -1,2 +1,0 @@
-# Place snagdesk.crt here after copying from VPS:
-# scp user@147.93.30.96:/etc/ssl/certs/snagdesk.crt android/app/src/main/res/raw/snagdesk.crt

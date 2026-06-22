@@ -8,6 +8,7 @@ import { Lightbox } from '../ui/Lightbox'
 import { useResponses } from '../../hooks/useResponses'
 import { ImageUploader } from '../inspection/ImageUploader'
 import toast from 'react-hot-toast'
+import { generateId } from '../../utils/id'
 import { cn } from '../../utils/cn'
 
 type QADecision = 'approved' | 'rejected' | 'revision_required'
@@ -95,7 +96,7 @@ export function ReviewItemRow({
   const handleEvidenceAdd = async (file: File, base64: string) => {
     // Optimistic local image
     const localImg: SnagImage = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       inspectionId,
       responseId: response.id,
       type: 'evidence',

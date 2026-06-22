@@ -6,6 +6,8 @@ import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
 import { calcCompletionPct } from './responses'
+import { getFlatHistory, logFlatHistory } from '../utils/flatHistory'
+import { param } from '../utils/params'
 
 const router = Router()
 router.use(authenticate)
@@ -107,6 +109,28 @@ router.get(
 )
 
 router.get(
+  '/:id/history',
+  requireRole('engineer', 'qa', 'admin'),
+  asyncHandler(async (req, res) => {
+    const flatId = param(req, 'id')
+    const row = getDB().prepare('SELECT id, status FROM flats WHERE id = ?').get(flatId) as
+      | { id: string; status: string }
+      | undefined
+    if (!row) {
+      res.status(404).json({ error: 'Flat not found' })
+      return
+    }
+    if (req.user!.role === 'qa') {
+      if (!['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(row.status)) {
+        res.status(403).json({ error: 'Flat has not been submitted for review' })
+        return
+      }
+    }
+    res.json(getFlatHistory(flatId))
+  })
+)
+
+router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const row = getDB().prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
@@ -161,6 +185,13 @@ router.post(
       return
     }
     db.prepare(`UPDATE flats SET status = 'handed_over' WHERE id = ?`).run(req.params.id)
+    logFlatHistory({
+      flatId: param(req, 'id'),
+      eventType: 'handed_over',
+      actorId: req.user!.id,
+      title: 'Handed over to client',
+      description: 'Flat marked as handed over to the client.',
+    })
     const updated = db.prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
     res.json(enrichFlat(updated))
   })

@@ -141,8 +141,8 @@ export function ReviewChecklist({
                         response={response!}
                         inspectionId={inspectionId}
                         onResponseUpdate={(updated) => onResponseUpdate?.(response!.id, updated)}
-                        qaComment={itemComments[response!.id] || response!.qaRemarks || ''}
-                        onQaComment={(v) => onItemCommentChange(response!.id, v)}
+                        qaComment={itemComments[item.id] || response!.qaRemarks || ''}
+                        onQaComment={(v) => onItemCommentChange(item.id, v)}
                       />
                     ))}
                   </div>

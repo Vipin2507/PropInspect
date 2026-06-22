@@ -1,11 +1,13 @@
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, Wrench, CheckCircle2, PackageCheck } from 'lucide-react'
+import { ArrowLeft, Eye, Wrench, CheckCircle2, PackageCheck, History } from 'lucide-react'
 import { useInspection } from '../../hooks/useInspection'
 import { useAuthStore } from '../../store/authStore'
 import { useSnags } from '../../hooks/useSnags'
 import { useFlatDetail } from '../../hooks/useFlatDetail'
+import { useFlatHistory } from '../../hooks/useFlatHistory'
 import { ProgressBar } from '../../components/ui/ProgressBar'
 import { InspectionSummary } from '../../components/inspection/InspectionSummary'
+import { FlatHistoryTab } from '../../components/flat/FlatHistoryTab'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
@@ -18,6 +20,8 @@ import { flatsApi } from '../../utils/api'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 
+type FlatTab = 'overview' | 'history'
+
 export default function FlatDetail() {
   const { flatId }  = useParams<{ flatId: string }>()
   const navigate    = useNavigate()
@@ -26,8 +30,12 @@ export default function FlatDetail() {
   const isQA        = user?.role === 'qa'
   const canHandover = isAdmin || isQA
 
+  const [activeTab, setActiveTab] = useState<FlatTab>('overview')
   const { inspection, loading } = useInspection(flatId)
   const flat = useFlatDetail(flatId)
+  const { history, loading: historyLoading, error: historyError } = useFlatHistory(
+    activeTab === 'history' ? flatId : undefined
+  )
   const { snags } = useSnags({ flatId })
   const openSnagCount = snags.filter((s) => ['open', 'assigned', 'in_rectification'].includes(s.status)).length
 
@@ -35,7 +43,6 @@ export default function FlatDetail() {
   const [handoverLoading, setHandoverLoading] = useState(false)
   const [flatStatus, setFlatStatus] = useState<string | null>(null)
 
-  // Use local state override once handover is done, so UI updates without refetch
   const currentFlatStatus = flatStatus ?? flat?.status
 
   const responses    = inspection?.responses || []
@@ -93,11 +100,10 @@ export default function FlatDetail() {
         {backLabel}
       </Link>
 
-      {!isAdmin && inspection?.status === 'revision_required' && (
+      {!isAdmin && inspection?.status === 'revision_required' && activeTab === 'overview' && (
         <RevisionBanner comments="Please address QA comments and resubmit." />
       )}
 
-      {/* Handed Over banner */}
       {currentFlatStatus === 'handed_over' && (
         <div className="flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 p-4">
           <PackageCheck size={22} className="shrink-0 text-teal-600" aria-hidden="true" />
@@ -108,7 +114,6 @@ export default function FlatDetail() {
         </div>
       )}
 
-      {/* Flat info card */}
       <div className="rounded-2xl bg-white p-4 shadow-sm md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -121,11 +126,9 @@ export default function FlatDetail() {
               </p>
             )}
           </div>
-          {/* Show local status override if available */}
           <Badge status={currentFlatStatus ?? inspection?.status ?? 'not_started'} />
         </div>
 
-        {/* Admin/QA: assignment info */}
         {canHandover && flat?.assignment && (
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
             <div>
@@ -139,7 +142,7 @@ export default function FlatDetail() {
           </div>
         )}
 
-        {totalCount > 0 && (
+        {totalCount > 0 && activeTab === 'overview' && (
           <div className="mt-4">
             <div className="mb-1.5 flex justify-between text-sm font-medium">
               <span className="text-slate-600">Overall Progress</span>
@@ -152,7 +155,7 @@ export default function FlatDetail() {
           </div>
         )}
 
-        {!isAdmin && !isQA && isComplete && inspection?.status === 'draft' && (
+        {!isAdmin && !isQA && isComplete && inspection?.status === 'draft' && activeTab === 'overview' && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
             <CheckCircle2 size={16} aria-hidden="true" />
             All items complete — ready to submit for QA review!
@@ -160,103 +163,127 @@ export default function FlatDetail() {
         )}
       </div>
 
-      {/* Open snags */}
-      {!isAdmin && !isQA && openSnagCount > 0 && (
+      <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
         <button
           type="button"
-          onClick={() => navigate(ROUTES.ENGINEER_FLAT_SNAGS?.(flatId!) ?? ROUTES.DESNAGGING)}
-          className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left touch-manipulation active:bg-red-100"
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors touch-manipulation',
+            activeTab === 'overview' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
+          )}
         >
-          <div className="flex items-center gap-2">
-            <Wrench size={18} className="text-fail" aria-hidden="true" />
-            <span className="text-sm font-semibold text-fail">
-              {openSnagCount} open snag{openSnagCount !== 1 ? 's' : ''} need rectification
-            </span>
-          </div>
-          <span className="text-sm font-semibold text-fail">View →</span>
+          Overview
         </button>
-      )}
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={cn(
+            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors touch-manipulation',
+            activeTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
+          )}
+        >
+          <History size={16} aria-hidden="true" />
+          History
+        </button>
+      </div>
 
-      {/* Checklist summary */}
-      <div>
-        <h2 className="mb-3 text-base font-bold text-slate-800 md:text-lg">Inspection Checklist</h2>
-        {!inspection ? (
-          <div className="rounded-2xl bg-white px-4 py-12 text-center shadow-sm">
-            <h3 className="text-base font-semibold text-slate-800">No Inspection Started</h3>
-            <p className="mb-6 mt-2 text-sm text-slate-500">
-              {canHandover
-                ? 'The engineer has not started this inspection yet.'
-                : 'Start the inspection to fill in the checklist.'}
-            </p>
-            {!canHandover && (
-              <Button onClick={startOrContinueInspection} className="mx-auto">
-                Start Inspection
-              </Button>
+      {activeTab === 'overview' ? (
+        <>
+          {!isAdmin && !isQA && openSnagCount > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.ENGINEER_FLAT_SNAGS?.(flatId!) ?? ROUTES.DESNAGGING)}
+              className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left touch-manipulation active:bg-red-100"
+            >
+              <div className="flex items-center gap-2">
+                <Wrench size={18} className="text-fail" aria-hidden="true" />
+                <span className="text-sm font-semibold text-fail">
+                  {openSnagCount} open snag{openSnagCount !== 1 ? 's' : ''} need rectification
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-fail">View →</span>
+            </button>
+          )}
+
+          <div>
+            <h2 className="mb-3 text-base font-bold text-slate-800 md:text-lg">Inspection Checklist</h2>
+            {!inspection ? (
+              <div className="rounded-2xl bg-white px-4 py-12 text-center shadow-sm">
+                <h3 className="text-base font-semibold text-slate-800">No Inspection Started</h3>
+                <p className="mb-6 mt-2 text-sm text-slate-500">
+                  {canHandover
+                    ? 'The engineer has not started this inspection yet.'
+                    : 'Start the inspection to fill in the checklist.'}
+                </p>
+                {!canHandover && (
+                  <Button onClick={startOrContinueInspection} className="mx-auto">
+                    Start Inspection
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <InspectionSummary responses={responses} flatId={flatId!} />
             )}
           </div>
-        ) : (
-          <InspectionSummary responses={responses} flatId={flatId!} />
-        )}
-      </div>
+        </>
+      ) : (
+        <FlatHistoryTab history={history} loading={historyLoading} error={historyError} />
+      )}
 
-      {/* ── Bottom action bar ───────────────────────────────────────── */}
-      <div className={cn(
-        'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-safe backdrop-blur-sm',
-        'md:relative md:bottom-auto md:left-auto md:right-auto md:border-none md:bg-transparent md:p-0'
-      )}>
-        <div className="mx-auto flex max-w-md flex-col gap-3">
-
-          {/* Admin/QA: View inspection + Handover */}
-          {canHandover && inspection && (
-            <>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate(`/qa/reviews/${inspection.id}`)}
-              >
-                <Eye size={18} aria-hidden="true" />
-                View Full Inspection
-              </Button>
-
-              {canMarkHandover && (
+      {activeTab === 'overview' && (
+        <div className={cn(
+          'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-safe backdrop-blur-sm',
+          'md:relative md:bottom-auto md:left-auto md:right-auto md:border-none md:bg-transparent md:p-0'
+        )}>
+          <div className="mx-auto flex max-w-md flex-col gap-3">
+            {canHandover && inspection && (
+              <>
                 <Button
-                  className="w-full bg-teal-600 active:bg-teal-700"
-                  onClick={() => setHandoverConfirmOpen(true)}
-                  loading={handoverLoading}
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => navigate(`/qa/reviews/${inspection.id}`)}
                 >
-                  <PackageCheck size={18} aria-hidden="true" />
-                  Mark as Handed Over to Client
+                  <Eye size={18} aria-hidden="true" />
+                  View Full Inspection
                 </Button>
-              )}
 
-              {currentFlatStatus === 'handed_over' && (
-                <p className="text-center text-sm font-medium text-teal-600">
-                  ✓ Already handed over to client
-                </p>
-              )}
-            </>
-          )}
+                {canMarkHandover && (
+                  <Button
+                    className="w-full bg-teal-600 active:bg-teal-700"
+                    onClick={() => setHandoverConfirmOpen(true)}
+                    loading={handoverLoading}
+                  >
+                    <PackageCheck size={18} aria-hidden="true" />
+                    Mark as Handed Over to Client
+                  </Button>
+                )}
 
-          {/* Engineer: continue / summary */}
-          {!canHandover && inspection && totalCount > 0 && (
-            <>
-              <Button onClick={startOrContinueInspection} className="w-full">
-                {progress > 0 ? 'Continue Inspection' : 'Start Inspection'}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate(ROUTES.ENGINEER_INSPECTION_SUMMARY(flatId!))}
-              >
-                Summary &amp; Submit
-              </Button>
-            </>
-          )}
+                {currentFlatStatus === 'handed_over' && (
+                  <p className="text-center text-sm font-medium text-teal-600">
+                    ✓ Already handed over to client
+                  </p>
+                )}
+              </>
+            )}
 
+            {!canHandover && inspection && totalCount > 0 && (
+              <>
+                <Button onClick={startOrContinueInspection} className="w-full">
+                  {progress > 0 ? 'Continue Inspection' : 'Start Inspection'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => navigate(ROUTES.ENGINEER_INSPECTION_SUMMARY(flatId!))}
+                >
+                  Summary &amp; Submit
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Handover confirm dialog */}
       <ConfirmDialog
         open={handoverConfirmOpen}
         onOpenChange={setHandoverConfirmOpen}

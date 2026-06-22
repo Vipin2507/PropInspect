@@ -44,10 +44,9 @@ export default function InspectionSummaryPage() {
     navigate(ROUTES.ENGINEER_FLATS)
   }
 
-  // Req 4.1 — submission only allowed when allDone
   const confirmMessage = allDone
     ? 'Once submitted, you cannot edit this inspection until the QA checker responds.'
-    : `${pendingCount} item${pendingCount !== 1 ? 's' : ''} still pending. Complete all tasks before submitting.`
+    : `${pendingCount} item${pendingCount !== 1 ? 's are' : ' is'} still pending. You can submit now and complete the remaining items later if QA requests revision.`
 
   // Responses that the Checker flagged for revision (after re-open)
   const revisionResponses = inspection.responses.filter((r) => r.qaDecision === 'revision_required')
@@ -86,14 +85,13 @@ export default function InspectionSummaryPage() {
         </div>
       </div>
 
-      {/* Req 4.2 — hard warning when not 100%: submission blocked */}
       {!allDone && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-          <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-600" aria-hidden="true" />
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
           <div>
-            <p className="text-sm font-semibold text-red-800">Submission blocked</p>
-            <p className="mt-0.5 text-sm text-red-700">
-              {pendingCount} item{pendingCount !== 1 ? 's' : ''} still pending. Complete all checklist items before submitting.
+            <p className="text-sm font-semibold text-amber-800">Incomplete inspection</p>
+            <p className="mt-0.5 text-sm text-amber-700">
+              {pendingCount} item{pendingCount !== 1 ? 's' : ''} still pending. You can still submit for QA review.
             </p>
           </div>
         </div>
@@ -118,7 +116,6 @@ export default function InspectionSummaryPage() {
       <h3 className="text-base font-bold text-slate-800">Category Progress</h3>
       <InspectionSummary responses={inspection.responses} flatId={flatId!} />
 
-      {/* Submit bar — only enabled when allDone (Req 4.1) */}
       <div className={cn(
         'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-safe backdrop-blur-sm',
         'md:relative md:bottom-auto md:left-auto md:right-auto md:border-none md:bg-transparent md:p-0'
@@ -126,8 +123,6 @@ export default function InspectionSummaryPage() {
         <Button
           className="mx-auto w-full max-w-md"
           onClick={() => setIsConfirmOpen(true)}
-          disabled={!allDone}
-          title={!allDone ? `Complete all ${pendingCount} remaining tasks first` : undefined}
         >
           Submit for QA Review
         </Button>

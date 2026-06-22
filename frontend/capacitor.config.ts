@@ -10,9 +10,9 @@ const config: CapacitorConfig = {
   },
   android: {
     backgroundColor: '#ffffff',
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: true,
   },
   plugins: {
     // Keep disabled — CapacitorHttp intercepts axios and can drop POST bodies on Android.
