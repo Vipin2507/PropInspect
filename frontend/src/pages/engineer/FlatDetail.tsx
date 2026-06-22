@@ -19,6 +19,8 @@ import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
 import { flatsApi } from '../../utils/api'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
+import { AdminFlatStatusControl } from '../../components/admin/AdminFlatStatusControl'
+import type { Flat } from '../../types'
 
 type FlatTab = 'overview' | 'history'
 
@@ -32,7 +34,9 @@ export default function FlatDetail() {
 
   const [activeTab, setActiveTab] = useState<FlatTab>('overview')
   const { inspection, loading } = useInspection(flatId)
-  const flat = useFlatDetail(flatId)
+  const flatFromHook = useFlatDetail(flatId)
+  const [flatOverride, setFlatOverride] = useState<Flat | null>(null)
+  const flat = flatOverride ?? flatFromHook
   const { history, loading: historyLoading, error: historyError } = useFlatHistory(
     activeTab === 'history' ? flatId : undefined
   )
@@ -53,14 +57,20 @@ export default function FlatDetail() {
   const isComplete   = completionPct === 100
 
   const canMarkHandover = canHandover
-    && ['approved', 'desnagging'].includes(currentFlatStatus ?? '')
+    && (isAdmin || ['approved', 'desnagging'].includes(currentFlatStatus ?? ''))
 
   const handleHandover = async () => {
     if (!flatId) return
     setHandoverLoading(true)
     try {
-      await flatsApi.handover(flatId)
-      setFlatStatus('handed_over')
+      if (isAdmin && currentFlatStatus !== 'handed_over') {
+        const { data } = await flatsApi.setStatus(flatId, 'handed_over')
+        setFlatOverride(data)
+        setFlatStatus('handed_over')
+      } else {
+        await flatsApi.handover(flatId)
+        setFlatStatus('handed_over')
+      }
       toast.success('Flat marked as Handed Over to Client')
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Failed to mark handover')
@@ -160,6 +170,16 @@ export default function FlatDetail() {
             <CheckCircle2 size={16} aria-hidden="true" />
             All items complete — ready to submit for QA review!
           </div>
+        )}
+
+        {isAdmin && flat && (
+          <AdminFlatStatusControl
+            flat={flat}
+            onUpdated={(updated) => {
+              setFlatOverride(updated)
+              setFlatStatus(updated.status)
+            }}
+          />
         )}
       </div>
 

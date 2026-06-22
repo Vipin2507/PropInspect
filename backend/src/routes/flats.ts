@@ -154,6 +154,7 @@ router.patch(
   '/:id/status',
   requireRole('admin'),
   asyncHandler(async (req, res) => {
+    const flatId = param(req, 'id')
     const { status } = z
       .object({
         status: z.enum([
@@ -162,8 +163,68 @@ router.patch(
         ]),
       })
       .parse(req.body)
-    getDB().prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, req.params.id)
-    const row = getDB().prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
+
+    const db = getDB()
+    const flat = db.prepare('SELECT id, status FROM flats WHERE id = ?').get(flatId) as
+      | { id: string; status: string }
+      | undefined
+    if (!flat) {
+      res.status(404).json({ error: 'Flat not found' })
+      return
+    }
+
+    const previousStatus = flat.status
+    db.prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, flatId)
+
+    const inspection = db
+      .prepare('SELECT id, status FROM inspections WHERE flat_id = ?')
+      .get(flatId) as { id: string; status: string } | undefined
+
+    if (inspection) {
+      const inspectionStatusMap: Record<string, string> = {
+        not_started: 'draft',
+        in_progress: 'draft',
+        submitted: 'submitted',
+        approved: 'approved',
+        rejected: 'rejected',
+        revision_required: 'revision_required',
+        desnagging: 'approved',
+        handed_over: 'approved',
+      }
+      const inspectionStatus = inspectionStatusMap[status]
+      if (inspectionStatus) {
+        db.prepare(
+          `UPDATE inspections SET status = ?, last_updated = datetime('now') WHERE id = ?`
+        ).run(inspectionStatus, inspection.id)
+        if (status === 'submitted') {
+          db.prepare(
+            `UPDATE inspections SET submitted_at = datetime('now') WHERE id = ?`
+          ).run(inspection.id)
+        }
+      }
+    }
+
+    if (previousStatus !== status) {
+      logFlatHistory({
+        flatId,
+        eventType: 'status_changed',
+        actorId: req.user!.id,
+        title: `Status changed to ${status.replace(/_/g, ' ')}`,
+        description: `Admin updated flat status from ${previousStatus.replace(/_/g, ' ')} to ${status.replace(/_/g, ' ')}.`,
+        metadata: { from: previousStatus, to: status },
+      })
+      if (status === 'handed_over') {
+        logFlatHistory({
+          flatId,
+          eventType: 'handed_over',
+          actorId: req.user!.id,
+          title: 'Handed over to client',
+          description: 'Flat marked as handed over to the client.',
+        })
+      }
+    }
+
+    const row = db.prepare('SELECT * FROM flats WHERE id = ?').get(flatId) as Record<string, unknown>
     res.json(enrichFlat(row))
   })
 )
@@ -179,8 +240,11 @@ router.post(
       res.status(404).json({ error: 'Flat not found' })
       return
     }
-    // Can only hand over an approved or desnagging flat
-    if (!['approved', 'desnagging'].includes(flat.status as string)) {
+    // QA can only hand over an approved or desnagging flat; admin may override any stage
+    if (
+      req.user!.role === 'qa' &&
+      !['approved', 'desnagging'].includes(flat.status as string)
+    ) {
       res.status(400).json({ error: 'Flat must be approved or desnagging before handover' })
       return
     }
