@@ -11,7 +11,15 @@ import { getItemMandatoryImage } from '../constants/checklist'
 import { createNotification, createNotifications } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
 import { param } from '../utils/params'
-import { calcCompletionPct } from './responses'
+import {
+  calcCompletionPct,
+  countCompletedTasks,
+  countPendingTasks,
+  getExpectedTaskCount,
+  isInspectionFullyComplete,
+  repairPartialSubmission,
+  syncInspectionResponses,
+} from '../utils/inspectionTasks'
 
 const router = Router()
 router.use(authenticate)
@@ -27,6 +35,10 @@ function loadInspection(inspectionId: string) {
   const db = getDB()
   const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown>
   if (!row) return null
+
+  syncInspectionResponses(inspectionId)
+  repairPartialSubmission(inspectionId, row.flat_id as string)
+
   const responses = (
     db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
   ).map((r) => rowToResponse(r, getImagesForResponse(r.id as string)))
@@ -35,11 +47,16 @@ function loadInspection(inspectionId: string) {
   const passCount = responses.filter((r) => r.status === 'pass').length
   const failCount = responses.filter((r) => r.status === 'fail').length
   const naCount = responses.filter((r) => r.status === 'na').length
+  const expectedTotal = getExpectedTaskCount()
+  const completedCount = countCompletedTasks(inspectionId)
+  const pendingCount = expectedTotal - completedCount
   const completionPct = calcCompletionPct(inspectionId)
   return {
     ...insp,
     responses,
-    totalItems: responses.length,
+    totalItems: expectedTotal,
+    completedCount,
+    pendingCount,
     passCount,
     failCount,
     naCount,
@@ -186,6 +203,18 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
   }
 
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
+
+  syncInspectionResponses(inspectionId)
+  const pendingCount = countPendingTasks(inspectionId)
+  if (pendingCount > 0) {
+    throw new AppError(
+      `Cannot submit: ${pendingCount} task${pendingCount === 1 ? '' : 's'} still pending. Complete all tasks to reach 100% before final submission.`,
+      400
+    )
+  }
+  if (!isInspectionFullyComplete(inspectionId)) {
+    throw new AppError('Cannot submit until all checklist tasks are completed (100%).', 400)
+  }
 
   // Fail items with mandatory images still require evidence before submit
   for (const r of responses) {

@@ -1,7 +1,6 @@
 /**
  * prefetch.ts — Full offline data seeder.
- * Runs 2 seconds after login and caches ALL data + images to IndexedDB.
- * Throttled to once per 5 minutes.
+ * Runs immediately after login and caches data to IndexedDB / localStorage.
  */
 
 import {
@@ -14,6 +13,9 @@ import { cacheImage } from './imageCache'
 import type { User, SnagImage } from '../types'
 
 const PREFETCH_KEY = 'snagdesk_last_prefetch'
+const CHECKER_FLATS_KEY = 'checker_flats_cache'
+const REVIEW_QUEUE_KEY = 'review_queue_cache'
+const REVIEW_HISTORY_KEY = 'review_history_cache'
 
 async function putMany(store: string, items: unknown[]): Promise<void> {
   if (!items.length) return
@@ -32,16 +34,17 @@ async function cacheImages(images: SnagImage[]): Promise<void> {
   }
 }
 
-export async function prefetchAll(user: User): Promise<void> {
+export async function prefetchAll(
+  user: User,
+  opts?: { force?: boolean }
+): Promise<void> {
   const last = Number(localStorage.getItem(PREFETCH_KEY) || '0')
-  if (Date.now() - last < 5 * 60 * 1000) return
+  if (!opts?.force && Date.now() - last < 5 * 60 * 1000) return
 
   try {
-    // 1. Projects
     const { data: projects } = await projectsApi.list()
     await putMany('projects', projects)
 
-    // 2. Towers + Floors
     const allTowers = (
       await Promise.all(
         projects.map((p) => towersApi.list(p.id as string).then((r) => r.data).catch(() => []))
@@ -56,7 +59,6 @@ export async function prefetchAll(user: User): Promise<void> {
     ).flat()
     await putMany('floors', allFloors)
 
-    // 3. Flats — all roles fetch by project; backend filters by role
     const allFlats: any[] = (
       await Promise.all(
         projects.map((p) => flatsApi.byProject(p.id as string).then((r) => r.data).catch(() => []))
@@ -64,15 +66,9 @@ export async function prefetchAll(user: User): Promise<void> {
     ).flat()
     await saveFlats(allFlats)
 
-    // 4. Inspections + responses + evidence images
-    const flatsToSync = user.role === 'qa'
-      ? allFlats  // QA already receives only submitted+ flats from backend
-      : allFlats.filter((f: any) =>
-          ['in_progress', 'submitted', 'revision_required', 'desnagging'].includes(f.status)
-        )
-
+    // Cache inspections for every flat (not only in-progress) so deep-links work
     await Promise.allSettled(
-      flatsToSync.map(async (flat: any) => {
+      allFlats.map(async (flat: any) => {
         try {
           const { data: insp } = await inspectionsApi.getByFlat(flat.id)
           await saveInspection(insp)
@@ -83,7 +79,6 @@ export async function prefetchAll(user: User): Promise<void> {
       })
     )
 
-    // 5. Snags + before/after images
     await Promise.allSettled(
       projects.map(async (p) => {
         try {
@@ -97,13 +92,11 @@ export async function prefetchAll(user: User): Promise<void> {
       })
     )
 
-    // 6. Notifications
     try {
       const { data: notifs } = await notificationsApi.list()
       await putMany('notifications', notifs)
     } catch { /* ignore */ }
 
-    // 7. Users (for user management)
     if (user.role === 'admin') {
       try {
         const { usersApi: ua } = await import('./api')
@@ -112,16 +105,23 @@ export async function prefetchAll(user: User): Promise<void> {
       } catch { /* ignore */ }
     }
 
-    // 8. QA: review queue + top 20 review details with images
     if (user.role === 'qa' || user.role === 'admin') {
       try {
         const { data: queue } = await reviewsApi.queue()
-        localStorage.setItem('review_queue_cache', JSON.stringify(queue))
+        localStorage.setItem(REVIEW_QUEUE_KEY, JSON.stringify(queue))
+      } catch { /* ignore */ }
+
+      try {
+        const { data: checkerFlats } = await flatsApi.checkerList({})
+        localStorage.setItem(CHECKER_FLATS_KEY, JSON.stringify(checkerFlats))
+
         await Promise.allSettled(
-          (queue as any[]).slice(0, 20).map(async (item: any) => {
+          (checkerFlats as any[]).map(async (flat: any) => {
+            const inspectionId = flat.inspectionId || flat.inspection?.id
+            if (!inspectionId) return
             try {
-              const { data: detail } = await reviewsApi.get(item.inspectionId)
-              localStorage.setItem(`review_detail_${item.inspectionId}`, JSON.stringify(detail))
+              const { data: detail } = await reviewsApi.get(inspectionId)
+              localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(detail))
               const insp = (detail as any).inspection
               for (const r of insp?.responses || []) {
                 await cacheImages(r.images || [])
@@ -130,13 +130,13 @@ export async function prefetchAll(user: User): Promise<void> {
           })
         )
       } catch { /* ignore */ }
+
       try {
         const { data: history } = await reviewsApi.history()
-        localStorage.setItem('review_history_cache', JSON.stringify(history))
+        localStorage.setItem(REVIEW_HISTORY_KEY, JSON.stringify(history))
       } catch { /* ignore */ }
     }
 
-    // 9. Dashboard stats
     if (user.role === 'admin' || user.role === 'viewer') {
       try {
         const { data: report } = await reportsApi.overview()
@@ -145,9 +145,10 @@ export async function prefetchAll(user: User): Promise<void> {
     }
 
     localStorage.setItem(PREFETCH_KEY, String(Date.now()))
-    console.log('[prefetch] ✅ Complete — all data + images cached for offline use')
+    console.log('[prefetch] Complete — offline cache ready')
   } catch (e) {
     console.warn('[prefetch] Partial failure:', e)
+    throw e
   }
 }
 

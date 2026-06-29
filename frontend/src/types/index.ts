@@ -165,6 +165,8 @@ export interface Inspection {
   lastUpdated: string
   syncedAt?: string
   totalItems?: number
+  completedCount?: number
+  pendingCount?: number
   passCount?: number
   failCount?: number
   naCount?: number

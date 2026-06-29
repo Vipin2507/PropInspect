@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
-import { calcCompletionPct } from './responses'
+import { calcCompletionPct, countPendingTasks, getExpectedTaskCount, repairPartialSubmission, syncInspectionResponses } from '../utils/inspectionTasks'
 import { getFlatHistory, logFlatHistory } from '../utils/flatHistory'
 import { param } from '../utils/params'
 
@@ -55,11 +55,19 @@ router.get(
 
     const result = rows.map((row) => {
       const inspectionId = row.inspection_id as string | undefined
+      if (inspectionId) {
+        syncInspectionResponses(inspectionId)
+        repairPartialSubmission(inspectionId, row.id as string)
+      }
       const completionPct = inspectionId ? calcCompletionPct(inspectionId) : 0
+      const flatStatus = row.status as string
+      // Only show as submitted in checker view when truly 100% complete
+      const effectiveStatus =
+        flatStatus === 'submitted' && completionPct < 100 ? 'in_progress' : flatStatus
       return {
         id: row.id,
         flatNumber: row.flat_number,
-        status: row.status,
+        status: effectiveStatus,
         towerId: row.tower_id,
         projectId: row.project_id,
         floorId: row.floor_id,
@@ -70,6 +78,7 @@ router.get(
         engineerName: row.engineer_name || null,
         submittedAt: utcTs(row.submitted_at),
         completionPct,
+        expectedTotal: getExpectedTaskCount(),
         createdAt: utcTs(row.created_at),
       }
     })
@@ -272,6 +281,11 @@ function enrichFlat(row: Record<string, unknown>) {
      WHERE i.flat_id = ?`
   ).get(row.id) as { id: string; status: string; engineer_id: string; engineer_name: string; submitted_at: string; last_updated: string } | undefined
 
+  if (inspection) {
+    syncInspectionResponses(inspection.id)
+    repairPartialSubmission(inspection.id, row.id as string)
+  }
+
   const lastReview = db.prepare(
     `SELECT r.qa_id, r.decision, r.reviewed_at, u.name as reviewer_name
      FROM reviews r
@@ -305,6 +319,8 @@ function enrichFlat(row: Record<string, unknown>) {
     // engineerName at flat level for admin monitoring — pulled from inspection
     engineerName: inspection?.engineer_name ?? null,
     completionPct: inspection ? calcCompletionPct(inspection.id) : 0,
+    expectedTotal: getExpectedTaskCount(),
+    pendingCount: inspection ? countPendingTasks(inspection.id) : getExpectedTaskCount(),
   }
 }
 

@@ -15,7 +15,7 @@ import { ROUTES } from '../../constants/routes'
 import { RevisionBanner } from '../../components/review/RevisionBanner'
 import { Spinner } from '../../components/ui/Spinner'
 import { cn } from '../../utils/cn'
-import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
+import { DEFAULT_CHECKLIST_CATEGORIES, TOTAL_ITEMS } from '../../constants/checklist'
 import { flatsApi } from '../../utils/api'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
@@ -50,11 +50,12 @@ export default function FlatDetail() {
   const currentFlatStatus = flatStatus ?? flat?.status
 
   const responses    = inspection?.responses || []
-  const doneCount    = responses.filter((r) => r.status !== 'pending').length
-  const totalCount   = responses.length
+  const totalCount   = inspection?.totalItems ?? TOTAL_ITEMS
+  const doneCount    = inspection?.completedCount ?? responses.filter((r) => r.status !== 'pending').length
+  const pendingCount = inspection?.pendingCount ?? Math.max(0, totalCount - doneCount)
   const progress     = totalCount > 0 ? (doneCount / totalCount) * 100 : 0
   const completionPct = inspection?.completionPct ?? progress
-  const isComplete   = completionPct === 100
+  const isComplete   = completionPct === 100 && pendingCount === 0
 
   const canMarkHandover = canHandover
     && (isAdmin || ['approved', 'desnagging'].includes(currentFlatStatus ?? ''))

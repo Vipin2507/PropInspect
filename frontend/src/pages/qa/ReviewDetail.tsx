@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button'
 import toast from 'react-hot-toast'
 import type { Inspection } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { ArrowLeft } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
@@ -27,6 +28,8 @@ export default function ReviewDetail() {
   const [lightboxImage, setLightboxImage]     = useState<string | null>(null)
   const [revisionDrawerOpen, setRevisionDrawerOpen] = useState(false)
   const [isSubmitting, setIsSubmitting]       = useState(false)
+  const [loading, setLoading]                   = useState(true)
+  const [loadError, setLoadError]               = useState<string | null>(null)
 
   const [isOffline, setIsOffline] = useState(false)
 
@@ -48,29 +51,67 @@ export default function ReviewDetail() {
   useEffect(() => {
     if (!inspectionId) return
     const cacheKey = `review_detail_${inspectionId}`
+    let cancelled = false
 
-    // 1. Serve from localStorage cache immediately (populated by prefetch)
+    setLoading(true)
+    setLoadError(null)
+
     try {
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         setData(JSON.parse(cached))
         setItemComments({})
+        setLoading(false)
       }
     } catch { /* ignore parse errors */ }
 
-    // 2. Refresh from network in background
     reviewsApi.get(inspectionId)
       .then(({ data: fresh }) => {
+        if (cancelled) return
         localStorage.setItem(cacheKey, JSON.stringify(fresh))
-        setData(fresh as any)
+        setData(fresh as typeof data)
         setItemComments({})
         setIsOffline(false)
+        setLoadError(null)
       })
-      .catch(() => {
-        // Network failed — show offline indicator if serving from cache
-        setIsOffline(true)
+      .catch(async (err: { response?: { status?: number; data?: { error?: string } } }) => {
+        if (cancelled) return
+        const hadCache = !!localStorage.getItem(cacheKey)
+        if (hadCache) {
+          setIsOffline(true)
+          return
+        }
+
+        // Legacy links used flat_id instead of inspection_id
+        if (err?.response?.status === 404) {
+          try {
+            const { flatsApi, inspectionsApi } = await import('../../utils/api')
+            const { saveSingleFlat, saveInspection } = await import('../../utils/storage')
+            const { data: flat } = await flatsApi.get(inspectionId)
+            await saveSingleFlat(flat)
+            const realId = flat.inspection?.id
+            if (realId && realId !== inspectionId) {
+              navigate(ROUTES.QA_REVIEW_DETAIL(realId), { replace: true })
+              return
+            }
+            const { data: insp } = await inspectionsApi.getByFlat(inspectionId)
+            await saveInspection(insp)
+            if (insp.id !== inspectionId) {
+              navigate(ROUTES.QA_REVIEW_DETAIL(insp.id), { replace: true })
+              return
+            }
+          } catch { /* fall through */ }
+        }
+
+        setLoadError(err?.response?.data?.error || 'Could not load this review')
+        setData(null)
       })
-  }, [inspectionId])
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [inspectionId, navigate])
 
   const submitReview = async (decision: 'approved' | 'revision_required' | 'rejected') => {
     if (!inspectionId || !data) return
@@ -139,6 +180,36 @@ export default function ReviewDetail() {
       setIsSubmitting(false)
       setRevisionDrawerOpen(false)
     }
+  }
+
+  if (loading && !data) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-24">
+        <Spinner size="lg" />
+      </div>
+    )
+  }
+
+  if (loadError && !data) {
+    return (
+      <div className="flex flex-col gap-4 py-8">
+        <button
+          type="button"
+          onClick={() => navigate(ROUTES.QA_REVIEWS)}
+          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
+        >
+          <ArrowLeft size={18} aria-hidden="true" />
+          Back to Reviews
+        </button>
+        <EmptyState
+          title="Review not found"
+          description={loadError}
+        />
+        <Button className="mx-auto w-full max-w-xs" onClick={() => navigate(ROUTES.QA_REVIEWS)}>
+          Back to queue
+        </Button>
+      </div>
+    )
   }
 
   if (!data) {

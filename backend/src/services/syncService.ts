@@ -1,9 +1,13 @@
 import { getDB } from '../db/database'
-import { getItemMandatoryImage } from '../constants/checklist'
+import { DEFAULT_CHECKLIST_CATEGORIES, getItemMandatoryImage } from '../constants/checklist'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { createNotification } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
+import {
+  countPendingTasks,
+  isInspectionFullyComplete,
+  syncInspectionResponses,
+} from '../utils/inspectionTasks'
 
 export function validateAndSubmitFromSync(inspectionId: string, isResubmit: boolean): void {
   const db = getDB()
@@ -11,6 +15,15 @@ export function validateAndSubmitFromSync(inspectionId: string, isResubmit: bool
   if (!inspection) throw new Error('Inspection not found')
 
   const responses = db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
+
+  syncInspectionResponses(inspectionId)
+  const pendingCount = countPendingTasks(inspectionId)
+  if (pendingCount > 0) {
+    throw new Error(`Cannot submit: ${pendingCount} task(s) still pending`)
+  }
+  if (!isInspectionFullyComplete(inspectionId)) {
+    throw new Error('Cannot submit until all checklist tasks are completed (100%)')
+  }
 
   for (const r of responses) {
     if (r.status === 'fail') {

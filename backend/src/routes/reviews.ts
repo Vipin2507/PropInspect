@@ -8,6 +8,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToImage, rowToSnag } from '../utils/mappers'
 import { createNotification, createNotifications } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
+import { isInspectionFullyComplete, syncInspectionResponses } from '../utils/inspectionTasks'
 
 const router = Router()
 router.use(authenticate)
@@ -36,7 +37,12 @@ router.get(
     sql += ` ORDER BY i.submitted_at DESC`
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
     res.json(
-      rows.map((r) => ({
+      rows
+        .filter((r) => {
+          syncInspectionResponses(r.id as string)
+          return isInspectionFullyComplete(r.id as string)
+        })
+        .map((r) => ({
         inspectionId: r.id,
         flatId: r.flat_id,
         flatNumber: r.flat_number,

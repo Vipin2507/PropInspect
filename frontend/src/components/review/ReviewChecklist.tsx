@@ -5,16 +5,9 @@ import type { InspectionResponse } from '../../types'
 import * as Icons from 'lucide-react'
 import { cn } from '../../utils/cn'
 
-/** Determine if a response should appear in the QA review.
- *  Show: fail, or any evaluated item with remarks/photos.
- *  Hide: pending (never touched), or pass/na with no notes and no photos.
- */
+/** Show every task the engineer has evaluated — Checker reviews each separately. */
 function isReviewable(r: InspectionResponse): boolean {
-  if (r.status === 'pending') return false
-  if (r.status === 'fail') return true
-  if (r.remarks?.trim()) return true
-  if (r.images?.length > 0) return true
-  return false
+  return r.status !== 'pending'
 }
 
 export function ReviewChecklist({
@@ -64,8 +57,8 @@ export function ReviewChecklist({
         const Icon = (Icons as any)[cat.icon] || Icons.HelpCircle
         const stats = catStats.get(cat.id)
 
-        // Skip categories with no evaluated items at all
-        if (!stats || stats.total === 0) return null
+        // Show categories that have at least one evaluated task
+        if (!stats || stats.reviewable === 0) return null
 
         const reviewableItems = cat.items
           .map((item) => ({

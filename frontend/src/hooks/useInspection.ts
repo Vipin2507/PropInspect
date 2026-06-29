@@ -231,10 +231,23 @@ export function useInspection(flatId: string | undefined) {
     await flushPendingSaves()
     try {
       await inspectionsApi.submit(inspection.id)
-      toast.success('Inspection submitted for review')
-    } catch {
-      await queueChange('submit_inspection', { inspectionId: inspection.id })
-      toast.success('Saved offline — will submit when back online')
+      toast.success('Inspection submitted for QA review')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
+      const status = axiosErr?.response?.status
+      const serverMsg = axiosErr?.response?.data?.error
+      const isNetwork = !status || status >= 500
+
+      if (isNetwork) {
+        try {
+          await queueChange('submit_inspection', { inspectionId: inspection.id })
+          toast.success('Saved offline — will submit when back online')
+        } catch {
+          toast.error('Failed to save submission offline')
+        }
+      } else {
+        toast.error(serverMsg || 'Cannot submit inspection yet')
+      }
     }
     await load()
   }

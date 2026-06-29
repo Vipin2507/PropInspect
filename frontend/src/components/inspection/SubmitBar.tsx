@@ -32,7 +32,7 @@ export function SubmitBar({
         {!isComplete && pending > 0 && (
           <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-amber-600">
             <AlertCircle size={13} aria-hidden="true" />
-            {pending} item{pending !== 1 ? 's' : ''} not yet evaluated — you can still proceed
+            {pending} of {totalCount} tasks not yet evaluated
           </p>
         )}
 

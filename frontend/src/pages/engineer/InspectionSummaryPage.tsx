@@ -10,6 +10,7 @@ import type { Flat } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
+import { TOTAL_ITEMS } from '../../constants/checklist'
 import { cn } from '../../utils/cn'
 import { useIsMobile } from '../../hooks/useBreakpoint'
 
@@ -33,11 +34,11 @@ export default function InspectionSummaryPage() {
     )
   }
 
-  const doneCount    = inspection.responses.filter((r) => r.status !== 'pending').length
-  const totalCount   = inspection.responses.length
-  const pendingCount = totalCount - doneCount
+  const doneCount    = inspection.completedCount ?? inspection.responses.filter((r) => r.status !== 'pending').length
+  const totalCount   = inspection.totalItems ?? TOTAL_ITEMS
+  const pendingCount = inspection.pendingCount ?? Math.max(0, totalCount - doneCount)
   const completionPct = inspection.completionPct ?? (totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0)
-  const allDone      = completionPct === 100
+  const allDone      = completionPct === 100 && pendingCount === 0
 
   const handleSubmit = async () => {
     await submit()
@@ -46,7 +47,7 @@ export default function InspectionSummaryPage() {
 
   const confirmMessage = allDone
     ? 'Once submitted, you cannot edit this inspection until the QA checker responds.'
-    : `${pendingCount} item${pendingCount !== 1 ? 's are' : ' is'} still pending. You can submit now and complete the remaining items later if QA requests revision.`
+    : `Complete all ${pendingCount} remaining task${pendingCount !== 1 ? 's' : ''} before final submission. A flat must reach 100% to be submitted for QA review.`
 
   // Responses that the Checker flagged for revision (after re-open)
   const revisionResponses = inspection.responses.filter((r) => r.qaDecision === 'revision_required')
@@ -91,7 +92,7 @@ export default function InspectionSummaryPage() {
           <div>
             <p className="text-sm font-semibold text-amber-800">Incomplete inspection</p>
             <p className="mt-0.5 text-sm text-amber-700">
-              {pendingCount} item{pendingCount !== 1 ? 's' : ''} still pending. You can still submit for QA review.
+              {pendingCount} task{pendingCount !== 1 ? 's' : ''} still pending. Final submission requires 100% completion.
             </p>
           </div>
         </div>
@@ -123,18 +124,19 @@ export default function InspectionSummaryPage() {
         <Button
           className="mx-auto w-full max-w-md"
           onClick={() => setIsConfirmOpen(true)}
+          disabled={!allDone}
         >
-          Submit for QA Review
+          {allDone ? 'Submit for QA Review' : `Complete ${pendingCount} more task${pendingCount !== 1 ? 's' : ''}`}
         </Button>
       </div>
 
       <ConfirmDialog
         open={isConfirmOpen}
         onOpenChange={setIsConfirmOpen}
-        title={allDone ? 'Submit Inspection?' : 'Submit Incomplete Inspection?'}
+        title={allDone ? 'Submit Inspection?' : 'Cannot Submit Yet'}
         message={confirmMessage}
-        confirmLabel="Yes, Submit"
-        onConfirm={handleSubmit}
+        confirmLabel={allDone ? 'Yes, Submit' : 'OK'}
+        onConfirm={allDone ? handleSubmit : () => setIsConfirmOpen(false)}
       />
     </div>
   )

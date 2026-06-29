@@ -7,6 +7,7 @@ import { initSyncListeners } from '../../utils/sync'
 import { prefetchAll } from '../../utils/prefetch'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
+import { usePrefetchStore } from '../../store/prefetchStore'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 
@@ -29,15 +30,26 @@ export function AppShell() {
     return cleanup
   }, [user?.id, user?.role, fetchCount])
 
-  // Background prefetch — download ALL data to IndexedDB right after login
+  // Prefetch all role data immediately after login / session restore
   useEffect(() => {
-    if (!user) return
-    // Small delay so the dashboard renders first, then prefetch runs in background
-    const t = setTimeout(() => {
-      prefetchAll(user).catch(() => {})
-    }, 2000)
-    return () => clearTimeout(t)
-  }, [user?.id]) // re-run only when the logged-in user changes
+    if (!user) {
+      usePrefetchStore.getState().setStatus('idle')
+      return
+    }
+
+    let cancelled = false
+    usePrefetchStore.getState().setStatus('loading')
+
+    prefetchAll(user, { force: true })
+      .then(() => {
+        if (!cancelled) usePrefetchStore.getState().setStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) usePrefetchStore.getState().setStatus('error')
+      })
+
+    return () => { cancelled = true }
+  }, [user?.id, user?.role])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)

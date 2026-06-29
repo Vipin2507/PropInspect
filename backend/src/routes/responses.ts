@@ -6,6 +6,11 @@ import { requireRole } from '../middleware/requireRole'
 import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToResponse, rowToImage } from '../utils/mappers'
 import { createNotification } from '../utils/notifications'
+import {
+  calcCompletionPct,
+  countPendingTasks,
+  refreshCompletionNotified,
+} from '../utils/inspectionTasks'
 
 const router = Router()
 router.use(authenticate)
@@ -18,24 +23,6 @@ function getImagesForResponse(responseId: string) {
       .prepare('SELECT * FROM images WHERE response_id = ?')
       .all(responseId) as Record<string, unknown>[]
   ).map(rowToImage)
-}
-
-/**
- * Calculate completion percentage for an inspection.
- * Returns a value 0–100 (integer).
- */
-export function calcCompletionPct(inspectionId: string): number {
-  const db = getDB()
-  const row = db
-    .prepare(
-      `SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN status IN ('pass','fail','na') THEN 1 ELSE 0 END) as done
-       FROM responses WHERE inspection_id = ?`
-    )
-    .get(inspectionId) as { total: number; done: number }
-  if (!row || row.total === 0) return 0
-  return Math.round((row.done / row.total) * 100)
 }
 
 /**
@@ -144,8 +131,10 @@ router.patch(
     db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspection.id)
 
     // Req 3.6 — recalculate completion pct; fire flat_completion if newly 100%
+    refreshCompletionNotified(inspection.id)
     maybeNotifyCompletion(inspection.id)
     const completionPct = calcCompletionPct(inspection.id)
+    const pendingCount = countPendingTasks(inspection.id)
 
     const updated = db
       .prepare('SELECT * FROM responses WHERE id = ?')
@@ -153,6 +142,7 @@ router.patch(
     res.json({
       ...rowToResponse(updated, getImagesForResponse(req.params.id as string)),
       completionPct,
+      pendingCount,
     })
   })
 )
@@ -210,5 +200,7 @@ router.patch(
     res.json(rowToResponse(updated, getImagesForResponse(req.params.id as string)))
   })
 )
+
+export { calcCompletionPct } from '../utils/inspectionTasks'
 
 export default router
