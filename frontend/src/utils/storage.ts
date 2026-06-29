@@ -14,10 +14,24 @@ export async function getInspection(flatId: string): Promise<Inspection | undefi
 
 export async function saveInspection(inspection: Inspection): Promise<void> {
   const db = await getDb()
-  await db.put('inspections', inspection as unknown as Record<string, unknown>)
+  const tx = db.transaction(['inspections', 'responses'], 'readwrite')
+  await tx.objectStore('inspections').put(inspection as unknown as Record<string, unknown>)
   for (const r of inspection.responses) {
-    await db.put('responses', r as unknown as Record<string, unknown>)
+    await tx.objectStore('responses').put(r as unknown as Record<string, unknown>)
   }
+  await tx.done
+}
+
+/** Fast path: persist inspection header + only the response that changed. */
+export async function saveInspectionDelta(
+  inspection: Inspection,
+  changedResponse: InspectionResponse
+): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction(['inspections', 'responses'], 'readwrite')
+  await tx.objectStore('inspections').put(inspection as unknown as Record<string, unknown>)
+  await tx.objectStore('responses').put(changedResponse as unknown as Record<string, unknown>)
+  await tx.done
 }
 
 export async function getFlatsByEngineer(engineerId: string): Promise<Flat[]> {

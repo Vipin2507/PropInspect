@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { inspectionsApi, responsesApi } from '../utils/api'
-import { saveInspection, getInspection } from '../utils/storage'
+import { saveInspection, saveInspectionDelta, getInspection } from '../utils/storage'
 import { queueChange } from '../utils/sync'
 import { useInspectionUiStore } from '../store/inspectionUiStore'
-import type { Inspection, InspectionResponse } from '../types'
+import { applyCompletionToInspection } from '../utils/completion'
+import { TOTAL_ITEMS } from '../constants/checklist'
+import { patchFlatCompletionLive, persistFlatCompletion } from '../utils/flatCache'
+import type { Inspection, InspectionResponse, Flat } from '../types'
 import toast from 'react-hot-toast'
 
 const REMARKS_DEBOUNCE_MS = 600
@@ -44,37 +47,117 @@ export function useInspection(flatId: string | undefined) {
 
   const remarkTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingPersist = useRef<Map<string, () => Promise<void>>>(new Map())
+  const inFlightSaves = useRef(0)
 
   const setGlobalSaveState = useInspectionUiStore((s) => s.setSaveState)
 
-  const markSaving = useCallback(() => {
-    setSaveState('saving')
-    setGlobalSaveState('saving')
+  const beginSave = useCallback(() => {
+    inFlightSaves.current += 1
+    if (inFlightSaves.current === 1) {
+      setSaveState('saving')
+      setGlobalSaveState('saving')
+    }
   }, [setGlobalSaveState])
 
-  const markSaved = useCallback(() => {
-    setSaveState('saved')
-    setGlobalSaveState('saved')
-    setTimeout(() => {
-      setSaveState('idle')
-      setGlobalSaveState('idle')
-    }, 2000)
+  const endSave = useCallback(() => {
+    inFlightSaves.current = Math.max(0, inFlightSaves.current - 1)
+    if (inFlightSaves.current === 0) {
+      setSaveState('saved')
+      setGlobalSaveState('saved')
+      setTimeout(() => {
+        if (inFlightSaves.current === 0) {
+          setSaveState('idle')
+          setGlobalSaveState('idle')
+        }
+      }, 1500)
+    }
   }, [setGlobalSaveState])
+
+  const markSaving = beginSave
+  const markSaved = endSave
+
+  const cachePersistAfterSave = useCallback(
+    (insp: Inspection, changed: InspectionResponse) => {
+      void saveInspectionDelta(insp, changed).catch(() => {})
+      if (insp.flatId && insp.completionPct !== undefined) {
+        patchFlatCompletionLive(insp.flatId, insp.completionPct, {
+          status: 'in_progress' as Flat['status'],
+        })
+        void persistFlatCompletion(insp.flatId, insp.completionPct, {
+          status: 'in_progress' as Flat['status'],
+        })
+      }
+    },
+    []
+  )
 
   const persistResponseToServer = useCallback(
-    async (response: InspectionResponse) => {
-      const current = inspectionRef.current
-      if (!current) return
-
+    async (response: InspectionResponse, opts?: { trackUi?: boolean }) => {
       if (response.status === 'fail' && !response.remarks?.trim()) return
 
-      markSaving()
+      const trackUi = opts?.trackUi ?? true
+      if (trackUi) markSaving()
+
+      const responseId = response.id
       try {
-        await responsesApi.updateStatus(response.id, {
+        const { data } = await responsesApi.updateStatus(responseId, {
           status: response.status,
           remarks: response.remarks || undefined,
         })
-      } catch {
+        const server = data as InspectionResponse & { completionPct?: number; pendingCount?: number }
+
+        let savedRow: InspectionResponse | null = null
+        setInspection((prev) => {
+          if (!prev) return prev
+          const responses = prev.responses.map((r) => {
+            if (r.id !== responseId) return r
+            savedRow = { ...r, ...server }
+            return savedRow
+          })
+          return applyCompletionToInspection(
+            {
+              ...prev,
+              completionPct: server.completionPct ?? prev.completionPct,
+              pendingCount: server.pendingCount ?? prev.pendingCount,
+              completedCount:
+                server.pendingCount !== undefined
+                  ? (prev.totalItems ?? TOTAL_ITEMS) - server.pendingCount
+                  : prev.completedCount,
+            },
+            responses
+          )
+        })
+
+        if (trackUi) markSaved()
+
+        const next = inspectionRef.current
+        if (next && savedRow) {
+          cachePersistAfterSave(next, savedRow)
+        }
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: { error?: string } } }
+        const status = axiosErr?.response?.status
+        const serverMsg = axiosErr?.response?.data?.error
+        const isNetwork = !status || status >= 500
+
+        if (!isNetwork) {
+          if (trackUi) {
+            inFlightSaves.current = Math.max(0, inFlightSaves.current - 1)
+            if (inFlightSaves.current === 0) {
+              setSaveState('idle')
+              setGlobalSaveState('idle')
+            }
+          }
+          toast.error(serverMsg || 'Could not save this task')
+          return
+        }
+
+        const current = inspectionRef.current
+        if (!current) {
+          if (trackUi) inFlightSaves.current = Math.max(0, inFlightSaves.current - 1)
+          return
+        }
+
         await queueChange('save_inspection', {
           inspectionId: current.id,
           responses: [{
@@ -85,35 +168,53 @@ export function useInspection(flatId: string | undefined) {
             remarks: response.remarks,
           }],
         })
+        if (trackUi) markSaved()
       }
-      markSaved()
     },
-    [markSaving, markSaved]
+    [markSaving, markSaved, cachePersistAfterSave, setGlobalSaveState]
   )
 
   const load = useCallback(async () => {
     if (!flatId) return
     setLoading(true)
 
-    const cached = await getInspection(flatId)
+    const cached = await getInspection(flatId).catch(() => undefined)
     if (cached) {
-      setInspection(cached)
+      setInspection(applyCompletionToInspection(cached))
       setLoading(false)
     }
 
     try {
       const { data } = await inspectionsApi.getByFlat(flatId)
-      const merged = cached ? mergeInspections(cached, data) : data
-      setInspection(merged)
-      await saveInspection(merged)
+      // Merge with current state (not stale cache) so in-flight edits are not wiped
+      setInspection((prev) => {
+        const base = prev ?? (cached ? applyCompletionToInspection(cached) : null)
+        if (!base) return applyCompletionToInspection(data)
+        return applyCompletionToInspection(mergeInspections(base, data))
+      })
 
-      if (cached && hasLocalNewerResponses(cached, data)) {
-        const slim = merged.responses.map(({ id, itemId, categoryId, status, remarks }) => ({
-          id, itemId, categoryId, status, remarks,
-        }))
-        inspectionsApi.save(merged.id, slim as any).catch(() => {
-          queueChange('save_inspection', { inspectionId: merged.id, responses: slim })
-        })
+      const latest = inspectionRef.current
+      if (latest) {
+        void saveInspection(latest).catch(() => {})
+        if (latest.flatId && latest.completionPct !== undefined) {
+          patchFlatCompletionLive(latest.flatId, latest.completionPct)
+          void persistFlatCompletion(latest.flatId, latest.completionPct)
+        }
+
+        const hadLocalEdits =
+          cached &&
+          hasLocalNewerResponses(
+            cached,
+            data as Inspection
+          )
+        if (hadLocalEdits) {
+          const slim = latest.responses.map(({ id, itemId, categoryId, status, remarks }) => ({
+            id, itemId, categoryId, status, remarks,
+          }))
+          inspectionsApi.save(latest.id, slim as any).catch(() => {
+            queueChange('save_inspection', { inspectionId: latest.id, responses: slim })
+          })
+        }
       }
     } catch {
       if (!cached) setInspection(null)
@@ -138,9 +239,12 @@ export function useInspection(flatId: string | undefined) {
     const current = inspectionRef.current
     if (!current) return
     markSaving()
-    const updated = { ...current, responses, lastUpdated: new Date().toISOString() }
-    setInspection(updated)
-    await saveInspection(updated)
+    const withProgress = applyCompletionToInspection(current, responses)
+    setInspection(withProgress)
+    void saveInspection(withProgress).catch(() => {})
+    patchFlatCompletionLive(withProgress.flatId, withProgress.completionPct ?? 0, {
+      status: 'in_progress' as Flat['status'],
+    })
 
     const slim = responses.map(({ id, itemId, categoryId, status, remarks }) => ({
       id, itemId, categoryId, status, remarks,
@@ -174,6 +278,14 @@ export function useInspection(flatId: string | undefined) {
       const existing = current.responses.find((r) => r.itemId === itemId)
       if (!existing) return
 
+      if (
+        patch.status === 'fail' &&
+        !(patch.remarks?.trim() || existing.remarks?.trim())
+      ) {
+        toast.error('Add remarks before marking as Fail')
+        return
+      }
+
       const merged: InspectionResponse = {
         ...existing,
         ...patch,
@@ -182,27 +294,26 @@ export function useInspection(flatId: string | undefined) {
       const responses = current.responses.map((r) =>
         r.itemId === itemId ? merged : r
       )
-      const updated: Inspection = {
-        ...current,
-        responses,
-        lastUpdated: new Date().toISOString(),
-      }
+      const updated = applyCompletionToInspection(
+        { ...current, lastUpdated: new Date().toISOString() },
+        responses
+      )
 
       setInspection(updated)
-      saveInspection(updated).catch(() => {})
+      patchFlatCompletionLive(updated.flatId, updated.completionPct ?? 0, {
+        status: 'in_progress' as Flat['status'],
+      })
 
       const isRemarksOnly =
         Object.keys(patch).length === 1 && patch.remarks !== undefined
 
-      const persistLatest = () => {
-        const latest = inspectionRef.current?.responses.find((r) => r.itemId === itemId)
-        if (latest) return persistResponseToServer(latest)
-      }
-
       if (isRemarksOnly) {
         const prev = remarkTimers.current.get(itemId)
         if (prev) clearTimeout(prev)
-        pendingPersist.current.set(itemId, () => persistLatest() ?? Promise.resolve())
+        pendingPersist.current.set(itemId, () => {
+          const latest = inspectionRef.current?.responses.find((r) => r.itemId === itemId)
+          return persistResponseToServer(latest ?? merged, { trackUi: true })
+        })
         remarkTimers.current.set(
           itemId,
           setTimeout(() => {
@@ -214,6 +325,7 @@ export function useInspection(flatId: string | undefined) {
             }
           }, REMARKS_DEBOUNCE_MS)
         )
+        void saveInspectionDelta(updated, merged).catch(() => {})
         return
       }
 
@@ -221,9 +333,22 @@ export function useInspection(flatId: string | undefined) {
       if (prev) clearTimeout(prev)
       remarkTimers.current.delete(itemId)
       pendingPersist.current.delete(itemId)
-      persistLatest()
+
+      // Instant feedback: local persist + Saved, then sync API in background
+      markSaving()
+      void saveInspectionDelta(updated, merged)
+        .then(() => markSaved())
+        .catch(() => {
+          inFlightSaves.current = Math.max(0, inFlightSaves.current - 1)
+          setSaveState('idle')
+          setGlobalSaveState('idle')
+        })
+      void persistFlatCompletion(updated.flatId, updated.completionPct ?? 0, {
+        status: 'in_progress' as Flat['status'],
+      })
+      void persistResponseToServer(merged, { trackUi: false })
     },
-    [persistResponseToServer]
+    [persistResponseToServer, markSaving, markSaved, setGlobalSaveState]
   )
 
   const submit = async () => {

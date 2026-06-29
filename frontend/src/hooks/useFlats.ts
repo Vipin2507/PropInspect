@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { flatsApi, projectsApi } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import { getDb } from '../utils/db'
+import { useFlatProgressStore } from '../store/flatProgressStore'
 import type { Flat } from '../types'
 
 // ── Sort helper ───────────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ export function useFlats(projectId?: string) {
       await writeDb(fresh)
       const sorted = sortFlats(fresh)
       memCache.set(key, sorted)
+      useFlatProgressStore.getState().clearAll()
       if (mounted.current) setFlats(sorted)
     } catch {
       // Network failed — memory/db cache already shown
@@ -111,4 +113,15 @@ export function useFlats(projectId?: string) {
   useEffect(() => { refresh() }, [refresh])
 
   return { flats, loading, refresh }
+}
+
+/** Update a flat in all in-memory list caches (all project keys). */
+export function patchFlatsMemCache(flatId: string, patch: Partial<Flat>): void {
+  for (const [key, flats] of memCache.entries()) {
+    const idx = flats.findIndex((f) => f.id === flatId)
+    if (idx < 0) continue
+    const next = [...flats]
+    next[idx] = { ...next[idx], ...patch }
+    memCache.set(key, next)
+  }
 }

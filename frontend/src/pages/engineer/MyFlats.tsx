@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Building2, Search } from 'lucide-react'
 import { useFlats } from '../../hooks/useFlats'
+import { useFlatProgressStore } from '../../store/flatProgressStore'
+import { resolveFlatProgressPct } from '../../utils/completion'
 import { useProjects } from '../../hooks/useProjects'
 import { useAuthStore } from '../../store/authStore'
 import { Badge } from '../../components/ui/Badge'
@@ -21,13 +23,6 @@ const TABS = [
   { id: 'handed_over', label: 'Handed Over' },
 ]
 
-function flatProgress(flat: { status: string }) {
-  if (['approved', 'handed_over'].includes(flat.status)) return 100
-  if (flat.status === 'submitted') return 100
-  if (flat.status === 'in_progress') return 40
-  return 0
-}
-
 export default function MyFlats() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
@@ -36,10 +31,12 @@ export default function MyFlats() {
   const { projects } = useProjects()
   const [projectFilter, setProjectFilter] = useState('')
 
-  const { flats, loading } = useFlats(isAdmin && projectFilter ? projectFilter : undefined)
+  const { flats, loading, refresh } = useFlats(isAdmin && projectFilter ? projectFilter : undefined)
+  const progressOverrides = useFlatProgressStore((s) => s.overrides)
 
   const [search, setSearch] = useState('')
   const [tab, setTab]       = useState('all')
+  const location = useLocation()
 
   // Default admin to "all" tab; engineer to "pending"
   useEffect(() => {
@@ -73,6 +70,13 @@ export default function MyFlats() {
     }
     return list
   }, [flats, search, tab])
+
+  // Re-fetch when returning to this page so list matches latest auto-saves
+  useEffect(() => {
+    if (location.pathname === ROUTES.ENGINEER_FLATS) {
+      refresh()
+    }
+  }, [location.pathname, refresh])
 
   return (
     <div className="flex flex-col gap-4">
@@ -148,7 +152,8 @@ export default function MyFlats() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredFlats.map((flat) => {
-            const progress = flatProgress(flat)
+            const progress =
+              progressOverrides[flat.id] ?? resolveFlatProgressPct(flat)
             return (
               <Link
                 key={flat.id}
