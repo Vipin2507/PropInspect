@@ -8,8 +8,10 @@ import { rowToResponse, rowToImage } from '../utils/mappers'
 import { createNotification } from '../utils/notifications'
 import {
   calcCompletionPct,
-  countPendingTasks,
+  calcCompletionPctFromDb,
+  countPendingTasksFromDb,
   refreshCompletionNotified,
+  syncInspectionResponses,
 } from '../utils/inspectionTasks'
 
 const router = Router()
@@ -131,10 +133,11 @@ router.patch(
     db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspection.id)
 
     // Req 3.6 — recalculate completion pct; fire flat_completion if newly 100%
+    syncInspectionResponses(inspection.id)
     refreshCompletionNotified(inspection.id)
     maybeNotifyCompletion(inspection.id)
-    const completionPct = calcCompletionPct(inspection.id)
-    const pendingCount = countPendingTasks(inspection.id)
+    const completionPct = calcCompletionPctFromDb(inspection.id)
+    const pendingCount = countPendingTasksFromDb(inspection.id)
 
     const updated = db
       .prepare('SELECT * FROM responses WHERE id = ?')

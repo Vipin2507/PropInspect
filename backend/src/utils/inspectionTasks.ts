@@ -32,8 +32,12 @@ export function syncInspectionResponses(inspectionId: string): number {
   return added
 }
 
-export function countCompletedTasks(inspectionId: string): number {
-  syncInspectionResponses(inspectionId)
+export function countCompletedTasks(inspectionId: string, sync = true): number {
+  if (sync) syncInspectionResponses(inspectionId)
+  return countCompletedTasksRaw(inspectionId)
+}
+
+function countCompletedTasksRaw(inspectionId: string): number {
   const db = getDB()
   const row = db
     .prepare(
@@ -48,14 +52,24 @@ export function countPendingTasks(inspectionId: string): number {
   return getExpectedTaskCount() - countCompletedTasks(inspectionId)
 }
 
+export function countPendingTasksFromDb(inspectionId: string): number {
+  return getExpectedTaskCount() - countCompletedTasksRaw(inspectionId)
+}
+
 /**
  * Completion % based on the full checklist template, not only existing DB rows.
  * Missing tasks count as pending (incomplete).
  */
 export function calcCompletionPct(inspectionId: string): number {
+  syncInspectionResponses(inspectionId)
+  return calcCompletionPctFromDb(inspectionId)
+}
+
+/** Fast path for hot paths (e.g. per-task PATCH) — caller should sync rows when needed. */
+export function calcCompletionPctFromDb(inspectionId: string): number {
   const expected = getExpectedTaskCount()
   if (expected === 0) return 0
-  const done = countCompletedTasks(inspectionId)
+  const done = countCompletedTasksRaw(inspectionId)
   return Math.round((done / expected) * 100)
 }
 
