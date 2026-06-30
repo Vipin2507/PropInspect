@@ -40,7 +40,7 @@ export function AppShell() {
     let cancelled = false
     usePrefetchStore.getState().setStatus('loading')
 
-    prefetchAll(user, { force: true })
+    prefetchAll(user)
       .then(() => {
         if (!cancelled) usePrefetchStore.getState().setStatus('ready')
       })

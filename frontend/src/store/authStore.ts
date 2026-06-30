@@ -24,6 +24,7 @@ export const useAuthStore = create<AuthStore>()(
       otpMobile: null,
       setAuth: (user, token) => {
         localStorage.setItem('snagdesk_token', token)
+        localStorage.removeItem('snagdesk_last_prefetch')
         set({ user, token })
       },
       setUser: (user) => set({ user }),

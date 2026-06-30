@@ -1,6 +1,6 @@
 /**
- * prefetch.ts — Full offline data seeder.
- * Runs immediately after login and caches data to IndexedDB / localStorage.
+ * prefetch.ts — Offline data seeder (lightweight).
+ * Caches structure + priority flats only — avoids flooding the API on login.
  */
 
 import {
@@ -10,12 +10,19 @@ import {
 import { saveFlats, saveInspection } from './storage'
 import { getDb } from './db'
 import { cacheImage } from './imageCache'
-import type { User, SnagImage } from '../types'
+import type { Flat, SnagImage, User } from '../types'
 
 const PREFETCH_KEY = 'snagdesk_last_prefetch'
 const CHECKER_FLATS_KEY = 'checker_flats_cache'
 const REVIEW_QUEUE_KEY = 'review_queue_cache'
 const REVIEW_HISTORY_KEY = 'review_history_cache'
+
+/** Max per-flat inspection fetches on login — rest load on demand. */
+const MAX_INSPECTION_PREFETCH = 15
+const PREFETCH_CONCURRENCY = 2
+const PREFETCH_DELAY_MS = 200
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 async function putMany(store: string, items: unknown[]): Promise<void> {
   if (!items.length) return
@@ -34,11 +41,11 @@ async function cacheImages(images: SnagImage[]): Promise<void> {
   }
 }
 
-/** Run async work with limited concurrency so user navigation isn't starved. */
+/** Run async work with limited concurrency and a small delay between items. */
 async function mapPool<T>(
   items: T[],
   fn: (item: T) => Promise<void>,
-  concurrency = 4
+  concurrency = PREFETCH_CONCURRENCY
 ): Promise<void> {
   if (!items.length) return
   let index = 0
@@ -46,9 +53,45 @@ async function mapPool<T>(
     while (index < items.length) {
       const i = index++
       await fn(items[i])
+      if (PREFETCH_DELAY_MS > 0) await sleep(PREFETCH_DELAY_MS)
     }
   })
   await Promise.all(workers)
+}
+
+const ACTIVE_STATUSES = new Set(['in_progress', 'revision_required', 'submitted', 'not_started'])
+
+function flatPriority(a: Flat, b: Flat): number {
+  const rank = (s: string) =>
+    s === 'in_progress' ? 0 : s === 'revision_required' ? 1 : s === 'submitted' ? 2 : 3
+  const diff = rank(a.status) - rank(b.status)
+  if (diff !== 0) return diff
+  return (b.completionPct ?? 0) - (a.completionPct ?? 0)
+}
+
+function pickInspectionFlats(flats: Flat[], user: User): Flat[] {
+  if (user.role === 'qa') {
+    // QA loads inspections on demand from Changes Log / All Flats
+    return []
+  }
+
+  return flats
+    .filter((f) => ACTIVE_STATUSES.has(f.status))
+    .sort(flatPriority)
+    .slice(0, MAX_INSPECTION_PREFETCH)
+}
+
+async function prefetchInspections(flats: Flat[], cacheImagesForInspections: boolean): Promise<void> {
+  await mapPool(flats, async (flat) => {
+    try {
+      const { data: insp } = await inspectionsApi.getByFlat(flat.id)
+      await saveInspection(insp)
+      if (!cacheImagesForInspections) return
+      for (const r of insp.responses || []) {
+        await cacheImages(r.images || [])
+      }
+    } catch { /* no inspection yet or rate limited */ }
+  })
 }
 
 export async function prefetchAll(
@@ -76,33 +119,21 @@ export async function prefetchAll(
     ).flat()
     await putMany('floors', allFloors)
 
-    const allFlats: any[] = (
+    const allFlats: Flat[] = (
       await Promise.all(
         projects.map((p) => flatsApi.byProject(p.id as string).then((r) => r.data).catch(() => []))
       )
     ).flat()
     await saveFlats(allFlats)
 
-    // Cache inspections with limited concurrency — avoids blocking user navigation
-    await mapPool(allFlats, async (flat: { id: string }) => {
-      try {
-        const { data: insp } = await inspectionsApi.getByFlat(flat.id)
-        await saveInspection(insp)
-        for (const r of insp.responses || []) {
-          await cacheImages(r.images || [])
-        }
-      } catch { /* no inspection yet */ }
-    })
+    const priorityFlats = pickInspectionFlats(allFlats, user)
+    await prefetchInspections(priorityFlats, user.role === 'engineer')
 
     await Promise.allSettled(
       projects.map(async (p) => {
         try {
           const { data: snags } = await snagsApi.list({ projectId: p.id as string })
           await putMany('snags', snags)
-          for (const s of snags) {
-            await cacheImages(s.beforeImages || [])
-            await cacheImages(s.afterImages || [])
-          }
         } catch { /* ignore */ }
       })
     )
@@ -130,20 +161,18 @@ export async function prefetchAll(
         const { data: checkerFlats } = await flatsApi.checkerList({})
         localStorage.setItem(CHECKER_FLATS_KEY, JSON.stringify(checkerFlats))
 
-        await Promise.allSettled(
-          (checkerFlats as any[]).map(async (flat: any) => {
-            const inspectionId = flat.inspectionId || flat.inspection?.id
-            if (!inspectionId) return
-            try {
-              const { data: detail } = await reviewsApi.get(inspectionId)
-              localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(detail))
-              const insp = (detail as any).inspection
-              for (const r of insp?.responses || []) {
-                await cacheImages(r.images || [])
-              }
-            } catch { /* ignore */ }
-          })
-        )
+        const submittedForReview = (checkerFlats as Flat[])
+          .filter((f) => f.status === 'submitted')
+          .slice(0, MAX_INSPECTION_PREFETCH)
+
+        await mapPool(submittedForReview, async (flat) => {
+          const inspectionId = flat.inspectionId || flat.inspection?.id
+          if (!inspectionId) return
+          try {
+            const { data: detail } = await reviewsApi.get(inspectionId)
+            localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(detail))
+          } catch { /* ignore */ }
+        })
       } catch { /* ignore */ }
 
       try {
