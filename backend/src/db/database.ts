@@ -334,6 +334,32 @@ export function runMigrations(database: SnagDeskDatabase): void {
     );
     CREATE INDEX IF NOT EXISTS idx_flat_history_flat    ON flat_history(flat_id);
     CREATE INDEX IF NOT EXISTS idx_flat_history_created ON flat_history(flat_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS task_change_log (
+      id            TEXT PRIMARY KEY,
+      flat_id       TEXT NOT NULL REFERENCES flats(id) ON DELETE CASCADE,
+      inspection_id TEXT NOT NULL,
+      response_id   TEXT NOT NULL,
+      item_id       TEXT NOT NULL,
+      category_id   TEXT NOT NULL,
+      item_label    TEXT NOT NULL,
+      category_name TEXT NOT NULL DEFAULT '',
+      flat_number   TEXT NOT NULL DEFAULT '',
+      tower_name    TEXT NOT NULL DEFAULT '',
+      project_id    TEXT NOT NULL DEFAULT '',
+      change_type   TEXT NOT NULL CHECK(change_type IN ('status_change','remarks_change')),
+      old_value     TEXT NOT NULL DEFAULT '',
+      new_value     TEXT NOT NULL DEFAULT '',
+      engineer_id   TEXT NOT NULL REFERENCES users(id),
+      engineer_name TEXT NOT NULL DEFAULT '',
+      reviewed_at   TEXT,
+      reviewed_by   TEXT REFERENCES users(id),
+      reviewer_name TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_change_flat     ON task_change_log(flat_id);
+    CREATE INDEX IF NOT EXISTS idx_task_change_reviewed ON task_change_log(reviewed_at);
+    CREATE INDEX IF NOT EXISTS idx_task_change_created  ON task_change_log(created_at);
   `)
 }
 

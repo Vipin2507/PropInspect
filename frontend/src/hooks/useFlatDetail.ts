@@ -1,38 +1,38 @@
-/**
- * useFlatDetail — loads a single flat with full offline support.
- *
- * Priority order:
- * 1. useFlats memory cache (already populated if user came from flat list — instant)
- * 2. IndexedDB (populated by prefetch — fast)
- * 3. Network (always refreshes in background)
- */
-
 import { useEffect, useState } from 'react'
 import { flatsApi } from '../utils/api'
-import { getDb } from '../utils/db'
 import { saveSingleFlat, getFlatById } from '../utils/storage'
+import { getFlatFromMemCache } from '../hooks/useFlats'
 import type { Flat } from '../types'
 
 export function useFlatDetail(flatId: string | undefined): Flat | null {
-  const [flat, setFlat] = useState<Flat | null>(null)
+  const [flat, setFlat] = useState<Flat | null>(() =>
+    flatId ? getFlatFromMemCache(flatId) ?? null : null
+  )
 
   useEffect(() => {
     if (!flatId) return
 
-    ;(async () => {
-      // 1. IndexedDB cache first — shows flat number immediately offline
-      const cached = await getFlatById(flatId).catch(() => undefined)
-      if (cached) setFlat(cached)
+    const fromList = getFlatFromMemCache(flatId)
+    if (fromList) setFlat(fromList)
 
-      // 2. Network refresh in background
+    let cancelled = false
+
+    ;(async () => {
+      const cached = await getFlatById(flatId).catch(() => undefined)
+      if (!cancelled && cached) setFlat(cached)
+
       try {
         const { data } = await flatsApi.get(flatId)
-        await saveSingleFlat(data)
-        setFlat(data)
+        if (!cancelled) {
+          await saveSingleFlat(data)
+          setFlat(data)
+        }
       } catch {
-        // Stay with cached flat — already set above
+        // Keep list / IndexedDB cache
       }
     })()
+
+    return () => { cancelled = true }
   }, [flatId])
 
   return flat

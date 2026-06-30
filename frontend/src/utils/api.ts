@@ -175,6 +175,15 @@ export const reviewsApi = {
   history: () => api.get('/reviews/history/list'),
 }
 
+export const qaChangesApi = {
+  list: (params?: { projectId?: string; towerId?: string; flatId?: string; unreviewedOnly?: boolean }) =>
+    api.get<{ totalUnreviewed: number; groups: import('../types').FlatChangeGroup[] }>('/qa/changes', { params }),
+  count: () => api.get<{ unreviewed: number }>('/qa/changes/count'),
+  markReviewed: (changeId: string) => api.patch(`/qa/changes/${changeId}/reviewed`),
+  markFlatReviewed: (flatId: string) =>
+    api.post<{ ok: boolean; markedCount: number }>('/qa/changes/mark-flat-reviewed', { flatId }),
+}
+
 export const usersApi = {
   list: (role?: string) => api.get<User[]>('/users', { params: { role } }),
   create: (data: { name: string; email: string; mobile: string; password: string; role: string }) =>

@@ -34,6 +34,23 @@ async function cacheImages(images: SnagImage[]): Promise<void> {
   }
 }
 
+/** Run async work with limited concurrency so user navigation isn't starved. */
+async function mapPool<T>(
+  items: T[],
+  fn: (item: T) => Promise<void>,
+  concurrency = 4
+): Promise<void> {
+  if (!items.length) return
+  let index = 0
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const i = index++
+      await fn(items[i])
+    }
+  })
+  await Promise.all(workers)
+}
+
 export async function prefetchAll(
   user: User,
   opts?: { force?: boolean }
@@ -66,18 +83,16 @@ export async function prefetchAll(
     ).flat()
     await saveFlats(allFlats)
 
-    // Cache inspections for every flat (not only in-progress) so deep-links work
-    await Promise.allSettled(
-      allFlats.map(async (flat: any) => {
-        try {
-          const { data: insp } = await inspectionsApi.getByFlat(flat.id)
-          await saveInspection(insp)
-          for (const r of insp.responses || []) {
-            await cacheImages(r.images || [])
-          }
-        } catch { /* no inspection yet */ }
-      })
-    )
+    // Cache inspections with limited concurrency — avoids blocking user navigation
+    await mapPool(allFlats, async (flat: { id: string }) => {
+      try {
+        const { data: insp } = await inspectionsApi.getByFlat(flat.id)
+        await saveInspection(insp)
+        for (const r of insp.responses || []) {
+          await cacheImages(r.images || [])
+        }
+      } catch { /* no inspection yet */ }
+    })
 
     await Promise.allSettled(
       projects.map(async (p) => {

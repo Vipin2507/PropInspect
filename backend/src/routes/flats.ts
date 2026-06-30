@@ -7,6 +7,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
 import { calcCompletionPct, countPendingTasks, getExpectedTaskCount, repairPartialSubmission, syncInspectionResponses } from '../utils/inspectionTasks'
 import { getFlatHistory, logFlatHistory } from '../utils/flatHistory'
+import { countUnreviewedChanges } from '../utils/taskChangeLog'
 import { param } from '../utils/params'
 
 const router = Router()
@@ -37,7 +38,7 @@ router.get(
       LEFT JOIN floors fl ON fl.id = f.floor_id
       LEFT JOIN inspections i ON i.flat_id = f.id
       LEFT JOIN users u   ON u.id  = i.engineer_id
-      WHERE f.status IN ('submitted','approved','rejected','revision_required','desnagging','handed_over')
+      WHERE f.status IN ('in_progress','submitted','approved','rejected','revision_required','desnagging','handed_over')
     `
     const params: unknown[] = []
 
@@ -49,7 +50,10 @@ router.get(
       params.push(projectId)
     }
 
-    sql += ` ORDER BY i.submitted_at DESC NULLS LAST`
+    sql += ` ORDER BY
+      CASE WHEN f.status = 'submitted' THEN 0 ELSE 1 END,
+      i.submitted_at DESC NULLS LAST,
+      f.flat_number ASC`
 
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[]
 
@@ -64,6 +68,7 @@ router.get(
       // Only show as submitted in checker view when truly 100% complete
       const effectiveStatus =
         flatStatus === 'submitted' && completionPct < 100 ? 'in_progress' : flatStatus
+      const unreviewedChangeCount = countUnreviewedChanges(row.id as string)
       return {
         id: row.id,
         flatNumber: row.flat_number,
@@ -78,6 +83,7 @@ router.get(
         engineerName: row.engineer_name || null,
         submittedAt: utcTs(row.submitted_at),
         completionPct,
+        unreviewedChangeCount,
         expectedTotal: getExpectedTaskCount(),
         createdAt: utcTs(row.created_at),
       }

@@ -12,6 +12,8 @@ export const ROUTES = {
   ENGINEER_FLAT_SNAGS: (flatId: string) => `/engineer/flats/${flatId}/snags`,
   ENGINEER_NOTIFICATIONS: '/engineer/notifications',
   QA_DASHBOARD: '/qa/dashboard',
+  QA_CHANGES: '/qa/changes',
+  QA_ALL_FLATS: '/qa/flats',
   QA_REVIEWS: '/qa/reviews',
   QA_REVIEW_DETAIL: (inspectionId: string) => `/qa/reviews/${inspectionId}`,
   QA_HISTORY: '/qa/reviewed',

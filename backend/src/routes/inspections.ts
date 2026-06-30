@@ -20,6 +20,7 @@ import {
   repairPartialSubmission,
   syncInspectionResponses,
 } from '../utils/inspectionTasks'
+import { logTaskResponseChange } from '../utils/taskChangeLog'
 
 const router = Router()
 router.use(authenticate)
@@ -129,12 +130,6 @@ router.get(
       return
     }
 
-    // QA can only view inspections that have been submitted for review
-    if (role === 'qa' && !['submitted', 'approved', 'rejected', 'revision_required'].includes(row.status as string)) {
-      res.status(403).json({ error: 'Flat has not been submitted for review' })
-      return
-    }
-
     res.json(loadInspection(row.id as string))
   })
 )
@@ -162,7 +157,28 @@ router.put(
 
     for (const r of body.responses) {
       if (r.id && r.status) {
-        update.run(r.status, r.remarks ?? '', r.id, inspectionId)
+        const existing = db
+          .prepare('SELECT * FROM responses WHERE id = ? AND inspection_id = ?')
+          .get(r.id, inspectionId) as Record<string, unknown> | undefined
+        if (!existing) continue
+
+        const newStatus = r.status as string
+        const newRemarks = (r.remarks as string) ?? ''
+
+        logTaskResponseChange({
+          flatId: inspection.flat_id as string,
+          inspectionId,
+          responseId: r.id as string,
+          itemId: existing.item_id as string,
+          categoryId: existing.category_id as string,
+          engineerId: req.user!.id,
+          oldStatus: existing.status as string,
+          newStatus,
+          oldRemarks: (existing.remarks as string) ?? '',
+          newRemarks,
+        })
+
+        update.run(newStatus, newRemarks, r.id, inspectionId)
       }
     }
 

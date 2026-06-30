@@ -13,6 +13,8 @@ import {
   refreshCompletionNotified,
   syncInspectionResponses,
 } from '../utils/inspectionTasks'
+import { logTaskResponseChange } from '../utils/taskChangeLog'
+import { param } from '../utils/params'
 
 const router = Router()
 router.use(authenticate)
@@ -119,6 +121,19 @@ router.patch(
     if (newStatus === 'pending') {
       newRemarks = ''
     }
+
+    logTaskResponseChange({
+      flatId: inspection.flat_id,
+      inspectionId: inspection.id,
+      responseId: param(req, 'id'),
+      itemId: response.item_id as string,
+      categoryId: response.category_id as string,
+      engineerId: req.user!.id,
+      oldStatus: response.status as string,
+      newStatus,
+      oldRemarks: (response.remarks as string) ?? '',
+      newRemarks: newRemarks ?? '',
+    })
 
     db.prepare(
       `UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`

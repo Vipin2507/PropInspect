@@ -93,7 +93,8 @@ export default function FlatDetail() {
 
   const backLabel = isAdmin ? 'Back to All Flats' : 'Back to My Flats'
 
-  if (loading) {
+  const waitingForInspection = loading && !inspection
+  if (waitingForInspection && !flat) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />
@@ -153,7 +154,14 @@ export default function FlatDetail() {
           </div>
         )}
 
-        {totalCount > 0 && activeTab === 'overview' && (
+        {activeTab === 'overview' && waitingForInspection && (
+          <div className="mt-4 flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+            <Spinner size="sm" />
+            Loading inspection…
+          </div>
+        )}
+
+        {totalCount > 0 && activeTab === 'overview' && !waitingForInspection && (
           <div className="mt-4">
             <div className="mb-1.5 flex justify-between text-sm font-medium">
               <span className="text-slate-600">Overall Progress</span>
@@ -228,7 +236,12 @@ export default function FlatDetail() {
 
           <div>
             <h2 className="mb-3 text-base font-bold text-slate-800 md:text-lg">Inspection Checklist</h2>
-            {!inspection ? (
+            {waitingForInspection ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl bg-white py-12 shadow-sm text-sm text-slate-500">
+                <Spinner size="sm" />
+                Loading inspection…
+              </div>
+            ) : !inspection ? (
               <div className="rounded-2xl bg-white px-4 py-12 text-center shadow-sm">
                 <h3 className="text-base font-semibold text-slate-800">No Inspection Started</h3>
                 <p className="mb-6 mt-2 text-sm text-slate-500">

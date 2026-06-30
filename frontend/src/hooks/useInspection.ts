@@ -48,6 +48,18 @@ export function useInspection(flatId: string | undefined) {
   const remarkTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingPersist = useRef<Map<string, () => Promise<void>>>(new Map())
   const inFlightSaves = useRef(0)
+  const loadGen = useRef(0)
+  const mounted = useRef(true)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+
+  useEffect(() => {
+    setInspection(null)
+    setLoading(true)
+  }, [flatId])
 
   const setGlobalSaveState = useInspectionUiStore((s) => s.setSaveState)
 
@@ -176,19 +188,34 @@ export function useInspection(flatId: string | undefined) {
 
   const load = useCallback(async () => {
     if (!flatId) return
-    setLoading(true)
+    const gen = ++loadGen.current
 
-    const cached = await getInspection(flatId).catch(() => undefined)
-    if (cached) {
-      setInspection(applyCompletionToInspection(cached))
+    const hydrateFromCache = async (): Promise<Inspection | undefined> => {
+      const cached = await getInspection(flatId).catch(() => undefined)
+      if (!cached || gen !== loadGen.current || !mounted.current) return cached
+      const withProgress = applyCompletionToInspection(cached)
+      setInspection(withProgress)
       setLoading(false)
+      return withProgress
     }
+
+    await hydrateFromCache()
+
+    // Prefetch may populate IndexedDB while our network request is queued
+    const pollCache = setInterval(() => {
+      if (gen !== loadGen.current || inspectionRef.current) {
+        clearInterval(pollCache)
+        return
+      }
+      void hydrateFromCache()
+    }, 400)
 
     try {
       const { data } = await inspectionsApi.getByFlat(flatId)
-      // Merge with current state (not stale cache) so in-flight edits are not wiped
+      if (gen !== loadGen.current || !mounted.current) return
+
       setInspection((prev) => {
-        const base = prev ?? (cached ? applyCompletionToInspection(cached) : null)
+        const base = prev ?? null
         if (!base) return applyCompletionToInspection(data)
         return applyCompletionToInspection(mergeInspections(base, data))
       })
@@ -201,12 +228,10 @@ export function useInspection(flatId: string | undefined) {
           void persistFlatCompletion(latest.flatId, latest.completionPct)
         }
 
+        const cached = await getInspection(flatId).catch(() => undefined)
         const hadLocalEdits =
           cached &&
-          hasLocalNewerResponses(
-            cached,
-            data as Inspection
-          )
+          hasLocalNewerResponses(cached, data as Inspection)
         if (hadLocalEdits) {
           const slim = latest.responses.map(({ id, itemId, categoryId, status, remarks }) => ({
             id, itemId, categoryId, status, remarks,
@@ -217,9 +242,14 @@ export function useInspection(flatId: string | undefined) {
         }
       }
     } catch {
-      if (!cached) setInspection(null)
+      if (gen === loadGen.current && mounted.current && !inspectionRef.current) {
+        setInspection(null)
+      }
     } finally {
-      setLoading(false)
+      clearInterval(pollCache)
+      if (gen === loadGen.current && mounted.current) {
+        setLoading(false)
+      }
     }
   }, [flatId])
 

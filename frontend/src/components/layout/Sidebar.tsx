@@ -15,12 +15,14 @@ import {
   Bell,
   MonitorDot,
   Activity,
+  ScrollText,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { useAuthStore } from '../../store/authStore'
 import { ROUTES } from '../../constants/routes'
 import { useEffect } from 'react'
 import { useNotificationStore } from '../../store/notificationStore'
+import { useQaChangesCount } from '../../hooks/useQaChanges'
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard }
 
@@ -29,7 +31,9 @@ const adminNav: NavItem[] = [
   { to: ROUTES.ADMIN,             label: 'Dashboard',      icon: LayoutDashboard },
   { to: ROUTES.ADMIN_PROJECTS,    label: 'Projects',       icon: Building2 },
   { to: ROUTES.ENGINEER_FLATS,    label: 'All Flats',      icon: ClipboardList },
-  { to: ROUTES.QA_REVIEWS,        label: 'QA Reviews',     icon: ClipboardCheck },
+  { to: ROUTES.QA_ALL_FLATS,      label: 'QA All Flats',   icon: Building2 },
+  { to: ROUTES.QA_CHANGES,        label: 'Changes Log',    icon: ScrollText },
+  { to: ROUTES.QA_REVIEWS,        label: 'Submitted Reviews', icon: ClipboardCheck },
   { to: ROUTES.QA_HISTORY,        label: 'Review History', icon: History },
   { to: ROUTES.DESNAGGING,        label: 'De-Snagging',    icon: Wrench },
   { to: ROUTES.ADMIN_MONITORING,  label: 'Monitoring',     icon: MonitorDot },
@@ -48,10 +52,12 @@ const navByRole: Record<string, NavItem[]> = {
     { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
   ],
   qa: [
-    { to: ROUTES.QA_DASHBOARD, label: 'Dashboard',      icon: LayoutDashboard },
-    { to: ROUTES.QA_REVIEWS,   label: 'Reviews',        icon: ClipboardList },
-    { to: ROUTES.QA_HISTORY,   label: 'History',        icon: FileText },
-    { to: ROUTES.DESNAGGING,   label: 'De-Snagging',    icon: Wrench },
+    { to: ROUTES.QA_DASHBOARD, label: 'Dashboard',         icon: LayoutDashboard },
+    { to: ROUTES.QA_ALL_FLATS, label: 'All Flats',         icon: Building2 },
+    { to: ROUTES.QA_CHANGES,   label: 'Changes Log',       icon: ScrollText },
+    { to: ROUTES.QA_REVIEWS,   label: 'Submitted Reviews', icon: ClipboardCheck },
+    { to: ROUTES.QA_HISTORY,   label: 'History',           icon: FileText },
+    { to: ROUTES.DESNAGGING,   label: 'De-Snagging',       icon: Wrench },
     { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
   ],
   viewer: [
@@ -69,6 +75,7 @@ function SidebarNav({
 }) {
   const user  = useAuthStore((s) => s.user)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const { count: unreviewedChanges } = useQaChangesCount()
   const items = navByRole[user?.role || 'engineer'] || []
 
   return (
@@ -99,6 +106,11 @@ function SidebarNav({
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
+            {to === ROUTES.QA_CHANGES && unreviewedChanges > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white leading-none">
+                {unreviewedChanges > 9 ? '9+' : unreviewedChanges}
+              </span>
+            )}
           </div>
           {!isCollapsed && (
             <span className="flex-1">{label}</span>
@@ -106,6 +118,11 @@ function SidebarNav({
           {!isCollapsed && to === ROUTES.ENGINEER_NOTIFICATIONS && unreadCount > 0 && (
             <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-fail px-1 text-[10px] font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+          {!isCollapsed && to === ROUTES.QA_CHANGES && unreviewedChanges > 0 && (
+            <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {unreviewedChanges > 9 ? '9+' : unreviewedChanges}
             </span>
           )}
         </NavLink>

@@ -17,6 +17,7 @@ export function ReviewChecklist({
   onItemCommentChange,
   onResponseUpdate,
   onImageClick,
+  readOnly = false,
 }: {
   responses: InspectionResponse[]
   inspectionId: string
@@ -24,6 +25,7 @@ export function ReviewChecklist({
   onItemCommentChange: (itemId: string, v: string) => void
   onResponseUpdate?: (responseId: string, updated: Partial<InspectionResponse>) => void
   onImageClick: (url: string) => void
+  readOnly?: boolean
 }) {
   const [expandedCats, setExpandedCats] = useState<Set<string>>(() => {
     // Pre-expand categories that have fail items
@@ -136,6 +138,7 @@ export function ReviewChecklist({
                         onResponseUpdate={(updated) => onResponseUpdate?.(response!.id, updated)}
                         qaComment={itemComments[item.id] || response!.qaRemarks || ''}
                         onQaComment={(v) => onItemCommentChange(item.id, v)}
+                        readOnly={readOnly}
                       />
                     ))}
                   </div>

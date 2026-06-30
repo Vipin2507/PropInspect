@@ -42,6 +42,7 @@ export function ReviewItemRow({
   onResponseUpdate,
   qaComment,
   onQaComment,
+  readOnly = false,
 }: {
   index: number
   label: string
@@ -53,6 +54,7 @@ export function ReviewItemRow({
   /** Legacy per-item QA comment (kept for overall review payload) */
   qaComment: string
   onQaComment: (v: string) => void
+  readOnly?: boolean
 }) {
   const [response, setResponse] = useState(initialResponse)
   const [remarkText, setRemarkText] = useState(response.qaRemarks || '')
@@ -198,7 +200,8 @@ export function ReviewItemRow({
             </div>
           )}
 
-          {/* Per-task decision buttons — Req 6.2 */}
+          {/* Per-task decision buttons — formal review only */}
+          {!readOnly && (
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(DECISION_CONFIG) as QADecision[]).map((d) => {
               const cfg = DECISION_CONFIG[d]
@@ -225,9 +228,10 @@ export function ReviewItemRow({
               )
             })}
           </div>
+          )}
 
           {/* Remark input — required for reject/revision (Req 6.3) */}
-          {showRemarkInput && (
+          {!readOnly && showRemarkInput && (
             <div>
               <label
                 htmlFor={`qa-remark-${response.id}`}
@@ -257,7 +261,7 @@ export function ReviewItemRow({
           )}
 
           {/* Legacy overall QA comment (used in review payload) */}
-          {!showRemarkInput && (
+          {!readOnly && !showRemarkInput && (
             <div>
               <label
                 htmlFor={`qa-comment-${response.id}`}
@@ -277,6 +281,7 @@ export function ReviewItemRow({
           )}
 
           {/* Evidence photos section — Req 7 */}
+          {!readOnly && (
           <div>
             <p className="mb-1.5 text-xs font-semibold text-slate-500">Evidence Photos</p>
             <div className="rounded-xl bg-slate-50 p-3">
@@ -288,6 +293,7 @@ export function ReviewItemRow({
               />
             </div>
           </div>
+          )}
         </div>
       )}
 

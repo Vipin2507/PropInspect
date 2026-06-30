@@ -78,6 +78,10 @@ export interface Flat {
     decision: string
     reviewedAt: string
   } | null
+  /** QA Changes Log — unreviewed engineer updates */
+  unreviewedChangeCount?: number
+  inspectionId?: string | null
+  submittedAt?: string | null
 }
 
 export type FlatStatus =
@@ -362,4 +366,42 @@ export interface DashboardData {
     status: InspectionStatus
   }>
   engineerLeaderboard: EngineerStats[]
+}
+
+export type TaskChangeType = 'status_change' | 'remarks_change'
+
+export interface TaskChangeLogEntry {
+  id: string
+  flatId: string
+  inspectionId: string
+  responseId: string
+  itemId: string
+  categoryId: string
+  itemLabel: string
+  categoryName: string
+  flatNumber: string
+  towerName: string
+  projectId: string
+  changeType: TaskChangeType
+  oldValue: string
+  newValue: string
+  engineerId: string
+  engineerName: string
+  reviewedAt: string | null
+  reviewedBy: string | null
+  reviewerName: string | null
+  createdAt: string
+}
+
+export interface FlatChangeGroup {
+  flatId: string
+  flatNumber: string
+  towerName: string
+  projectId: string
+  engineerName: string
+  flatStatus: string
+  completionPct: number
+  unreviewedCount: number
+  lastChangeAt: string
+  changes: TaskChangeLogEntry[]
 }

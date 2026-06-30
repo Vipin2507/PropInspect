@@ -14,6 +14,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { ArrowLeft } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
+import { cn } from '../../utils/cn'
 
 export default function ReviewDetail() {
   const { inspectionId } = useParams()
@@ -220,8 +221,10 @@ export default function ReviewDetail() {
     )
   }
 
+  const isFormalReview = data.inspection.status === 'submitted'
+
   return (
-    <div className="flex flex-col gap-4 pb-[160px] md:pb-6">
+    <div className={cn('flex flex-col gap-4', isFormalReview ? 'pb-[160px] md:pb-6' : 'pb-6')}>
       {/* Header */}
       <button
         type="button"
@@ -233,8 +236,17 @@ export default function ReviewDetail() {
       </button>
 
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Review: {data.flatNumber}</h1>
-        <p className="text-sm text-slate-500">Submitted by {data.engineerName}</p>
+        <h1 className="text-xl font-bold text-slate-900">
+          {isFormalReview ? 'Review' : 'View'}: {data.flatNumber}
+        </h1>
+        <p className="text-sm text-slate-500">
+          {isFormalReview ? 'Submitted' : 'In progress'} by {data.engineerName}
+        </p>
+        {!isFormalReview && (
+          <p className="mt-2 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            View-only — Approve/Reject/Revision is available after the engineer submits at 100%.
+          </p>
+        )}
         {isOffline && (
           <p className="mt-1 text-xs font-medium text-amber-600">
             ⚡ Showing cached data — connect to submit review
@@ -247,10 +259,13 @@ export default function ReviewDetail() {
         inspectionId={data.inspection.id}
         itemComments={itemComments}
         onItemCommentChange={(id, value) => setItemComments((c) => ({ ...c, [id]: value }))}
-        onResponseUpdate={handleResponseUpdate}
+        onResponseUpdate={isFormalReview ? handleResponseUpdate : undefined}
         onImageClick={setLightboxImage}
+        readOnly={!isFormalReview}
       />
 
+      {isFormalReview && (
+      <>
       {/* Fixed bottom actions panel — compact on mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-safe backdrop-blur-sm lg:left-60">
         <div className="mx-auto max-w-2xl">
@@ -296,6 +311,8 @@ export default function ReviewDetail() {
           Send for Revision
         </Button>
       </Drawer>
+      </>
+      )}
 
       {lightboxImage && (
         <Lightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />

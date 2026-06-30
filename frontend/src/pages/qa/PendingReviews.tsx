@@ -24,13 +24,15 @@ export default function PendingReviews() {
   const { flats, loading } = useCheckerFlats({ search: filters.search })
 
   const filteredFlats = useMemo(() => {
-    if (filters.status === 'all') return flats
-    return flats.filter((f) => f.status === filters.status)
+    const submittedStatuses = ['submitted', 'revision_required', 'approved', 'rejected']
+    const base = flats.filter((f) => submittedStatuses.includes(f.status))
+    if (filters.status === 'all') return base
+    return base.filter((f) => f.status === filters.status)
   }, [flats, filters.status])
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Flat Reviews</h1>
+      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Submitted Reviews</h1>
 
       <FilterBar
         filters={[{ id: 'status', label: 'Status', value: filters.status, options: STATUS_FILTER_OPTIONS }]}

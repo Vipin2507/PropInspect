@@ -115,6 +115,15 @@ export function useFlats(projectId?: string) {
   return { flats, loading, refresh }
 }
 
+/** Find a flat from any in-memory list cache (instant after All Flats loaded). */
+export function getFlatFromMemCache(flatId: string): Flat | undefined {
+  for (const flats of memCache.values()) {
+    const flat = flats.find((f) => f.id === flatId)
+    if (flat) return flat
+  }
+  return undefined
+}
+
 /** Update a flat in all in-memory list caches (all project keys). */
 export function patchFlatsMemCache(flatId: string, patch: Partial<Flat>): void {
   for (const [key, flats] of memCache.entries()) {

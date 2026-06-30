@@ -22,6 +22,8 @@ import QADashboard from './pages/qa/QADashboard'
 import PendingReviews from './pages/qa/PendingReviews'
 import ReviewDetail from './pages/qa/ReviewDetail'
 import ReviewHistory from './pages/qa/ReviewHistory'
+import ChangesLog from './pages/qa/ChangesLog'
+import QaAllFlats from './pages/qa/QaAllFlats'
 
 import SnagList from './pages/desnagging/SnagList'
 import SnagDetail from './pages/desnagging/SnagDetail'
@@ -75,6 +77,8 @@ export default function App() {
             {/* ── QA routes — qa + admin ── */}
             <Route element={<ProtectedRoute roles={['qa', 'admin']} />}>
               <Route path={ROUTES.QA_DASHBOARD} element={<QADashboard />} />
+              <Route path={ROUTES.QA_CHANGES}   element={<ChangesLog />} />
+              <Route path={ROUTES.QA_ALL_FLATS} element={<QaAllFlats />} />
               <Route path={ROUTES.QA_REVIEWS}   element={<PendingReviews />} />
               <Route path="/qa/reviews/:inspectionId" element={<ReviewDetail />} />
               <Route path={ROUTES.QA_HISTORY}   element={<ReviewHistory />} />

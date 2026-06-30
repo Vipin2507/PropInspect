@@ -10,6 +10,7 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
 import { validateAndSubmitFromSync } from '../services/syncService'
 import { createNotification } from '../utils/notifications'
+import { logTaskResponseChange } from '../utils/taskChangeLog'
 
 const router = Router()
 router.use(authenticate)
@@ -33,11 +34,35 @@ router.post(
         // ── 1. Save checklist responses ──────────────────────────────────
         if (type === 'save_inspection') {
           const inspectionId = payload.inspectionId as string
+          const inspection = db
+            .prepare('SELECT flat_id, engineer_id FROM inspections WHERE id = ?')
+            .get(inspectionId) as { flat_id: string; engineer_id: string } | undefined
           const responses = payload.responses as Array<{ id: string; status?: string; remarks?: string }>
           for (const r of responses) {
+            const existing = db
+              .prepare('SELECT * FROM responses WHERE id = ?')
+              .get(r.id) as Record<string, unknown> | undefined
+            if (!existing || !inspection) continue
+
+            const newStatus = r.status ?? 'pending'
+            const newRemarks = r.remarks ?? ''
+
+            logTaskResponseChange({
+              flatId: inspection.flat_id,
+              inspectionId,
+              responseId: r.id,
+              itemId: existing.item_id as string,
+              categoryId: existing.category_id as string,
+              engineerId: inspection.engineer_id,
+              oldStatus: existing.status as string,
+              newStatus,
+              oldRemarks: (existing.remarks as string) ?? '',
+              newRemarks,
+            })
+
             db.prepare(`UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`).run(
-              r.status ?? 'pending',
-              r.remarks ?? '',
+              newStatus,
+              newRemarks,
               r.id
             )
           }
