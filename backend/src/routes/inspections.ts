@@ -152,7 +152,7 @@ router.put(
     }
 
     const update = db.prepare(
-      `UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ? AND inspection_id = ?`
+      `UPDATE responses SET status = ?, remarks = ?, qa_decision = NULL, qa_remarks = '', updated_at = datetime('now') WHERE id = ? AND inspection_id = ?`
     )
 
     for (const r of body.responses) {

@@ -136,8 +136,8 @@ router.get(
       return
     }
     if (req.user!.role === 'qa') {
-      if (!['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(row.status)) {
-        res.status(403).json({ error: 'Flat has not been submitted for review' })
+      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(row.status)) {
+        res.status(403).json({ error: 'Flat is not available for review' })
         return
       }
     }
@@ -156,8 +156,8 @@ router.get(
     // QA can only see flats that have been submitted for review or are in a reviewed state
     if (req.user!.role === 'qa') {
       const status = row.status as string
-      if (!['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)) {
-        res.status(403).json({ error: 'Flat has not been submitted for review' })
+      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)) {
+        res.status(403).json({ error: 'Flat is not available for review' })
         return
       }
     }

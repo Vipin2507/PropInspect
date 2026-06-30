@@ -222,6 +222,7 @@ export default function ReviewDetail() {
   }
 
   const isFormalReview = data.inspection.status === 'submitted'
+  const canReviewTasks = ['draft', 'submitted', 'revision_required'].includes(data.inspection.status)
 
   return (
     <div className={cn('flex flex-col gap-4', isFormalReview ? 'pb-[160px] md:pb-6' : 'pb-6')}>
@@ -242,9 +243,15 @@ export default function ReviewDetail() {
         <p className="text-sm text-slate-500">
           {isFormalReview ? 'Submitted' : 'In progress'} by {data.engineerName}
         </p>
-        {!isFormalReview && (
-          <p className="mt-2 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-800">
-            View-only — Approve/Reject/Revision is available after the engineer submits at 100%.
+        {!isFormalReview && canReviewTasks && (
+          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Per-task review — mark items for revision. The engineer will see this in flat history.
+            Formal Approve/Reject is available after 100% submit.
+          </p>
+        )}
+        {!canReviewTasks && (
+          <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            This inspection is closed for editing.
           </p>
         )}
         {isOffline && (
@@ -259,9 +266,10 @@ export default function ReviewDetail() {
         inspectionId={data.inspection.id}
         itemComments={itemComments}
         onItemCommentChange={(id, value) => setItemComments((c) => ({ ...c, [id]: value }))}
-        onResponseUpdate={isFormalReview ? handleResponseUpdate : undefined}
+        onResponseUpdate={canReviewTasks ? handleResponseUpdate : undefined}
         onImageClick={setLightboxImage}
-        readOnly={!isFormalReview}
+        readOnly={!canReviewTasks}
+        taskReviewOnly={!isFormalReview}
       />
 
       {isFormalReview && (

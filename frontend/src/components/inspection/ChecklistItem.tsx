@@ -97,10 +97,14 @@ export function ChecklistItem({
       )}
 
       {/* ── QA revision feedback ── */}
-      {needsRevision && response.qaRemarks && (
+      {needsRevision && (
         <div className="mx-4 mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-          <p className="font-semibold text-amber-700">Revision Required</p>
-          <p className="mt-0.5 text-amber-700">{response.qaRemarks}</p>
+          <p className="font-semibold text-amber-700">Sent for revision by QA</p>
+          {response.qaRemarks ? (
+            <p className="mt-0.5 text-amber-700">{response.qaRemarks}</p>
+          ) : (
+            <p className="mt-0.5 text-amber-600">Please review and correct this task.</p>
+          )}
         </div>
       )}
       {isRejected && response.qaRemarks && (

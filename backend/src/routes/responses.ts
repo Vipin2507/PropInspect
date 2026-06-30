@@ -6,6 +6,8 @@ import { requireRole } from '../middleware/requireRole'
 import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToResponse, rowToImage } from '../utils/mappers'
 import { createNotification } from '../utils/notifications'
+import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
+import { logFlatHistory } from '../utils/flatHistory'
 import {
   calcCompletionPct,
   calcCompletionPctFromDb,
@@ -52,6 +54,12 @@ function maybeNotifyCompletion(inspectionId: string): void {
     'All checklist items are done — you can now submit for QA review.',
     inspection.flat_id
   )
+}
+
+function getItemLabel(itemId: string, categoryId: string): string {
+  const cat = DEFAULT_CHECKLIST_CATEGORIES.find((c) => c.id === categoryId)
+  const item = cat?.items.find((i) => i.id === itemId)
+  return item?.label ?? itemId
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -136,7 +144,7 @@ router.patch(
     })
 
     db.prepare(
-      `UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE responses SET status = ?, remarks = ?, qa_decision = NULL, qa_remarks = '', updated_at = datetime('now') WHERE id = ?`
     ).run(newStatus, newRemarks, req.params.id)
 
     // Keep flat status in sync
@@ -182,20 +190,32 @@ router.patch(
       .parse(req.body)
 
     const db = getDB()
+    const responseId = param(req, 'id')
     const response = db
       .prepare('SELECT * FROM responses WHERE id = ?')
-      .get(req.params.id) as Record<string, unknown>
+      .get(responseId) as Record<string, unknown>
     if (!response) throw new AppError('Response not found', 404)
 
     const inspection = db
-      .prepare('SELECT id, status FROM inspections WHERE id = ?')
-      .get(response.inspection_id) as { id: string; status: string }
+      .prepare(
+        `SELECT i.id, i.status, i.flat_id, i.engineer_id
+         FROM inspections i WHERE i.id = ?`
+      )
+      .get(response.inspection_id) as {
+      id: string
+      status: string
+      flat_id: string
+      engineer_id: string
+    }
     if (!inspection) throw new AppError('Inspection not found', 404)
 
-    // Req 6.1 — inspection must be submitted
-    if (inspection.status !== 'submitted') {
+    const reviewableStatuses = ['draft', 'submitted', 'revision_required']
+    if (!reviewableStatuses.includes(inspection.status)) {
       throw new AppError('Inspection is not available for per-task review', 400)
     }
+
+    const oldDecision = (response.qa_decision as string) || ''
+    const oldRemark = (response.qa_remarks as string) || ''
 
     // Req 6.3 — reject / revision requires non-empty remark
     if (
@@ -210,12 +230,61 @@ router.patch(
 
     db.prepare(
       `UPDATE responses SET qa_decision = ?, qa_remarks = ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(body.qaDecision, body.qaRemark ?? '', req.params.id)
+    ).run(body.qaDecision, body.qaRemark ?? '', responseId)
+
+    const itemLabel = getItemLabel(response.item_id as string, response.category_id as string)
+    const decisionChanged =
+      oldDecision !== body.qaDecision || (body.qaRemark ?? '').trim() !== oldRemark.trim()
+
+    if (decisionChanged && body.qaDecision !== 'approved') {
+      const isRevision = body.qaDecision === 'revision_required'
+      const eventType = isRevision ? 'qa_task_revision' : 'qa_task_rejected'
+      const title = isRevision ? `Sent for revision: ${itemLabel}` : `Task rejected: ${itemLabel}`
+
+      logFlatHistory({
+        flatId: inspection.flat_id,
+        eventType,
+        actorId: req.user!.id,
+        title,
+        description: body.qaRemark?.trim() || (isRevision ? 'QA requested a correction on this task.' : 'QA rejected this task.'),
+        metadata: {
+          responseId,
+          itemId: response.item_id,
+          categoryId: response.category_id,
+          itemLabel,
+          qaDecision: body.qaDecision,
+          inspectionId: inspection.id,
+        },
+      })
+
+      createNotification(
+        inspection.engineer_id,
+        isRevision ? 'qa_task_revision' : 'qa_task_rejected',
+        isRevision ? 'Task sent for revision' : 'Task rejected by QA',
+        `${itemLabel}: ${body.qaRemark?.trim() || (isRevision ? 'Please review and correct.' : 'See QA feedback.')}`,
+        inspection.flat_id
+      )
+    } else if (decisionChanged && body.qaDecision === 'approved') {
+      logFlatHistory({
+        flatId: inspection.flat_id,
+        eventType: 'qa_task_approved',
+        actorId: req.user!.id,
+        title: `Task approved: ${itemLabel}`,
+        description: body.qaRemark?.trim() || 'QA approved this task.',
+        metadata: {
+          responseId,
+          itemId: response.item_id,
+          itemLabel,
+          qaDecision: 'approved',
+          inspectionId: inspection.id,
+        },
+      })
+    }
 
     const updated = db
       .prepare('SELECT * FROM responses WHERE id = ?')
-      .get(req.params.id as string) as Record<string, unknown>
-    res.json(rowToResponse(updated, getImagesForResponse(req.params.id as string)))
+      .get(responseId as string) as Record<string, unknown>
+    res.json(rowToResponse(updated, getImagesForResponse(responseId)))
   })
 )
 

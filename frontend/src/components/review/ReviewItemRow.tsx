@@ -43,6 +43,7 @@ export function ReviewItemRow({
   qaComment,
   onQaComment,
   readOnly = false,
+  taskReviewOnly = false,
 }: {
   index: number
   label: string
@@ -55,6 +56,7 @@ export function ReviewItemRow({
   qaComment: string
   onQaComment: (v: string) => void
   readOnly?: boolean
+  taskReviewOnly?: boolean
 }) {
   const [response, setResponse] = useState(initialResponse)
   const [remarkText, setRemarkText] = useState(response.qaRemarks || '')
@@ -280,8 +282,8 @@ export function ReviewItemRow({
             </div>
           )}
 
-          {/* Evidence photos section — Req 7 */}
-          {!readOnly && (
+          {/* Evidence photos — formal submitted review only */}
+          {!readOnly && !taskReviewOnly && (
           <div>
             <p className="mb-1.5 text-xs font-semibold text-slate-500">Evidence Photos</p>
             <div className="rounded-xl bg-slate-50 p-3">

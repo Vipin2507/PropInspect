@@ -16,7 +16,8 @@ import toast from 'react-hot-toast'
 function notificationIcon(type: string): string {
   switch (type) {
     case 'inspection_approved':   return '✅'
-    case 'revision_required':     return '🔄'
+    case 'revision_required':
+    case 'qa_task_revision':      return '🔄'
     case 'inspection_rejected':   return '❌'
     case 'inspection_submitted':  return '📋'
     case 'snag_assigned':         return '🔧'

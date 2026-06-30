@@ -54,6 +54,24 @@ const EVENT_CONFIG: Record<
     bg: 'bg-amber-50',
     border: 'border-amber-200',
   },
+  qa_task_revision: {
+    icon: RotateCcw,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+  },
+  qa_task_rejected: {
+    icon: XCircle,
+    color: 'text-red-600',
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+  },
+  qa_task_approved: {
+    icon: CheckCircle2,
+    color: 'text-green-600',
+    bg: 'bg-green-50',
+    border: 'border-green-200',
+  },
   handed_over: {
     icon: PackageCheck,
     color: 'text-teal-600',

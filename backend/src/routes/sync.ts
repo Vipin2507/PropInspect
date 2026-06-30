@@ -60,7 +60,7 @@ router.post(
               newRemarks,
             })
 
-            db.prepare(`UPDATE responses SET status = ?, remarks = ?, updated_at = datetime('now') WHERE id = ?`).run(
+            db.prepare(`UPDATE responses SET status = ?, remarks = ?, qa_decision = NULL, qa_remarks = '', updated_at = datetime('now') WHERE id = ?`).run(
               newStatus,
               newRemarks,
               r.id
