@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { Button } from '../../components/ui/Button'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../constants/routes'
+import { useEngineerFeedbackCount } from '../../hooks/useEngineerFeedback'
 
 const COLORS = ['#16A34A', '#D97706', '#F97316', '#DC2626']
 
@@ -16,6 +17,7 @@ export default function EngineerDashboard() {
   const isAdmin = user?.role === 'admin'
   const navigate = useNavigate()
   const { flats, loading } = useFlats()
+  const { count: unseenFeedback } = useEngineerFeedbackCount()
 
   if (loading && flats.length === 0) {
     return (
@@ -79,6 +81,25 @@ export default function EngineerDashboard() {
           colorClass="text-secondary bg-orange-100"
         />
       </div>
+
+      {!isAdmin && unseenFeedback > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                {unseenFeedback} QA feedback item{unseenFeedback === 1 ? '' : 's'} waiting
+              </p>
+              <p className="text-xs text-amber-700">Tasks sent for revision — open the QA Feedback log</p>
+            </div>
+            <Link
+              to={ROUTES.ENGINEER_CHANGES}
+              className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white active:bg-amber-700"
+            >
+              View Log
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Pie chart */}

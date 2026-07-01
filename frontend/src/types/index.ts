@@ -242,6 +242,8 @@ export type NotificationType =
   | 'inspection_approved'
   | 'inspection_rejected'
   | 'revision_required'
+  | 'qa_task_revision'
+  | 'qa_task_rejected'
   | 'flat_completion'
   | 'snag_assigned'
   | 'snag_rectified'
@@ -407,4 +409,39 @@ export interface FlatChangeGroup {
   unreviewedCount: number
   lastChangeAt: string
   changes: TaskChangeLogEntry[]
+}
+
+export type EngineerFeedbackType = 'revision_required' | 'rejected' | 'approved'
+
+export interface EngineerFeedbackEntry {
+  id: string
+  flatId: string
+  inspectionId: string
+  responseId: string
+  itemId: string
+  itemLabel: string
+  categoryName: string
+  flatNumber: string
+  towerName: string
+  projectId: string
+  engineerId: string
+  qaId: string
+  qaName: string
+  feedbackType: EngineerFeedbackType
+  remark: string
+  seenAt: string | null
+  createdAt: string
+}
+
+export interface EngineerFeedbackGroup {
+  flatId: string
+  flatNumber: string
+  towerName: string
+  projectId: string
+  qaName: string
+  flatStatus: string
+  completionPct: number
+  unseenCount: number
+  lastFeedbackAt: string
+  feedback: EngineerFeedbackEntry[]
 }

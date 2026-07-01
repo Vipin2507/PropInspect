@@ -21,6 +21,7 @@ import {
   syncInspectionResponses,
 } from '../utils/inspectionTasks'
 import { logTaskResponseChange } from '../utils/taskChangeLog'
+import { markFeedbackSeenForResponse } from '../utils/engineerFeedbackLog'
 
 const router = Router()
 router.use(authenticate)
@@ -179,6 +180,7 @@ router.put(
         })
 
         update.run(newStatus, newRemarks, r.id, inspectionId)
+        markFeedbackSeenForResponse(r.id as string, req.user!.id)
       }
     }
 

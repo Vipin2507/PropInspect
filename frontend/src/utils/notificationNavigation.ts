@@ -76,6 +76,13 @@ export async function resolveNotificationRoute(
       return ROUTES.ENGINEER_FLAT(id)
     }
 
+    case 'qa_task_revision':
+    case 'qa_task_rejected':
+      if (role === 'engineer' || role === 'admin') {
+        return ROUTES.ENGINEER_CHANGES
+      }
+      return ROUTES.ENGINEER_FLAT(id)
+
     case 'revision_required':
     case 'inspection_rejected':
       if (role === 'engineer' || role === 'admin') {

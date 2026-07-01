@@ -175,6 +175,18 @@ export const reviewsApi = {
   history: () => api.get('/reviews/history/list'),
 }
 
+export const engineerFeedbackApi = {
+  list: (params?: { flatId?: string; unseenOnly?: boolean }) =>
+    api.get<{ totalUnseen: number; groups: import('../types').EngineerFeedbackGroup[] }>(
+      '/engineer/feedback',
+      { params }
+    ),
+  count: () => api.get<{ unseen: number }>('/engineer/feedback/count'),
+  markSeen: (feedbackId: string) => api.patch(`/engineer/feedback/${feedbackId}/seen`),
+  markFlatSeen: (flatId: string) =>
+    api.post<{ ok: boolean; markedCount: number }>('/engineer/feedback/mark-flat-seen', { flatId }),
+}
+
 export const qaChangesApi = {
   list: (params?: { projectId?: string; towerId?: string; flatId?: string; unreviewedOnly?: boolean }) =>
     api.get<{ totalUnreviewed: number; groups: import('../types').FlatChangeGroup[] }>('/qa/changes', { params }),

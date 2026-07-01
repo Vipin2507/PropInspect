@@ -23,6 +23,7 @@ import { ROUTES } from '../../constants/routes'
 import { useEffect } from 'react'
 import { useNotificationStore } from '../../store/notificationStore'
 import { useQaChangesCount } from '../../hooks/useQaChanges'
+import { useEngineerFeedbackCount } from '../../hooks/useEngineerFeedback'
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard }
 
@@ -31,6 +32,7 @@ const adminNav: NavItem[] = [
   { to: ROUTES.ADMIN,             label: 'Dashboard',      icon: LayoutDashboard },
   { to: ROUTES.ADMIN_PROJECTS,    label: 'Projects',       icon: Building2 },
   { to: ROUTES.ENGINEER_FLATS,    label: 'All Flats',      icon: ClipboardList },
+  { to: ROUTES.ENGINEER_CHANGES,  label: 'QA Feedback',    icon: ScrollText },
   { to: ROUTES.QA_ALL_FLATS,      label: 'QA All Flats',   icon: Building2 },
   { to: ROUTES.QA_CHANGES,        label: 'Changes Log',    icon: ScrollText },
   { to: ROUTES.QA_REVIEWS,        label: 'Submitted Reviews', icon: ClipboardCheck },
@@ -48,6 +50,7 @@ const navByRole: Record<string, NavItem[]> = {
   engineer: [
     { to: ROUTES.ENGINEER_DASHBOARD,    label: 'Dashboard',      icon: LayoutDashboard },
     { to: ROUTES.ENGINEER_FLATS,        label: 'All Flats',      icon: Building2 },
+    { to: ROUTES.ENGINEER_CHANGES,      label: 'QA Feedback',  icon: ScrollText },
     { to: ROUTES.DESNAGGING,            label: 'De-Snagging',    icon: Wrench },
     { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
   ],
@@ -76,6 +79,7 @@ function SidebarNav({
   const user  = useAuthStore((s) => s.user)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const { count: unreviewedChanges } = useQaChangesCount()
+  const { count: unseenFeedback } = useEngineerFeedbackCount()
   const items = navByRole[user?.role || 'engineer'] || []
 
   return (
@@ -111,6 +115,11 @@ function SidebarNav({
                 {unreviewedChanges > 9 ? '9+' : unreviewedChanges}
               </span>
             )}
+            {to === ROUTES.ENGINEER_CHANGES && unseenFeedback > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white leading-none">
+                {unseenFeedback > 9 ? '9+' : unseenFeedback}
+              </span>
+            )}
           </div>
           {!isCollapsed && (
             <span className="flex-1">{label}</span>
@@ -123,6 +132,11 @@ function SidebarNav({
           {!isCollapsed && to === ROUTES.QA_CHANGES && unreviewedChanges > 0 && (
             <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
               {unreviewedChanges > 9 ? '9+' : unreviewedChanges}
+            </span>
+          )}
+          {!isCollapsed && to === ROUTES.ENGINEER_CHANGES && unseenFeedback > 0 && (
+            <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {unseenFeedback > 9 ? '9+' : unseenFeedback}
             </span>
           )}
         </NavLink>

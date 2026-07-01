@@ -17,6 +17,7 @@ import CategorySummary from './pages/engineer/CategorySummary'
 import InspectionSummaryPage from './pages/engineer/InspectionSummaryPage'
 import NotificationsPage from './pages/engineer/NotificationsPage'
 import FlatSnagList from './pages/engineer/FlatSnagList'
+import EngineerChangesLog from './pages/engineer/EngineerChangesLog'
 
 import QADashboard from './pages/qa/QADashboard'
 import PendingReviews from './pages/qa/PendingReviews'
@@ -72,6 +73,7 @@ export default function App() {
               <Route path="/engineer/flats/:flatId/summary/:categoryId"    element={<CategorySummary />} />
               <Route path="/engineer/flats/:flatId/inspection-summary"     element={<InspectionSummaryPage />} />
               <Route path="/engineer/flats/:flatId/snags"                  element={<FlatSnagList />} />
+              <Route path={ROUTES.ENGINEER_CHANGES}                        element={<EngineerChangesLog />} />
             </Route>
 
             {/* ── QA routes — qa + admin ── */}

@@ -11,6 +11,7 @@ export const ROUTES = {
   ENGINEER_INSPECTION_SUMMARY: (flatId: string) => `/engineer/flats/${flatId}/inspection-summary`,
   ENGINEER_FLAT_SNAGS: (flatId: string) => `/engineer/flats/${flatId}/snags`,
   ENGINEER_NOTIFICATIONS: '/engineer/notifications',
+  ENGINEER_CHANGES: '/engineer/changes',
   QA_DASHBOARD: '/qa/dashboard',
   QA_CHANGES: '/qa/changes',
   QA_ALL_FLATS: '/qa/flats',

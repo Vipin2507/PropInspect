@@ -8,6 +8,7 @@ import { rowToResponse, rowToImage } from '../utils/mappers'
 import { createNotification } from '../utils/notifications'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { logFlatHistory } from '../utils/flatHistory'
+import { logEngineerFeedback, markFeedbackSeenForResponse } from '../utils/engineerFeedbackLog'
 import {
   calcCompletionPct,
   calcCompletionPctFromDb,
@@ -60,6 +61,11 @@ function getItemLabel(itemId: string, categoryId: string): string {
   const cat = DEFAULT_CHECKLIST_CATEGORIES.find((c) => c.id === categoryId)
   const item = cat?.items.find((i) => i.id === itemId)
   return item?.label ?? itemId
+}
+
+function getCategoryName(categoryId: string): string {
+  const cat = DEFAULT_CHECKLIST_CATEGORIES.find((c) => c.id === categoryId)
+  return cat?.name ?? categoryId
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -147,6 +153,8 @@ router.patch(
       `UPDATE responses SET status = ?, remarks = ?, qa_decision = NULL, qa_remarks = '', updated_at = datetime('now') WHERE id = ?`
     ).run(newStatus, newRemarks, req.params.id)
 
+    markFeedbackSeenForResponse(param(req, 'id'), req.user!.id)
+
     // Keep flat status in sync
     db.prepare(
       `UPDATE flats SET status = 'in_progress' WHERE id = ? AND status = 'not_started'`
@@ -233,6 +241,10 @@ router.patch(
     ).run(body.qaDecision, body.qaRemark ?? '', responseId)
 
     const itemLabel = getItemLabel(response.item_id as string, response.category_id as string)
+    const categoryName = getCategoryName(response.category_id as string)
+    const qaUser = db
+      .prepare('SELECT name FROM users WHERE id = ?')
+      .get(req.user!.id) as { name: string } | undefined
     const decisionChanged =
       oldDecision !== body.qaDecision || (body.qaRemark ?? '').trim() !== oldRemark.trim()
 
@@ -264,6 +276,20 @@ router.patch(
         `${itemLabel}: ${body.qaRemark?.trim() || (isRevision ? 'Please review and correct.' : 'See QA feedback.')}`,
         inspection.flat_id
       )
+
+      logEngineerFeedback({
+        flatId: inspection.flat_id,
+        inspectionId: inspection.id,
+        responseId,
+        itemId: response.item_id as string,
+        itemLabel,
+        categoryName,
+        engineerId: inspection.engineer_id,
+        qaId: req.user!.id,
+        qaName: qaUser?.name ?? 'QA',
+        feedbackType: isRevision ? 'revision_required' : 'rejected',
+        remark: body.qaRemark?.trim() ?? '',
+      })
     } else if (decisionChanged && body.qaDecision === 'approved') {
       logFlatHistory({
         flatId: inspection.flat_id,
@@ -278,6 +304,20 @@ router.patch(
           qaDecision: 'approved',
           inspectionId: inspection.id,
         },
+      })
+
+      logEngineerFeedback({
+        flatId: inspection.flat_id,
+        inspectionId: inspection.id,
+        responseId,
+        itemId: response.item_id as string,
+        itemLabel,
+        categoryName,
+        engineerId: inspection.engineer_id,
+        qaId: req.user!.id,
+        qaName: qaUser?.name ?? 'QA',
+        feedbackType: 'approved',
+        remark: body.qaRemark?.trim() ?? '',
       })
     }
 

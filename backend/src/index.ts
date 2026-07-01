@@ -29,6 +29,7 @@ import reportRoutes from './routes/reports'
 import syncRoutes from './routes/sync'
 import bulkUploadRoutes from './routes/bulkUpload'
 import qaChangesRoutes from './routes/qaChanges'
+import engineerFeedbackRoutes from './routes/engineerFeedback'
 
 dotenv.config()
 
@@ -135,6 +136,7 @@ app.use('/api/reports', reportRoutes)
 app.use('/api/sync', syncRoutes)
 app.use('/api/bulk-upload', bulkUploadRoutes)
 app.use('/api/qa/changes', qaChangesRoutes)
+app.use('/api/engineer/feedback', engineerFeedbackRoutes)
 
 app.use(errorHandler)
 

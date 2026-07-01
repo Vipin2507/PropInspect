@@ -11,6 +11,7 @@ import { rowToFlat } from '../utils/mappers'
 import { validateAndSubmitFromSync } from '../services/syncService'
 import { createNotification } from '../utils/notifications'
 import { logTaskResponseChange } from '../utils/taskChangeLog'
+import { markFeedbackSeenForResponse } from '../utils/engineerFeedbackLog'
 
 const router = Router()
 router.use(authenticate)
@@ -65,6 +66,7 @@ router.post(
               newRemarks,
               r.id
             )
+            markFeedbackSeenForResponse(r.id, inspection.engineer_id)
           }
           db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
           processed++
