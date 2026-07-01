@@ -77,7 +77,9 @@ export function ReviewItemRow({
     // Toggle off if already selected
     if (response.qaDecision === decision) return
 
-    if (decision !== 'approved' && !remarkText.trim()) {
+    const effectiveRemark = (remarkText.trim() || qaComment.trim())
+
+    if (decision !== 'approved' && !effectiveRemark) {
       setShowRemarkInput(true)
       toast.error('Please add a remark before rejecting or requesting revision.')
       return
@@ -85,7 +87,11 @@ export function ReviewItemRow({
 
     setIsSaving(true)
     try {
-      const updated = await setQaDecision(response.id, decision, remarkText.trim() || undefined)
+      const updated = await setQaDecision(
+        response.id,
+        decision,
+        effectiveRemark || undefined
+      )
       const merged = { ...response, ...updated }
       setResponse(merged as InspectionResponse)
       onResponseUpdate?.(merged)
@@ -215,6 +221,9 @@ export function ReviewItemRow({
                   disabled={isSaving}
                   onClick={() => {
                     setShowRemarkInput(d !== 'approved')
+                    if (d !== 'approved' && !remarkText.trim() && qaComment.trim()) {
+                      setRemarkText(qaComment.trim())
+                    }
                     handleDecision(d)
                   }}
                   className={cn(

@@ -153,7 +153,7 @@ router.patch(
       `UPDATE responses SET status = ?, remarks = ?, qa_decision = NULL, qa_remarks = '', updated_at = datetime('now') WHERE id = ?`
     ).run(newStatus, newRemarks, req.params.id)
 
-    markFeedbackSeenForResponse(param(req, 'id'), req.user!.id)
+    markFeedbackSeenForResponse(param(req, 'id'))
 
     // Keep flat status in sync
     db.prepare(

@@ -245,8 +245,8 @@ export default function ReviewDetail() {
         </p>
         {!isFormalReview && canReviewTasks && (
           <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Per-task review — mark items for revision. The engineer will see this in flat history.
-            Formal Approve/Reject is available after 100% submit.
+            Expand a task, enter a remark, then tap <strong>Revision</strong> or <strong>Reject</strong>.
+            The engineer will see it in QA Feedback Log.
           </p>
         )}
         {!canReviewTasks && (

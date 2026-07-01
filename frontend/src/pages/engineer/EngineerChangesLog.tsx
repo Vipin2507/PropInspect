@@ -27,7 +27,10 @@ function feedbackTone(type: string): string {
 export default function EngineerChangesLog() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [markingFlat, setMarkingFlat] = useState<string | null>(null)
-  const { groups, totalUnseen, loading, markFlatSeen, reload } = useEngineerFeedback()
+  const [showAll, setShowAll] = useState(false)
+  const { groups, totalUnseen, loading, error, markFlatSeen, reload } = useEngineerFeedback({
+    unseenOnly: !showAll,
+  })
 
   const toggleExpand = (flatId: string) => {
     setExpanded((prev) => {
@@ -56,15 +59,30 @@ export default function EngineerChangesLog() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 md:text-2xl">QA Feedback Log</h1>
           <p className="mt-1 text-sm text-slate-500">
-            QA revisions and comments on your flats — no need to open each flat to check
+            QA revisions on your flats — open a flat, expand a task, tap Revision with a remark
           </p>
         </div>
-        {totalUnseen > 0 && (
-          <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
-            {totalUnseen} new
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {totalUnseen > 0 && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+              {totalUnseen} new
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="text-xs font-medium text-primary active:underline"
+          >
+            {showAll ? 'New only' : 'Show all'}
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error} — is the backend updated?
+        </div>
+      )}
 
       {loading && groups.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-20">
@@ -72,8 +90,8 @@ export default function EngineerChangesLog() {
         </div>
       ) : groups.length === 0 ? (
         <EmptyState
-          title="No new QA feedback"
-          description="When QA marks tasks for revision, they will appear here."
+          title={showAll ? 'No QA feedback yet' : 'No new QA feedback'}
+          description="When QA taps Revision or Reject on a task (with a remark), it appears here. Engineer fail remarks go to QA Changes Log, not this page."
         />
       ) : (
         <div className="space-y-3">

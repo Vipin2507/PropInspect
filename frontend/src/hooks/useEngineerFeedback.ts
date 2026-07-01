@@ -8,10 +8,12 @@ export function useEngineerFeedback(filters: { flatId?: string; unseenOnly?: boo
   const [groups, setGroups] = useState<EngineerFeedbackGroup[]>([])
   const [totalUnseen, setTotalUnseen] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (role !== 'engineer' && role !== 'admin') return
     setLoading(true)
+    setError(null)
     try {
       const { data } = await engineerFeedbackApi.list({
         flatId: filters.flatId,
@@ -19,8 +21,11 @@ export function useEngineerFeedback(filters: { flatId?: string; unseenOnly?: boo
       })
       setGroups(data.groups)
       setTotalUnseen(data.totalUnseen)
-    } catch {
-      /* keep previous */
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Could not load QA feedback'
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -37,7 +42,7 @@ export function useEngineerFeedback(filters: { flatId?: string; unseenOnly?: boo
     return data.markedCount
   }, [])
 
-  return { groups, totalUnseen, loading, reload: load, markFlatSeen }
+  return { groups, totalUnseen, loading, error, reload: load, markFlatSeen }
 }
 
 export function useEngineerFeedbackCount() {

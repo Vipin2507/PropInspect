@@ -104,38 +104,33 @@ export function logEngineerFeedback(params: {
         params.feedbackType,
         params.remark
       )
-  } catch {
-    // Must not break QA saves
+  } catch (err) {
+    console.error('[engineerFeedbackLog] insert failed:', err)
   }
 }
 
-export function countUnseenFeedback(engineerId: string, flatId?: string): number {
+export function countUnseenFeedback(flatId?: string): number {
   const db = getDB()
   if (flatId) {
     const row = db
       .prepare(
         `SELECT COUNT(*) AS c FROM engineer_feedback_log
-         WHERE engineer_id = ? AND flat_id = ? AND seen_at IS NULL`
+         WHERE flat_id = ? AND seen_at IS NULL`
       )
-      .get(engineerId, flatId) as { c: number }
+      .get(flatId) as { c: number }
     return row?.c ?? 0
   }
   const row = db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM engineer_feedback_log
-       WHERE engineer_id = ? AND seen_at IS NULL`
-    )
-    .get(engineerId) as { c: number }
+    .prepare(`SELECT COUNT(*) AS c FROM engineer_feedback_log WHERE seen_at IS NULL`)
+    .get() as { c: number }
   return row?.c ?? 0
 }
 
-export function markFeedbackSeen(feedbackId: string, engineerId: string): boolean {
+export function markFeedbackSeen(feedbackId: string): boolean {
   const db = getDB()
   const row = db
-    .prepare(
-      `SELECT id FROM engineer_feedback_log WHERE id = ? AND engineer_id = ? AND seen_at IS NULL`
-    )
-    .get(feedbackId, engineerId)
+    .prepare(`SELECT id FROM engineer_feedback_log WHERE id = ? AND seen_at IS NULL`)
+    .get(feedbackId)
   if (!row) return false
   db.prepare(
     `UPDATE engineer_feedback_log SET seen_at = datetime('now') WHERE id = ?`
@@ -143,34 +138,106 @@ export function markFeedbackSeen(feedbackId: string, engineerId: string): boolea
   return true
 }
 
-export function markFlatFeedbackSeen(flatId: string, engineerId: string): number {
+export function markFlatFeedbackSeen(flatId: string): number {
   const db = getDB()
   const countRow = db
     .prepare(
       `SELECT COUNT(*) AS c FROM engineer_feedback_log
-       WHERE flat_id = ? AND engineer_id = ? AND seen_at IS NULL`
+       WHERE flat_id = ? AND seen_at IS NULL`
     )
-    .get(flatId, engineerId) as { c: number } | undefined
+    .get(flatId) as { c: number } | undefined
   const count = countRow?.c ?? 0
   if (count === 0) return 0
   db.prepare(
     `UPDATE engineer_feedback_log SET seen_at = datetime('now')
-     WHERE flat_id = ? AND engineer_id = ? AND seen_at IS NULL`
-  ).run(flatId, engineerId)
+     WHERE flat_id = ? AND seen_at IS NULL`
+  ).run(flatId)
   return count
 }
 
 /** Auto-acknowledge when engineer updates the task. */
-export function markFeedbackSeenForResponse(responseId: string, engineerId: string): void {
+export function markFeedbackSeenForResponse(responseId: string): void {
   try {
     getDB()
       .prepare(
         `UPDATE engineer_feedback_log SET seen_at = datetime('now')
-         WHERE response_id = ? AND engineer_id = ? AND seen_at IS NULL`
+         WHERE response_id = ? AND seen_at IS NULL`
       )
-      .run(responseId, engineerId)
+      .run(responseId)
   } catch {
     /* ignore */
+  }
+}
+
+/** Backfill from flat_history for QA actions logged before engineer_feedback_log existed. */
+function backfillFromFlatHistory(): void {
+  try {
+    const db = getDB()
+    const rows = db
+      .prepare(
+        `SELECT fh.*, i.id AS inspection_id, i.engineer_id
+         FROM flat_history fh
+         JOIN inspections i ON i.flat_id = fh.flat_id
+         WHERE fh.event_type IN ('qa_task_revision', 'qa_task_rejected', 'qa_task_approved')
+         ORDER BY datetime(fh.created_at) ASC`
+      )
+      .all() as Record<string, unknown>[]
+
+    for (const row of rows) {
+      const historyId = row.id as string
+      const exists = db
+        .prepare(`SELECT id FROM engineer_feedback_log WHERE id = ?`)
+        .get(`backfill-${historyId}`)
+      if (exists) continue
+
+      let meta: Record<string, unknown> = {}
+      try {
+        meta = JSON.parse((row.metadata as string) || '{}')
+      } catch {
+        continue
+      }
+      const responseId = meta.responseId as string | undefined
+      if (!responseId) continue
+
+      const feedbackType =
+        row.event_type === 'qa_task_revision'
+          ? 'revision_required'
+          : row.event_type === 'qa_task_rejected'
+          ? 'rejected'
+          : 'approved'
+
+      try {
+        const flatMeta = getFlatMeta(row.flat_id as string)
+        db.prepare(
+          `INSERT OR IGNORE INTO engineer_feedback_log
+           (id, flat_id, inspection_id, response_id, item_id, item_label, category_name,
+            flat_number, tower_name, project_id, engineer_id, qa_id, qa_name,
+            feedback_type, remark, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          `backfill-${historyId}`,
+          row.flat_id,
+          (meta.inspectionId as string) || row.inspection_id,
+          responseId,
+          (meta.itemId as string) || '',
+          (meta.itemLabel as string) || (row.title as string),
+          '',
+          flatMeta.flatNumber,
+          flatMeta.towerName,
+          flatMeta.projectId,
+          row.engineer_id,
+          row.actor_id ?? '',
+          row.actor_name ?? 'QA',
+          feedbackType,
+          (row.description as string) || '',
+          row.created_at
+        )
+      } catch {
+        /* skip row */
+      }
+    }
+  } catch {
+    /* best-effort */
   }
 }
 
@@ -188,14 +255,15 @@ export interface EngineerFeedbackGroup {
 }
 
 export function getEngineerFeedbackGrouped(opts: {
-  engineerId: string
   unseenOnly?: boolean
   flatId?: string
   limit?: number
 }): EngineerFeedbackGroup[] {
+  backfillFromFlatHistory()
+
   const db = getDB()
-  let sql = `SELECT * FROM engineer_feedback_log WHERE engineer_id = ?`
-  const params: unknown[] = [opts.engineerId]
+  let sql = `SELECT * FROM engineer_feedback_log WHERE 1=1`
+  const params: unknown[] = []
 
   if (opts.unseenOnly !== false) {
     sql += ` AND seen_at IS NULL`

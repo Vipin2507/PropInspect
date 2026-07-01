@@ -180,7 +180,7 @@ router.put(
         })
 
         update.run(newStatus, newRemarks, r.id, inspectionId)
-        markFeedbackSeenForResponse(r.id as string, req.user!.id)
+        markFeedbackSeenForResponse(r.id as string)
       }
     }
 

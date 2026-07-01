@@ -66,7 +66,7 @@ router.post(
               newRemarks,
               r.id
             )
-            markFeedbackSeenForResponse(r.id, inspection.engineer_id)
+            markFeedbackSeenForResponse(r.id)
           }
           db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
           processed++
