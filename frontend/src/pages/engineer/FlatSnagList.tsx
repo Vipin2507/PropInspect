@@ -1,14 +1,12 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
 import { ArrowLeft, ChevronRight, Wrench } from 'lucide-react'
 import { useSnags } from '../../hooks/useSnags'
-import { flatsApi } from '../../utils/api'
+import { useFlatDetail } from '../../hooks/useFlatDetail'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ROUTES } from '../../constants/routes'
-import type { Flat } from '../../types'
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: 'text-fail',
@@ -19,12 +17,8 @@ const SEVERITY_COLOR: Record<string, string> = {
 export default function FlatSnagList() {
   const { flatId } = useParams<{ flatId: string }>()
   const navigate = useNavigate()
-  const [flat, setFlat] = useState<Flat | null>(null)
+  const flat = useFlatDetail(flatId)
   const { snags, loading } = useSnags({ flatId })
-
-  useEffect(() => {
-    if (flatId) flatsApi.get(flatId).then(({ data }) => setFlat(data))
-  }, [flatId])
 
   const openSnags = snags.filter((s) =>
     ['open', 'assigned', 'in_rectification'].includes(s.status)

@@ -183,7 +183,24 @@ router.post(
 
           processed++
 
-        // ── 5. Update snag status/remarks ─────────────────────────────────
+        // ── 5. Per-task QA decision (queued offline) ─────────────────────
+        } else if (type === 'qa_decision') {
+          const { responseId, qaDecision, qaRemark } = payload as {
+            responseId: string
+            qaDecision: 'approved' | 'rejected' | 'revision_required'
+            qaRemark?: string
+          }
+          const response = db
+            .prepare('SELECT * FROM responses WHERE id = ?')
+            .get(responseId) as Record<string, unknown> | undefined
+          if (response) {
+            db.prepare(
+              `UPDATE responses SET qa_decision = ?, qa_remarks = ?, updated_at = datetime('now') WHERE id = ?`
+            ).run(qaDecision, qaRemark ?? '', responseId)
+          }
+          processed++
+
+        // ── 6. Update snag status/remarks ─────────────────────────────────
         } else if (type === 'update_snag') {
           const { snagId, changes: snagChanges } = payload as {
             snagId: string

@@ -1,12 +1,11 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useInspection } from '../../hooks/useInspection'
-import { useEffect, useState } from 'react'
-import { flatsApi } from '../../utils/api'
+import { useFlatDetail } from '../../hooks/useFlatDetail'
+import { useState } from 'react'
 import { ProgressRing } from '../../components/ui/ProgressRing'
 import { InspectionSummary } from '../../components/inspection/InspectionSummary'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
-import type { Flat } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
@@ -18,13 +17,9 @@ export default function InspectionSummaryPage() {
   const { flatId } = useParams<{ flatId: string }>()
   const navigate   = useNavigate()
   const isMobile   = useIsMobile()
-  const [flat, setFlat]               = useState<Flat | null>(null)
+  const flat = useFlatDetail(flatId)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const { inspection, loading, submit }   = useInspection(flatId)
-
-  useEffect(() => {
-    if (flatId) flatsApi.get(flatId).then(({ data }) => setFlat(data))
-  }, [flatId])
 
   if (loading || !inspection || !flat) {
     return (

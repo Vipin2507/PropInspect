@@ -6,6 +6,8 @@ import { resolveMediaUrl } from '../../utils/api'
 import { resolveImageOffline } from '../../utils/imageCache'
 import { cn } from '../../utils/cn'
 import { Lightbox } from '../ui/Lightbox'
+import { Capacitor } from '@capacitor/core'
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera'
 
 /** Renders a single thumbnail, resolving via IndexedDB cache for offline support */
 function OfflineThumbnail({ img, onClick }: { img: SnagImage; onClick: () => void }) {
@@ -54,6 +56,7 @@ export function ImageUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const isNative = Capacitor.isNativePlatform()
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -69,6 +72,30 @@ export function ImageUploader({
       }
     }
     e.target.value = ''
+  }
+
+  const handleNativePick = async () => {
+    try {
+      const photo = await CapCamera.getPhoto({
+        source: CameraSource.Prompt,
+        resultType: CameraResultType.Uri,
+        quality: 85,
+        correctOrientation: true,
+      })
+      const webPath = photo.webPath
+      if (!webPath) return
+
+      const resp = await fetch(webPath)
+      const blob = await resp.blob()
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' })
+
+      const compressed = await compressImage(file)
+      const base64 = await blobToBase64(compressed)
+      onAdd(new File([compressed], file.name, { type: compressed.type }), base64)
+    } catch (err) {
+      // User cancelled or permission denied
+      console.warn('Native photo pick failed:', err)
+    }
   }
 
   if (readOnly && images.length === 0) return null
@@ -105,7 +132,11 @@ export function ImageUploader({
           {!readOnly && images.length < maxImages && !trigger && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isNative) handleNativePick()
+                else inputRef.current?.click()
+              }}
               className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 active:border-primary active:text-primary touch-manipulation"
               aria-label="Add another photo"
             >
@@ -120,7 +151,11 @@ export function ImageUploader({
         <>
           {trigger ? (
             <div
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isNative) handleNativePick()
+                else inputRef.current?.click()
+              }}
               className="cursor-pointer"
             >
               {trigger}
@@ -128,7 +163,11 @@ export function ImageUploader({
           ) : images.length === 0 ? (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isNative) handleNativePick()
+                else inputRef.current?.click()
+              }}
               className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 text-sm font-medium text-slate-500 active:border-primary active:text-primary touch-manipulation"
               aria-label="Add photo"
             >
@@ -139,14 +178,15 @@ export function ImageUploader({
         </>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      {!isNative && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      )}
 
       {lightboxIndex !== null && (
         <Lightbox

@@ -90,3 +90,15 @@ export async function saveSingleFlat(flat: Flat): Promise<void> {
   const db = await getDb()
   await db.put('flats', flat as unknown as Record<string, unknown>)
 }
+
+export async function saveTemplates(templates: Record<string, unknown>[]): Promise<void> {
+  const db = await getDb()
+  const tx = db.transaction('templates', 'readwrite')
+  for (const t of templates) await tx.store.put(t)
+  await tx.done
+}
+
+export async function getTemplatesFromDb(): Promise<Record<string, unknown>[]> {
+  const db = await getDb()
+  return (await db.getAll('templates')) as Record<string, unknown>[]
+}

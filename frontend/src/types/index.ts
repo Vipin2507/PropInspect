@@ -309,6 +309,7 @@ export type PendingChangeType =
   | 'upload_image'
   | 'create_snag'
   | 'update_snag'
+  | 'qa_decision'
 
 export interface PendingChange {
   id: string

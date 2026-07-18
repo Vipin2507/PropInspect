@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { snagsApi } from '../../utils/api'
 import { getDb } from '../../utils/db'
-import { resolveImageOffline } from '../../utils/imageCache'
+import { resolveImageOffline, cacheSnagImages } from '../../utils/imageCache'
 import { queueChange } from '../../utils/sync'
 import { SnagTimeline } from '../../components/desnagging/SnagTimeline'
 import { RectificationForm } from '../../components/desnagging/RectificationForm'
@@ -87,6 +87,7 @@ export default function SnagDetail() {
       try {
         const { data } = await snagsApi.get(snagId)
         await db.put('snags', data as unknown as Record<string, unknown>)
+        cacheSnagImages(data)
         setSnag(data)
       } catch { /* stay with cached */ }
     })()
@@ -106,7 +107,12 @@ export default function SnagDetail() {
     } catch {
       // Queue for when back online — update local cache optimistically
       await queueChange('update_snag', { snagId, changes: { status: 'in_rectification', remarks } })
-      setSnag((prev) => prev ? { ...prev, status: 'in_rectification', remarks } : prev)
+      setSnag((prev) => {
+        if (!prev) return prev
+        const next = { ...prev, status: 'in_rectification' as const, remarks }
+        void getDb().then((db) => db.put('snags', next as unknown as Record<string, unknown>))
+        return next
+      })
       setRemarks('')
       toast.success('Saved offline — will sync when back online')
     }
@@ -125,7 +131,12 @@ export default function SnagDetail() {
     } catch {
       const newStatus = approved ? 'closed' : 'open'
       await queueChange('update_snag', { snagId, changes: { status: newStatus, remarks: comments ?? '' } })
-      setSnag((prev) => prev ? { ...prev, status: newStatus } : prev)
+      setSnag((prev) => {
+        if (!prev) return prev
+        const next = { ...prev, status: newStatus as typeof prev.status }
+        void getDb().then((db) => db.put('snags', next as unknown as Record<string, unknown>))
+        return next
+      })
       toast.success('Saved offline — will sync when back online')
     }
   }

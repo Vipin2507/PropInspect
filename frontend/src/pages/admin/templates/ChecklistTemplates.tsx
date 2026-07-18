@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { templatesApi } from '../../../utils/api'
+import { getTemplatesFromDb, saveTemplates } from '../../../utils/storage'
 import { DEFAULT_CHECKLIST_CATEGORIES, TOTAL_ITEMS } from '../../../constants/checklist'
 import type { ChecklistTemplate } from '../../../types'
 import { Spinner } from '../../../components/ui/Spinner'
@@ -279,9 +280,26 @@ export default function ChecklistTemplates() {
   const [editTarget, setEditTarget] = useState<ChecklistTemplate | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const load = () => {
+  const load = async () => {
     setLoading(true)
-    templatesApi.list().then(({ data }) => setTemplates(data)).finally(() => setLoading(false))
+
+    try {
+      const cached = await getTemplatesFromDb()
+      if (cached.length > 0) {
+        setTemplates(cached as unknown as ChecklistTemplate[])
+        setLoading(false)
+      }
+    } catch { /* ignore */ }
+
+    try {
+      const { data } = await templatesApi.list()
+      await saveTemplates(data as unknown as Record<string, unknown>[])
+      setTemplates(data)
+    } catch {
+      // keep cached
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { snagsApi } from '../utils/api'
 import { getDb } from '../utils/db'
+import { cacheSnagImages } from '../utils/imageCache'
 import type { Snag } from '../types'
 
 // Module-level memory cache keyed by query string
@@ -50,7 +51,10 @@ export function useSnags(params: { flatId?: string; projectId?: string; inspecti
         if (data.length > 0) {
           const db = await getDb()
           const tx = db.transaction('snags', 'readwrite')
-          for (const s of data) await tx.store.put(s as unknown as Record<string, unknown>)
+          for (const s of data) {
+            await tx.store.put(s as unknown as Record<string, unknown>)
+            cacheSnagImages(s)
+          }
           await tx.done
         }
         if (mounted.current) setSnags(data)

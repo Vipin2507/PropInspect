@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useReportsOverview } from '../../hooks/useReports'
+import { cacheKey, readLsCache, writeLsCache } from '../../utils/offlineCache'
 import { useProjects } from '../../hooks/useProjects'
 import { useUsers } from '../../hooks/useUsers'
 import { reportsApi } from '../../utils/api'
@@ -115,19 +116,33 @@ export default function AdminDashboard() {
   const activeFilterCount = [filters.projectId, filters.engineerId, filters.status, filters.dateFrom, filters.dateTo].filter(Boolean).length
   const hasFilters = activeFilterCount > 0
 
+  const flatsCacheKey = (params: Record<string, string>) =>
+    cacheKey('reports_flats_cache', params)
+
   // ── Always fetch — with or without filters ────────────────────────────
   const fetch = useCallback(async () => {
     setLoading(true)
+    const params: Record<string,string> = {}
+    if (filters.projectId)  params.projectId  = filters.projectId
+    if (filters.engineerId) params.engineerId = filters.engineerId
+    if (filters.status)     params.status     = filters.status
+    if (filters.dateFrom)   params.dateFrom   = filters.dateFrom
+    if (filters.dateTo)     params.dateTo     = filters.dateTo
+
+    const key = flatsCacheKey(params)
+    const cached = readLsCache<{ summary: Summary; flats: FlatRow[] }>(key)
+    if (cached) {
+      setResult(cached)
+      setLoading(false)
+    }
+
     try {
-      const params: Record<string,string> = {}
-      if (filters.projectId)  params.projectId  = filters.projectId
-      if (filters.engineerId) params.engineerId = filters.engineerId
-      if (filters.status)     params.status     = filters.status
-      if (filters.dateFrom)   params.dateFrom   = filters.dateFrom
-      if (filters.dateTo)     params.dateTo     = filters.dateTo
       const { data } = await reportsApi.flats(params)
+      writeLsCache(key, data)
       setResult(data)
-    } catch { setResult(null) }
+    } catch {
+      if (!cached) setResult(null)
+    }
     finally  { setLoading(false) }
   }, [filters])
 

@@ -40,8 +40,17 @@ export function useResponses() {
       qaDecision: 'approved' | 'rejected' | 'revision_required',
       qaRemark?: string
     ): Promise<Partial<InspectionResponse>> => {
-      const { data } = await responsesApi.setQaDecision(responseId, { qaDecision, qaRemark })
-      return data as Partial<InspectionResponse>
+      try {
+        const { data } = await responsesApi.setQaDecision(responseId, { qaDecision, qaRemark })
+        return data as Partial<InspectionResponse>
+      } catch {
+        await queueChange('qa_decision', { responseId, qaDecision, qaRemark })
+        return {
+          id: responseId,
+          qaDecision,
+          qaRemarks: qaRemark ?? '',
+        }
+      }
     },
     []
   )

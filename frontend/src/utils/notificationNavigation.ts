@@ -1,5 +1,7 @@
 import { flatsApi, inspectionsApi, reviewsApi, snagsApi } from './api'
 import { getFlatById, saveInspection, saveSingleFlat } from './storage'
+import { writeLsCache } from './offlineCache'
+import { cacheInspectionImages, cacheReviewDetailImages, cacheSnagImages } from './imageCache'
 import { ROUTES } from '../constants/routes'
 import type { Notification } from '../types'
 
@@ -31,7 +33,8 @@ export async function warmRouteData(route: string): Promise<void> {
     const inspectionId = qaReview[1]
     try {
       const { data } = await reviewsApi.get(inspectionId)
-      localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(data))
+      writeLsCache(`review_detail_${inspectionId}`, data)
+      cacheReviewDetailImages(data as { inspection: import('../types').Inspection })
     } catch { /* page will retry */ }
     return
   }
@@ -44,6 +47,7 @@ export async function warmRouteData(route: string): Promise<void> {
       await saveSingleFlat(flat)
       const { data: insp } = await inspectionsApi.getByFlat(flatId)
       await saveInspection(insp)
+      cacheInspectionImages(insp)
     } catch { /* page will retry */ }
     return
   }
@@ -56,6 +60,7 @@ export async function warmRouteData(route: string): Promise<void> {
       const { getDb } = await import('./db')
       const db = await getDb()
       await db.put('snags', data as unknown as Record<string, unknown>)
+      cacheSnagImages(data)
     } catch { /* page will retry */ }
   }
 }

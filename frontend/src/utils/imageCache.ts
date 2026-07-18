@@ -9,6 +9,7 @@
 
 import { getDb } from './db'
 import { resolveMediaUrl } from './api'
+import type { Inspection, Snag, SnagImage } from '../types'
 
 /** Download an image URL and store its base64 in IndexedDB. */
 export async function cacheImage(serverUrl: string | undefined | null): Promise<void> {
@@ -51,6 +52,30 @@ export async function resolveImageOffline(serverUrl: string | undefined | null):
 
   // Not in cache — return resolved URL (will only work online)
   return resolveMediaUrl(serverUrl) ?? undefined
+}
+
+/** Cache all images from a list (fire-and-forget, non-blocking). */
+export function cacheImagesFromList(images: SnagImage[] | undefined | null): void {
+  if (!images?.length) return
+  for (const img of images) {
+    void cacheImage(img.thumbnailUrl)
+    void cacheImage(img.url)
+  }
+}
+
+export function cacheInspectionImages(inspection: Inspection): void {
+  for (const r of inspection.responses || []) {
+    cacheImagesFromList(r.images)
+  }
+}
+
+export function cacheSnagImages(snag: Snag): void {
+  cacheImagesFromList(snag.beforeImages)
+  cacheImagesFromList(snag.afterImages)
+}
+
+export function cacheReviewDetailImages(data: { inspection: Inspection }): void {
+  cacheInspectionImages(data.inspection)
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

@@ -3,6 +3,7 @@ import { flatsApi, projectsApi } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import { getDb } from '../utils/db'
 import { useFlatProgressStore } from '../store/flatProgressStore'
+import { prefetchInspections } from '../utils/prefetch'
 import type { Flat } from '../types'
 
 // ── Sort helper ───────────────────────────────────────────────────────────────
@@ -103,6 +104,16 @@ export function useFlats(projectId?: string) {
       memCache.set(key, sorted)
       useFlatProgressStore.getState().clearAll()
       if (mounted.current) setFlats(sorted)
+
+      // While online on All Flats, quietly cache any missing inspections for offline
+      if (user.role === 'engineer' || user.role === 'admin') {
+        const toCache = sorted.filter(
+          (f) =>
+            f.status !== 'handed_over' &&
+            !(f.status === 'not_started' && !f.inspectionId && !f.inspection?.id)
+        )
+        void prefetchInspections(toCache, { cacheImages: true })
+      }
     } catch {
       // Network failed — memory/db cache already shown
     } finally {

@@ -1,8 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { flatsApi } from '../utils/api'
-import type { Flat } from '../types'
+import { flatsApi, reviewsApi } from '../utils/api'
+import { cacheKey, readLsCache, writeLsCache } from '../utils/offlineCache'
+import { saveInspection } from '../utils/storage'
+import { cacheReviewDetailImages } from '../utils/imageCache'
+import type { Flat, Inspection } from '../types'
 
-const CACHE_KEY = 'checker_flats_cache'
+const CACHE_PREFIX = 'checker_flats_cache'
 
 interface CheckerFlatsFilters {
   projectId?: string
@@ -16,15 +19,15 @@ interface CheckerFlatsFilters {
  * Results are cached in localStorage for offline use.
  */
 export function useCheckerFlats(filters: CheckerFlatsFilters = {}) {
-  const [flats, setFlats] = useState<Flat[]>(() => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY)
-      return cached ? JSON.parse(cached) : []
-    } catch {
-      return []
-    }
+  const listKey = cacheKey(CACHE_PREFIX, {
+    projectId: filters.projectId,
+    towerId: filters.towerId,
   })
-  const [loading, setLoading] = useState(!localStorage.getItem(CACHE_KEY))
+
+  const [flats, setFlats] = useState<Flat[]>(() =>
+    readLsCache<Flat[]>(listKey) ?? readLsCache<Flat[]>(CACHE_PREFIX) ?? []
+  )
+  const [loading, setLoading] = useState(!readLsCache(listKey) && !readLsCache(CACHE_PREFIX))
 
   const load = useCallback(async () => {
     try {
@@ -32,14 +35,35 @@ export function useCheckerFlats(filters: CheckerFlatsFilters = {}) {
         projectId: filters.projectId,
         towerId: filters.towerId,
       })
-      localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+      writeLsCache(listKey, data)
+      writeLsCache(CACHE_PREFIX, data)
       setFlats(data)
+
+      // Quietly cache review details for offline while online on All Flats
+      void Promise.allSettled(
+        data
+          .filter((f) =>
+            ['submitted', 'revision_required', 'approved', 'rejected', 'desnagging'].includes(f.status)
+          )
+          .map(async (flat) => {
+            const inspectionId = flat.inspectionId || flat.inspection?.id
+            if (!inspectionId) return
+            const cacheKeyDetail = `review_detail_${inspectionId}`
+            if (readLsCache(cacheKeyDetail)) return
+            try {
+              const { data: detail } = await reviewsApi.get(inspectionId)
+              writeLsCache(cacheKeyDetail, detail)
+              cacheReviewDetailImages(detail as { inspection: Inspection })
+              if (detail.inspection) await saveInspection(detail.inspection)
+            } catch { /* ignore */ }
+          })
+      )
     } catch {
       // Network unavailable — stay with cached
     } finally {
       setLoading(false)
     }
-  }, [filters.projectId, filters.towerId])
+  }, [filters.projectId, filters.towerId, listKey])
 
   useEffect(() => {
     load()

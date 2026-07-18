@@ -2,6 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { reviewsApi } from '../../utils/api'
 import { queueChange } from '../../utils/sync'
+import { cacheReviewDetailImages } from '../../utils/imageCache'
+import { readLsCache, writeLsCache } from '../../utils/offlineCache'
 import { ReviewChecklist } from '../../components/review/ReviewChecklist'
 import { ReviewActions } from '../../components/review/ReviewActions'
 import { Lightbox } from '../../components/ui/Lightbox'
@@ -34,10 +36,15 @@ export default function ReviewDetail() {
 
   const [isOffline, setIsOffline] = useState(false)
 
+  const persistReviewCache = (next: NonNullable<typeof data>) => {
+    if (!inspectionId) return
+    writeLsCache(`review_detail_${inspectionId}`, next)
+  }
+
   const handleResponseUpdate = (responseId: string, updated: Partial<Inspection['responses'][0]>) => {
     setData((prev) => {
       if (!prev) return prev
-      return {
+      const next = {
         ...prev,
         inspection: {
           ...prev.inspection,
@@ -46,6 +53,8 @@ export default function ReviewDetail() {
           ),
         },
       }
+      persistReviewCache(next)
+      return next
     })
   }
 
@@ -58,9 +67,9 @@ export default function ReviewDetail() {
     setLoadError(null)
 
     try {
-      const cached = localStorage.getItem(cacheKey)
+      const cached = readLsCache<typeof data>(cacheKey)
       if (cached) {
-        setData(JSON.parse(cached))
+        setData(cached)
         setItemComments({})
         setLoading(false)
       }
@@ -69,7 +78,8 @@ export default function ReviewDetail() {
     reviewsApi.get(inspectionId)
       .then(({ data: fresh }) => {
         if (cancelled) return
-        localStorage.setItem(cacheKey, JSON.stringify(fresh))
+        writeLsCache(cacheKey, fresh)
+        cacheReviewDetailImages(fresh as { inspection: Inspection })
         setData(fresh as typeof data)
         setItemComments({})
         setIsOffline(false)
@@ -77,7 +87,7 @@ export default function ReviewDetail() {
       })
       .catch(async (err: { response?: { status?: number; data?: { error?: string } } }) => {
         if (cancelled) return
-        const hadCache = !!localStorage.getItem(cacheKey)
+        const hadCache = !!readLsCache(cacheKey)
         if (hadCache) {
           setIsOffline(true)
           return
@@ -170,7 +180,8 @@ export default function ReviewDetail() {
         toast.error(serverMsg || 'Failed to submit review')
         try {
           const { data: fresh } = await reviewsApi.get(inspectionId)
-          localStorage.setItem(`review_detail_${inspectionId}`, JSON.stringify(fresh))
+          writeLsCache(`review_detail_${inspectionId}`, fresh)
+          cacheReviewDetailImages(fresh as { inspection: Inspection })
           setData(fresh as typeof data)
           setIsOffline(false)
         } catch {
@@ -245,8 +256,8 @@ export default function ReviewDetail() {
         </p>
         {!isFormalReview && canReviewTasks && (
           <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Expand a task, enter a remark, then tap <strong>Revision</strong> or <strong>Reject</strong>.
-            The engineer will see it in QA Feedback Log.
+            Expand a task, type your remark, add photos if needed, then tap <strong>Revision</strong>.
+            You can upload evidence photos before saving.
           </p>
         )}
         {!canReviewTasks && (

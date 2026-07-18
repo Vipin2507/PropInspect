@@ -4,6 +4,7 @@ import { saveInspection, saveInspectionDelta, getInspection } from '../utils/sto
 import { queueChange } from '../utils/sync'
 import { useInspectionUiStore } from '../store/inspectionUiStore'
 import { applyCompletionToInspection } from '../utils/completion'
+import { cacheInspectionImages } from '../utils/imageCache'
 import { TOTAL_ITEMS } from '../constants/checklist'
 import { patchFlatCompletionLive, persistFlatCompletion } from '../utils/flatCache'
 import type { Inspection, InspectionResponse, Flat } from '../types'
@@ -214,32 +215,31 @@ export function useInspection(flatId: string | undefined) {
       const { data } = await inspectionsApi.getByFlat(flatId)
       if (gen !== loadGen.current || !mounted.current) return
 
-      setInspection((prev) => {
-        const base = prev ?? null
-        if (!base) return applyCompletionToInspection(data)
-        return applyCompletionToInspection(mergeInspections(base, data))
-      })
+      const base = inspectionRef.current
+      const merged = base
+        ? applyCompletionToInspection(mergeInspections(base, data))
+        : applyCompletionToInspection(data)
 
-      const latest = inspectionRef.current
-      if (latest) {
-        void saveInspection(latest).catch(() => {})
-        if (latest.flatId && latest.completionPct !== undefined) {
-          patchFlatCompletionLive(latest.flatId, latest.completionPct)
-          void persistFlatCompletion(latest.flatId, latest.completionPct)
-        }
+      setInspection(merged)
 
-        const cached = await getInspection(flatId).catch(() => undefined)
-        const hadLocalEdits =
-          cached &&
-          hasLocalNewerResponses(cached, data as Inspection)
-        if (hadLocalEdits) {
-          const slim = latest.responses.map(({ id, itemId, categoryId, status, remarks }) => ({
-            id, itemId, categoryId, status, remarks,
-          }))
-          inspectionsApi.save(latest.id, slim as any).catch(() => {
-            queueChange('save_inspection', { inspectionId: latest.id, responses: slim })
-          })
-        }
+      void saveInspection(merged).catch(() => {})
+      cacheInspectionImages(merged)
+      if (merged.flatId && merged.completionPct !== undefined) {
+        patchFlatCompletionLive(merged.flatId, merged.completionPct)
+        void persistFlatCompletion(merged.flatId, merged.completionPct)
+      }
+
+      const cached = await getInspection(flatId).catch(() => undefined)
+      const hadLocalEdits =
+        cached &&
+        hasLocalNewerResponses(cached, data as Inspection)
+      if (hadLocalEdits) {
+        const slim = merged.responses.map(({ id, itemId, categoryId, status, remarks }) => ({
+          id, itemId, categoryId, status, remarks,
+        }))
+        inspectionsApi.save(merged.id, slim as any).catch(() => {
+          queueChange('save_inspection', { inspectionId: merged.id, responses: slim })
+        })
       }
     } catch {
       if (gen === loadGen.current && mounted.current && !inspectionRef.current) {
