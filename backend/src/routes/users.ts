@@ -36,10 +36,11 @@ router.post(
       })
       .parse(req.body)
     const id = uuidv4()
+    const email = body.email.trim().toLowerCase()
     const hash = bcrypt.hashSync(body.password, 10)
     getDB()
       .prepare(`INSERT INTO users (id, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(id, body.name, body.email, body.mobile, hash, body.role)
+      .run(id, body.name, email, body.mobile, hash, body.role)
     const row = getDB().prepare('SELECT * FROM users WHERE id = ?').get(id) as Record<string, unknown>
     res.status(201).json(rowToUser(row))
   })
@@ -64,7 +65,13 @@ router.put(
     }
     db.prepare(
       `UPDATE users SET name = ?, email = ?, mobile = ?, role = ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(body.name ?? row.name, body.email ?? row.email, body.mobile ?? row.mobile, body.role ?? row.role, req.params.id)
+    ).run(
+      body.name ?? row.name,
+      body.email ? body.email.trim().toLowerCase() : row.email,
+      body.mobile ?? row.mobile,
+      body.role ?? row.role,
+      req.params.id
+    )
     const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as Record<string, unknown>
     res.json(rowToUser(updated))
   })

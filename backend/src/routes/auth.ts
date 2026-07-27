@@ -31,7 +31,10 @@ router.post(
     const db = getDB()
     let row: Record<string, unknown> | undefined
     if (body.email) {
-      row = db.prepare('SELECT * FROM users WHERE email = ? AND is_active = 1').get(body.email) as Record<string, unknown>
+      const email = body.email.trim().toLowerCase()
+      row = db
+        .prepare('SELECT * FROM users WHERE LOWER(email) = ? AND is_active = 1')
+        .get(email) as Record<string, unknown>
     } else if (body.mobile) {
       row = db.prepare('SELECT * FROM users WHERE mobile = ? AND is_active = 1').get(body.mobile) as Record<string, unknown>
     }
@@ -51,8 +54,11 @@ router.post(
   requireRole('admin'),
   asyncHandler(async (req, res) => {
     const body = registerSchema.parse(req.body)
+    const email = body.email.trim().toLowerCase()
     const db = getDB()
-    const existing = db.prepare('SELECT id FROM users WHERE email = ? OR mobile = ?').get(body.email, body.mobile)
+    const existing = db
+      .prepare('SELECT id FROM users WHERE LOWER(email) = ? OR mobile = ?')
+      .get(email, body.mobile)
     if (existing) {
       res.status(400).json({ error: 'Email or mobile already registered' })
       return
@@ -61,7 +67,7 @@ router.post(
     const hash = bcrypt.hashSync(body.password, 10)
     db.prepare(
       `INSERT INTO users (id, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(id, body.name, body.email, body.mobile, hash, body.role)
+    ).run(id, body.name, email, body.mobile, hash, body.role)
     const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as Record<string, unknown>
     const user = rowToUser(row)
     const token = signToken(id)
@@ -94,7 +100,7 @@ router.patch(
 
     const updates: Record<string, unknown> = {
       name:   body.name   ?? row.name,
-      email:  body.email  ?? row.email,
+      email:  body.email  ? body.email.trim().toLowerCase() : row.email,
       mobile: body.mobile ?? row.mobile,
     }
     if (body.newPassword) {
