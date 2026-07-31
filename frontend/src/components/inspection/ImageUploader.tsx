@@ -1,15 +1,16 @@
 import { useRef, useState, useEffect } from 'react'
-import { Camera, X, ImageIcon } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Camera, X, ImageIcon, Plus } from 'lucide-react'
 import type { SnagImage } from '../../types'
 import { compressImage, blobToBase64 } from '../../utils/imageUtils'
 import { resolveMediaUrl } from '../../utils/api'
 import { resolveImageOffline } from '../../utils/imageCache'
 import { cn } from '../../utils/cn'
 import { Lightbox } from '../ui/Lightbox'
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 import { Capacitor } from '@capacitor/core'
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera'
 
-/** Renders a single thumbnail, resolving via IndexedDB cache for offline support */
 function OfflineThumbnail({ img, onClick }: { img: SnagImage; onClick: () => void }) {
   const initial = img.localBlob || resolveMediaUrl(img.thumbnailUrl) || resolveMediaUrl(img.url)
   const [src, setSrc] = useState<string | undefined>(initial)
@@ -25,14 +26,19 @@ function OfflineThumbnail({ img, onClick }: { img: SnagImage; onClick: () => voi
 
   if (!src) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
-        <ImageIcon size={20} className="text-slate-400" aria-hidden="true" />
+      <div className="flex h-full w-full items-center justify-center bg-ink-50">
+        <ImageIcon size={18} className="text-ink-300" aria-hidden="true" />
       </div>
     )
   }
   return (
     <button type="button" className="h-full w-full" onClick={onClick} aria-label="View image">
-      <img src={src} alt="Photo" className="h-full w-full object-cover" onError={() => setSrc(undefined)} />
+      <img
+        src={src}
+        alt="Photo"
+        className="h-full w-full object-cover transition-transform duration-fast group-hover:scale-105"
+        onError={() => setSrc(undefined)}
+      />
     </button>
   )
 }
@@ -46,6 +52,7 @@ export function ImageUploader({
   readOnly,
   maxImages = MAX,
   trigger,
+  compact,
 }: {
   images: SnagImage[]
   onAdd: (file: File, base64: string) => void
@@ -53,18 +60,23 @@ export function ImageUploader({
   readOnly?: boolean
   maxImages?: number
   trigger?: React.ReactNode
+  compact?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const { reduced } = useMotionSafe()
   const isNative = Capacitor.isNativePlatform()
+
+  const pick = () => {
+    if (isNative) handleNativePick()
+    else inputRef.current?.click()
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       try {
-        const blob   = await compressImage(file)
-        // Use base64 data URI — works reliably in Capacitor Android WebView
-        // unlike blob: URLs which can fail to render
+        const blob = await compressImage(file)
         const base64 = await blobToBase64(blob)
         onAdd(new File([blob], file.name, { type: blob.type }), base64)
       } catch (err) {
@@ -93,68 +105,76 @@ export function ImageUploader({
       const base64 = await blobToBase64(compressed)
       onAdd(new File([compressed], file.name, { type: compressed.type }), base64)
     } catch (err) {
-      // User cancelled or permission denied
       console.warn('Native photo pick failed:', err)
     }
   }
 
   if (readOnly && images.length === 0) return null
 
+  const thumb = compact ? 'h-12 w-12' : 'h-[4.25rem] w-[4.25rem]'
+
   return (
     <>
-      {/* Thumbnail grid */}
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 py-1">
-          {images.map((img, idx) => {
-            return (
-              <div
+        <div className="flex flex-wrap gap-1.5 py-0.5">
+          <AnimatePresence initial={false}>
+            {images.map((img, idx) => (
+              <motion.div
                 key={img.id}
-                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                layout={!reduced}
+                initial={reduced ? false : { opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={reduced ? undefined : { opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(
+                  'group relative shrink-0 overflow-hidden rounded-md border border-ink-100 bg-ink-50 shadow-xs',
+                  thumb
+                )}
               >
                 <OfflineThumbnail img={img} onClick={() => setLightboxIndex(idx)} />
-
-                {/* Remove button */}
                 {!readOnly && (
                   <button
                     type="button"
-                    className="absolute right-0.5 top-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-fail text-white shadow"
-                    onClick={(e) => { e.stopPropagation(); onRemove(img.id) }}
+                    className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-danger-600 text-white shadow-sm touch-manipulation"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemove(img.id)
+                    }}
                     aria-label="Remove photo"
                   >
-                    <X size={12} strokeWidth={3} aria-hidden="true" />
+                    <X size={10} strokeWidth={3} aria-hidden="true" />
                   </button>
                 )}
-              </div>
-            )
-          })}
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
-          {/* Inline add button when there are already images */}
           {!readOnly && images.length < maxImages && !trigger && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                if (isNative) handleNativePick()
-                else inputRef.current?.click()
+                pick()
               }}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 active:border-primary active:text-primary touch-manipulation"
+              className={cn(
+                'flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-brand-300 bg-brand-50/40 text-brand-600 transition-colors duration-fast hover:border-brand-500 hover:bg-brand-50 active:scale-[0.97] touch-manipulation',
+                thumb
+              )}
               aria-label="Add another photo"
             >
-              <Camera size={20} aria-hidden="true" />
+              <Plus size={compact ? 14 : 16} aria-hidden="true" />
             </button>
           )}
         </div>
       )}
 
-      {/* Trigger button (shown when no images OR custom trigger provided) */}
       {!readOnly && images.length < maxImages && (
         <>
           {trigger ? (
             <div
               onClick={(e) => {
                 e.stopPropagation()
-                if (isNative) handleNativePick()
-                else inputRef.current?.click()
+                pick()
               }}
               className="cursor-pointer"
             >
@@ -165,13 +185,21 @@ export function ImageUploader({
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                if (isNative) handleNativePick()
-                else inputRef.current?.click()
+                pick()
               }}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 text-sm font-medium text-slate-500 active:border-primary active:text-primary touch-manipulation"
+              className={cn(
+                'group flex w-full items-center justify-center gap-2 rounded-md',
+                'border border-dashed border-ink-200 bg-ink-50/40',
+                'font-semibold text-ink-500',
+                'transition-all duration-fast',
+                'hover:border-brand-400 hover:bg-brand-50/50 hover:text-brand-700',
+                'active:scale-[0.99] touch-manipulation',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100',
+                compact ? 'h-9 gap-1.5 text-xs' : 'h-14 gap-2.5 text-sm'
+              )}
               aria-label="Add photo"
             >
-              <Camera size={18} aria-hidden="true" />
+              <Camera size={compact ? 14 : 15} className="text-brand-600" aria-hidden="true" />
               Add Photo
             </button>
           ) : null}

@@ -26,7 +26,7 @@ export function ChecklistCategory({
   const { reduced, stagger } = useMotionSafe()
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {category.items.map((item, i) => {
         const response = responses.find((r) => r.itemId === item.id)
         if (!response) return null
