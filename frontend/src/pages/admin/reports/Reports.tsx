@@ -38,16 +38,21 @@ function ChartTip({
   label,
 }: {
   active?: boolean
-  payload?: { name: string; value: number; color: string }[]
+  payload?: { name: string; value: number; fill?: string; color?: string }[]
   label?: string
 }) {
   if (!active || !payload?.length) return null
+  const rows = payload.filter((p) => Number(p.value) > 0)
+  if (!rows.length) return null
   return (
     <div className="rounded-md border border-ink-100 bg-white p-2.5 text-xs shadow-md">
       <p className="mb-1.5 font-semibold text-ink-800">{label}</p>
-      {payload.map((p) => (
+      {rows.map((p) => (
         <p key={p.name} className="flex items-center gap-2 text-ink-600">
-          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: p.fill || p.color }}
+          />
           {p.name}: <span className="font-bold tabular text-ink-800">{p.value}</span>
         </p>
       ))}
@@ -108,12 +113,36 @@ export default function Reports() {
   const barData = useMemo(() => {
     if (!data) return []
     return data.projectStats.map((p) => ({
-      name: p.projectName.slice(0, 14),
+      name: p.projectName.slice(0, 16),
       Approved: p.approved,
-      Pending: p.notStarted + p.inProgress,
+      Submitted: p.submitted,
+      InProgress: p.inProgress,
       Revision: p.revisionRequired,
+      Rejected: p.rejected,
+      Desnagging: p.desnagging,
+      HandedOver: p.handedOver,
+      NotStarted: p.notStarted,
     }))
   }, [data])
+
+  const barSeries = useMemo(() => {
+    const series = [
+      { key: 'Approved', name: 'Approved', fill: CHART_COLORS.approved },
+      { key: 'Submitted', name: 'Submitted', fill: CHART_COLORS.submitted },
+      { key: 'InProgress', name: 'In Progress', fill: CHART_COLORS.in_progress },
+      { key: 'Revision', name: 'Revision', fill: CHART_COLORS.revision },
+      { key: 'Rejected', name: 'Rejected', fill: CHART_COLORS.rejected },
+      { key: 'Desnagging', name: 'Desnagging', fill: CHART_COLORS.desnagging },
+      { key: 'HandedOver', name: 'Handed Over', fill: CHART_COLORS.handed_over },
+      { key: 'NotStarted', name: 'Not Started', fill: CHART_COLORS.not_started },
+    ] as const
+    return series.filter((s) =>
+      barData.some((row) => Number((row as Record<string, number | string>)[s.key] || 0) > 0)
+    )
+  }, [barData])
+
+  const fewProjects = barData.length <= 2
+  const barMaxSize = barData.length <= 1 ? 48 : barData.length <= 3 ? 40 : 28
 
   const snagDonut = useMemo(
     () => [
@@ -261,7 +290,7 @@ export default function Reports() {
             <Card className="overflow-hidden p-3 shadow-xs">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h2 className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                  Project status
+                  Flat status by project
                 </h2>
                 <span className="text-[10px] tabular text-ink-400">
                   {barData.length} project{barData.length !== 1 ? 's' : ''}
@@ -271,70 +300,124 @@ export default function Reports() {
                 <p className="py-10 text-center text-[11px] text-ink-400">No project stats yet</p>
               ) : (
                 <>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={barData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E8EEF4" vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 10, fill: '#64748B' }}
-                        axisLine={false}
-                        tickLine={false}
+                  <ResponsiveContainer
+                    width="100%"
+                    height={fewProjects ? Math.max(120, barData.length * 56) : 220}
+                  >
+                    <BarChart
+                      layout={fewProjects ? 'vertical' : 'horizontal'}
+                      data={barData}
+                      margin={
+                        fewProjects
+                          ? { top: 4, right: 12, left: 4, bottom: 4 }
+                          : { top: 8, right: 8, left: 0, bottom: 4 }
+                      }
+                      barCategoryGap={
+                        fewProjects ? '28%' : barData.length === 1 ? '55%' : '22%'
+                      }
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#E2E8F0"
+                        horizontal={!fewProjects}
+                        vertical={fewProjects}
                       />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: '#64748B' }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
+                      {fewProjects ? (
+                        <>
+                          <XAxis
+                            type="number"
+                            tick={{ fontSize: 11, fill: '#64748B' }}
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            width={72}
+                            tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 11, fill: '#64748B' }}
+                            axisLine={false}
+                            tickLine={false}
+                            interval={0}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11, fill: '#64748B' }}
+                            axisLine={false}
+                            tickLine={false}
+                            allowDecimals={false}
+                            width={36}
+                          />
+                        </>
+                      )}
                       <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(0,155,255,0.06)' }} />
-                      <Bar
-                        dataKey="Approved"
-                        stackId="a"
-                        fill={CHART_COLORS.approved}
-                        isAnimationActive={!reduced}
-                      />
-                      <Bar
-                        dataKey="Pending"
-                        stackId="a"
-                        fill={CHART_COLORS.submitted}
-                        isAnimationActive={!reduced}
-                      />
-                      <Bar
-                        dataKey="Revision"
-                        stackId="a"
-                        fill={CHART_COLORS.revision}
-                        radius={[3, 3, 0, 0]}
-                        isAnimationActive={!reduced}
-                      />
+                      {barSeries.map((s, i) => (
+                        <Bar
+                          key={s.key}
+                          dataKey={s.key}
+                          stackId="a"
+                          fill={s.fill}
+                          name={s.name}
+                          maxBarSize={barMaxSize}
+                          isAnimationActive={!reduced}
+                          animationDuration={700}
+                          radius={
+                            i === barSeries.length - 1
+                              ? fewProjects
+                                ? [0, 4, 4, 0]
+                                : [4, 4, 0, 0]
+                              : [0, 0, 0, 0]
+                          }
+                        />
+                      ))}
                     </BarChart>
                   </ResponsiveContainer>
-                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-ink-50 pt-2">
-                    {[
-                      { key: 'Approved', fill: CHART_COLORS.approved },
-                      { key: 'Pending', fill: CHART_COLORS.submitted },
-                      { key: 'Revision', fill: CHART_COLORS.revision },
-                    ].map((s) => (
-                      <span
-                        key={s.key}
-                        className="inline-flex items-center gap-1.5 text-[11px] text-ink-600"
-                      >
+                  {barSeries.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-ink-50 pt-2">
+                      {barSeries.map((s) => (
                         <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ background: s.fill }}
-                        />
-                        {s.key}
-                      </span>
-                    ))}
-                  </div>
+                          key={s.key}
+                          className="inline-flex items-center gap-1.5 text-[11px] text-ink-600"
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ background: s.fill }}
+                          />
+                          {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </Card>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {data.projectStats.map((p, i) => {
-                const total =
-                  p.approved + p.notStarted + p.inProgress + p.revisionRequired || 1
-                const pct = Math.round((p.approved / total) * 100)
+                const total = p.totalFlats || 1
+                const pct =
+                  typeof p.completionPct === 'number'
+                    ? Math.round(p.completionPct)
+                    : Math.round(((p.approved + p.handedOver) / total) * 100)
+                const segments = [
+                  { key: 'approved', value: p.approved, fill: CHART_COLORS.approved },
+                  { key: 'submitted', value: p.submitted, fill: CHART_COLORS.submitted },
+                  { key: 'inProgress', value: p.inProgress, fill: CHART_COLORS.in_progress },
+                  { key: 'revision', value: p.revisionRequired, fill: CHART_COLORS.revision },
+                  { key: 'rejected', value: p.rejected, fill: CHART_COLORS.rejected },
+                  { key: 'desnagging', value: p.desnagging, fill: CHART_COLORS.desnagging },
+                  { key: 'handedOver', value: p.handedOver, fill: CHART_COLORS.handed_over },
+                  { key: 'notStarted', value: p.notStarted, fill: CHART_COLORS.not_started },
+                ].filter((s) => s.value > 0)
+
                 return (
                   <motion.div
                     key={p.projectId ?? p.projectName}
@@ -351,30 +434,55 @@ export default function Reports() {
                           {pct}%
                         </span>
                       </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
-                        <motion.div
-                          className="h-full rounded-full bg-success-500"
-                          initial={reduced ? false : { width: 0 }}
-                          animate={{ width: `${pct}%` }}
-                          transition={{ duration: 0.5, ease: easeOut, delay: Math.min(i, 8) * 0.04 }}
-                        />
+                      <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-ink-100">
+                        {segments.map((s) => (
+                          <motion.div
+                            key={s.key}
+                            className="h-full"
+                            style={{ background: s.fill }}
+                            initial={reduced ? false : { width: 0 }}
+                            animate={{ width: `${(s.value / total) * 100}%` }}
+                            transition={{
+                              duration: 0.5,
+                              ease: easeOut,
+                              delay: Math.min(i, 8) * 0.04,
+                            }}
+                          />
+                        ))}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-ink-500">
-                        <span>
-                          <span className="font-semibold text-success-600">{p.approved}</span> approved
-                        </span>
-                        <span>
-                          <span className="font-semibold text-warning-600">
-                            {p.notStarted + p.inProgress}
-                          </span>{' '}
-                          pending
-                        </span>
-                        <span>
-                          <span className="font-semibold text-warning-700">
-                            {p.revisionRequired}
-                          </span>{' '}
-                          revision
-                        </span>
+                        {p.approved > 0 && (
+                          <span>
+                            <span className="font-semibold text-success-600">{p.approved}</span>{' '}
+                            approved
+                          </span>
+                        )}
+                        {p.inProgress > 0 && (
+                          <span>
+                            <span className="font-semibold text-brand-600">{p.inProgress}</span>{' '}
+                            in progress
+                          </span>
+                        )}
+                        {p.submitted > 0 && (
+                          <span>
+                            <span className="font-semibold text-warning-600">{p.submitted}</span>{' '}
+                            submitted
+                          </span>
+                        )}
+                        {p.revisionRequired > 0 && (
+                          <span>
+                            <span className="font-semibold text-warning-700">
+                              {p.revisionRequired}
+                            </span>{' '}
+                            revision
+                          </span>
+                        )}
+                        {p.notStarted > 0 && (
+                          <span>
+                            <span className="font-semibold text-ink-500">{p.notStarted}</span>{' '}
+                            not started
+                          </span>
+                        )}
                       </div>
                     </Card>
                   </motion.div>
