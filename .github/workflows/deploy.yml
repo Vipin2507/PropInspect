@@ -39,26 +39,24 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # Prefer a pinned known_hosts secret (works even when GitHub cannot keyscan).
           if [ -n "${VPS_SSH_KNOWN_HOSTS:-}" ]; then
             printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
             chmod 600 ~/.ssh/known_hosts
-            echo "Loaded known_hosts from VPS_SSH_KNOWN_HOSTS secret."
+            echo "Loaded known_hosts from secret."
             exit 0
           fi
 
-          echo "Trying ssh-keyscan ${HOST}:${PORT}..."
-          if ssh-keyscan -T 15 -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err; then
-            if grep -qE 'ssh-(rsa|ed25519)|ecdsa-' ~/.ssh/known_hosts; then
-              echo "known_hosts updated via ssh-keyscan."
-              exit 0
-            fi
+          echo "Scanning ${HOST}:${PORT}..."
+          if ssh-keyscan -T 15 -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err \
+            && grep -qE 'ssh-(rsa|ed25519)|ecdsa-' ~/.ssh/known_hosts; then
+            echo "known_hosts updated via ssh-keyscan."
+            exit 0
           fi
 
-          echo "ssh-keyscan failed (often Hostinger firewall blocking GitHub Actions IPs):"
+          echo "ssh-keyscan failed:"
           cat /tmp/keyscan.err || true
-          echo "Falling back to StrictHostKeyChecking=accept-new for this run."
           echo "ACCEPT_NEW=1" >> "$GITHUB_ENV"
+          echo "Will use StrictHostKeyChecking=accept-new"
 
       - name: Deploy over SSH
         env:
@@ -78,33 +76,34 @@ jobs:
           WEB="${WEB_ROOT:-}"
 
           HOST="${HOST:-147.93.30.96}"
-          USER="${USER:?Set secret VPS_USER (e.g. deploy)}"
+          USER="${USER:?Set secret VPS_USER}"
           PORT="${PORT:-22}"
-          PATH_ON_VPS="${PATH_ON_VPS:?Set secret DEPLOY_PATH (e.g. /home/deploy/apps/PropInspect)}"
+          PATH_ON_VPS="${PATH_ON_VPS:?Set secret DEPLOY_PATH}"
           APP_NAME="${APP_NAME:-propinspect-api}"
 
           SSH_OPTS=(
             -p "$PORT"
             -o ServerAliveInterval=30
-            -o ConnectTimeout=30
+            -o ConnectTimeout=45
+            -o BatchMode=yes
           )
 
           if [ "${ACCEPT_NEW:-}" = "1" ]; then
-            SSH_OPTS+=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts)
+            SSH_OPTS+=(-o StrictHostKeyChecking=accept-new)
           else
             SSH_OPTS+=(-o StrictHostKeyChecking=yes)
           fi
 
           echo "Deploying to ${USER}@${HOST}:${PORT} path=${PATH_ON_VPS} pm2=${APP_NAME}"
 
-          # Quick connectivity check with a clear error if the firewall blocks GitHub.
-          if ! ssh "${SSH_OPTS[@]}" -o BatchMode=yes "${USER}@${HOST}" "echo ssh_ok"; then
-            echo "::error::SSH from GitHub Actions to ${HOST}:${PORT} failed."
-            echo "Open SSH (port ${PORT}) to 0.0.0.0/0 in Hostinger firewall / IP allowlist,"
-            echo "or allow GitHub Actions IP ranges. Also confirm VPS_SSH_PRIVATE_KEY is correct."
+          if ! ssh "${SSH_OPTS[@]}" "${USER}@${HOST}" "echo ssh_ok"; then
+            echo "::error::SSH timed out or was refused."
+            echo "Hostinger panel firewall looks open — also check ON the VPS:"
+            echo "  sudo ufw status"
+            echo "  sudo iptables -L INPUT -n | head -40"
             exit 1
           fi
 
           ssh "${SSH_OPTS[@]}" "${USER}@${HOST}" \
-            "export DEPLOY_PATH='${PATH_ON_VPS}' PM2_APP_NAME='${APP_NAME}' WEB_ROOT='${WEB}' GIT_BRANCH='main'; bash -s" \
+            "export DEPLOY_PATH='${PATH_ON_VPS}' PM2_APP_NAME='${APP_NAME}' WEB_ROOT='${WEB}' GIT_BRANCH='main' PATH=\"\$HOME/.nvm/versions/node/default/bin:\$HOME/.local/bin:/usr/local/bin:\$PATH\"; bash -s" \
             < scripts/deploy.sh

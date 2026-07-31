@@ -15,6 +15,49 @@ echo "    path:   $DEPLOY_PATH"
 echo "    branch: $GIT_BRANCH"
 echo "    pm2:    $PM2_APP_NAME"
 
+# Non-interactive SSH often skips .bashrc — load Node from common install locations.
+load_node() {
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # shellcheck disable=SC1090,SC1091
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    . "$NVM_DIR/nvm.sh"
+    nvm use default >/dev/null 2>&1 || nvm use node >/dev/null 2>&1 || true
+  fi
+  # shellcheck disable=SC1090,SC1091
+  [ -s "$HOME/.fnm/fnm" ] && eval "$("$HOME/.fnm/fnm" env)" || true
+  # shellcheck disable=SC1090,SC1091
+  [ -s /usr/local/nvm/nvm.sh ] && . /usr/local/nvm/nvm.sh || true
+
+  # Hostinger / manual installs
+  for d in \
+    "$HOME/.nvm/versions/node"/*/bin \
+    /usr/local/bin \
+    /usr/bin \
+    "$HOME/.local/bin"
+  do
+    if [ -x "$d/node" ]; then
+      export PATH="$d:$PATH"
+      break
+    fi
+  done
+
+  # Absolute fallbacks if `node` still missing but binary exists
+  if ! command -v node >/dev/null 2>&1; then
+    for candidate in \
+      "$HOME/.nvm/versions/node"/*/bin/node \
+      /usr/local/bin/node \
+      /usr/bin/node
+    do
+      if [ -x "$candidate" ]; then
+        export PATH="$(dirname "$candidate"):$PATH"
+        break
+      fi
+    done
+  fi
+}
+
+load_node
+
 if [[ ! -d "$DEPLOY_PATH/.git" ]]; then
   echo "ERROR: $DEPLOY_PATH is not a git checkout."
   echo "Clone the repo once on the VPS, then re-run deploy."
@@ -28,13 +71,10 @@ git fetch --prune origin "$GIT_BRANCH"
 git checkout "$GIT_BRANCH"
 git reset --hard "origin/$GIT_BRANCH"
 
-# Keep production env files if they exist outside git (or are gitignored).
-# backend/.env and frontend/.env.production should already be on the server.
-
-NODE_BIN="$(command -v node || true)"
-NPM_BIN="$(command -v npm || true)"
-if [[ -z "$NODE_BIN" || -z "$NPM_BIN" ]]; then
-  echo "ERROR: node/npm not found on PATH. Install Node.js >= 22.5 on the VPS."
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "ERROR: node/npm not found on PATH after loading nvm/fnm."
+  echo "PATH=$PATH"
+  echo "Which node (interactive)? Ask on the VPS: command -v node; type node; ls ~/.nvm/versions/node"
   exit 1
 fi
 
@@ -59,8 +99,9 @@ fi
 echo "==> Restart API ($PM2_APP_NAME)"
 cd "$DEPLOY_PATH"
 
+# pm2 is often installed next to node (same nvm bin)
 if ! command -v pm2 >/dev/null 2>&1; then
-  echo "ERROR: pm2 not found. Install with: npm i -g pm2"
+  echo "ERROR: pm2 not found on PATH. Install with: npm i -g pm2"
   exit 1
 fi
 
