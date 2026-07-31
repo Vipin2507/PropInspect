@@ -1,20 +1,20 @@
-/* Design tokens — Buildesk / SnagDesk */
+/* Design tokens — Buildesk / SnagDesk — primary #009BFF */
 :root {
-  /* Brand */
-  --brand-950: #05102b;
-  --brand-900: #0b1f4d;
-  --brand-800: #122b66;
-  --brand-700: #1b3a85;
-  --brand-600: #2547a8;
-  --brand-500: #3b5fd9;
-  --brand-400: #6b8cf0;
-  --brand-200: #c5d2f7;
-  --brand-100: #e8edfc;
-  --brand-50: #f4f7fe;
+  /* Brand (primary #009BFF) */
+  --brand-950: #031827;
+  --brand-900: #062a45;
+  --brand-800: #0a4a73;
+  --brand-700: #0077c7;
+  --brand-600: #009bff;
+  --brand-500: #33afff;
+  --brand-400: #66c4ff;
+  --brand-200: #b3e3ff;
+  --brand-100: #e5f6ff;
+  --brand-50: #f2faff;
 
   /* Accent */
-  --accent-500: #0ea5c9;
-  --accent-100: #dff6fb;
+  --accent-500: #00c2cb;
+  --accent-100: #e0fafa;
 
   /* Semantic */
   --success-600: #0f9d58;
@@ -23,11 +23,11 @@
   --warning-100: #fef3e2;
   --danger-600: #dc2626;
   --danger-100: #fdeaea;
-  --info-600: #2563eb;
-  --info-100: #eaf1ff;
+  --info-600: #009bff;
+  --info-100: #e5f6ff;
 
   /* Roles */
-  --role-engineer: #2547a8;
+  --role-engineer: #009bff;
   --role-qa: #7c3aed;
   --role-admin: #b45309;
 
@@ -46,7 +46,7 @@
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
-  --shadow-brand-glow: 0 8px 24px rgba(37, 71, 168, 0.25);
+  --shadow-brand-glow: 0 8px 24px rgba(0, 155, 255, 0.28);
 
   /* Radius */
   --radius-sm: 8px;
@@ -60,7 +60,7 @@
   --dur-base: 200ms;
   --dur-slow: 320ms;
 
-  /* Legacy aliases (existing classNames) */
+  /* Legacy aliases */
   --color-primary: var(--brand-600);
   --color-primary-dark: var(--brand-700);
   --color-primary-light: var(--brand-100);

@@ -19,7 +19,7 @@ html {
   height: 100%;
   height: -webkit-fill-available;
   overflow: hidden;
-  background-color: var(--brand-800);
+  background-color: var(--brand-600);
 }
 
 body {

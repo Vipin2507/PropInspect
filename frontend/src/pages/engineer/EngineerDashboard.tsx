@@ -1,8 +1,8 @@
-import { Building2, CheckCircle, Clock, Send, AlertTriangle, Plus, Bell } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts'
+import { Building2, CheckCircle, Clock, AlertTriangle, Plus, Bell, ScrollText } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { StatCard } from '../../components/ui/StatCard'
 import { Card } from '../../components/ui/Card'
-import { EmptyState } from '../../components/ui/EmptyState'
+import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
 import { useFlats } from '../../hooks/useFlats'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
@@ -12,178 +12,145 @@ import { Button } from '../../components/ui/Button'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../constants/routes'
 import { useEngineerFeedbackCount } from '../../hooks/useEngineerFeedback'
-
-const COLORS = ['#16A34A', '#D97706', '#F97316', '#DC2626']
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 
 export default function EngineerDashboard() {
-  const user    = useAuthStore((s) => s.user)
+  const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
   const navigate = useNavigate()
   const { flats, loading } = useFlats()
   const { count: unseenFeedback } = useEngineerFeedbackCount()
   const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const { fadeUp, reduced } = useMotionSafe()
 
   if (loading && flats.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center py-24">
+      <div className="flex flex-1 items-center justify-center py-16">
         <Spinner size="lg" />
       </div>
     )
   }
 
-  const total      = flats.length
-  const approved   = flats.filter((f) => f.status === 'approved').length
-  const submitted  = flats.filter((f) => f.status === 'submitted').length
+  const total = flats.length
+  const approved = flats.filter((f) => f.status === 'approved').length
+  const submitted = flats.filter((f) => f.status === 'submitted').length
   const inProgress = flats.filter((f) => f.status === 'in_progress').length
-  const pending    = flats.filter((f) => ['not_started', 'in_progress'].includes(f.status)).length
-  const revision   = flats.filter((f) => f.status === 'revision_required').length
-  const completed  = approved + submitted
+  const pending = flats.filter((f) => ['not_started', 'in_progress'].includes(f.status)).length
+  const revision = flats.filter((f) => f.status === 'revision_required').length
+  const completed = approved + submitted
 
   const chartData = [
-    { name: 'Approved',    value: approved },
-    { name: 'Submitted',   value: submitted },
-    { name: 'In Progress', value: inProgress },
-    { name: 'Revision',    value: revision },
+    { name: 'Approved', value: approved, fill: CHART_COLORS.approved },
+    { name: 'Submitted', value: submitted, fill: CHART_COLORS.submitted },
+    { name: 'In Progress', value: inProgress, fill: CHART_COLORS.in_progress },
+    { name: 'Revision', value: revision, fill: CHART_COLORS.revision },
   ].filter((d) => d.value > 0)
 
+  const recent = flats.slice(0, 4)
+
   return (
-    <div className="space-y-6 pb-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-h2 text-ink-950">
-          {isAdmin ? 'All Flats Overview' : `Hi, ${user?.name?.split(' ')[0] || 'Maker'}`}
-        </h1>
+    <motion.div className="space-y-3 pb-4" {...fadeUp}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-lg font-bold text-ink-950 md:text-xl">
+            {isAdmin ? 'Overview' : `Hi, ${user?.name?.split(' ')[0] || 'Maker'}`}
+          </h1>
+        </div>
         {!isAdmin && (
-          <Button size="sm" onClick={() => navigate(ROUTES.ENGINEER_FLATS)}>
-            <Plus size={16} aria-hidden="true" /> Start Inspection
+          <Button size="sm" className="!min-h-[36px] shrink-0 !px-3 !py-1.5 text-sm" onClick={() => navigate(ROUTES.ENGINEER_FLATS)}>
+            <Plus size={14} aria-hidden /> Start
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total Flats" value={total} icon={Building2} />
-        <StatCard
-          label="Pending"
-          value={pending}
-          icon={Clock}
-          colorClass="text-warning-600 bg-warning-100"
-        />
-        <StatCard
-          label="Completed"
-          value={completed}
-          icon={CheckCircle}
-          colorClass="text-success-600 bg-success-100"
-        />
-        <StatCard
-          label="Revision"
-          value={revision}
-          icon={AlertTriangle}
-          colorClass="text-warning-600 bg-warning-100"
-        />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatCard index={0} label="Total" value={total} icon={Building2} onClick={() => navigate(ROUTES.ENGINEER_FLATS)} />
+        <StatCard index={1} label="Pending" value={pending} icon={Clock} colorClass="text-warning-600 bg-warning-100" onClick={() => navigate(ROUTES.ENGINEER_FLATS)} />
+        <StatCard index={2} label="Done" value={completed} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
+        <StatCard index={3} label="Revision" value={revision} icon={AlertTriangle} colorClass="text-warning-600 bg-warning-100" onClick={() => unseenFeedback ? navigate(ROUTES.ENGINEER_CHANGES) : navigate(ROUTES.ENGINEER_FLATS)} />
       </div>
 
-      {unreadCount > 0 && (
-        <Link to={ROUTES.ENGINEER_NOTIFICATIONS} className="block">
-          <Card className="overflow-hidden border-0 bg-gradient-to-r from-brand-600 to-brand-500 p-4 text-white shadow-md">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                  <Bell size={18} aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">
-                    {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
-                  </p>
-                  <p className="text-xs text-white/80">Tap to open notifications</p>
-                </div>
-              </div>
-              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-brand-600">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            </div>
-          </Card>
-        </Link>
-      )}
-
-      {!isAdmin && unseenFeedback > 0 && (
-        <Card className="overflow-hidden border-0 bg-gradient-to-r from-warning-600 to-warning-500 p-4 text-white shadow-md">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">
-                {unseenFeedback} QA feedback item{unseenFeedback === 1 ? '' : 's'} waiting
-              </p>
-              <p className="text-xs text-white/80">Tasks sent for revision — open the QA Feedback log</p>
-            </div>
+      {(unreadCount > 0 || (!isAdmin && unseenFeedback > 0)) && (
+        <div className="flex flex-wrap gap-2">
+          {unreadCount > 0 && (
+            <Link
+              to={ROUTES.ENGINEER_NOTIFICATIONS}
+              className="inline-flex min-h-[36px] flex-1 items-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-xs transition-all duration-fast active:scale-[0.98] sm:flex-none"
+            >
+              <Bell size={14} aria-hidden />
+              {unreadCount} new
+            </Link>
+          )}
+          {!isAdmin && unseenFeedback > 0 && (
             <Link
               to={ROUTES.ENGINEER_CHANGES}
-              className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-semibold text-warning-600 active:brightness-95"
+              className="inline-flex min-h-[36px] flex-1 items-center gap-2 rounded-md bg-warning-600 px-3 py-2 text-sm font-semibold text-white shadow-xs transition-all duration-fast active:scale-[0.98] sm:flex-none"
             >
-              View Log
+              <ScrollText size={14} aria-hidden />
+              {unseenFeedback} feedback
             </Link>
-          </div>
-        </Card>
+          )}
+        </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <h2 className="mb-3 font-display text-base font-semibold text-ink-800">Status Breakdown</h2>
-          {total === 0 ? (
-            <EmptyState
-              title="No flats yet"
-              description="No flats in the system yet."
-              className="py-8"
-            />
-          ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={chartData} dataKey="value" innerRadius={45} outerRadius={70}>
-                  {chartData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
+      <div className="grid gap-2 lg:grid-cols-5">
+        <Card className="p-3 lg:col-span-2">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400">Status</p>
+          <StatusDonut
+            data={chartData}
+            height={132}
+            centerValue={total}
+            centerLabel="flats"
+          />
+          {chartData.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+              {chartData.map((d) => (
+                <span key={d.name} className="flex items-center gap-1 text-[10px] text-ink-600">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: d.fill }} />
+                  {d.name} <span className="font-semibold tabular">{d.value}</span>
+                </span>
+              ))}
+            </div>
           )}
         </Card>
 
-        <Card className="p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-base font-semibold text-ink-800">Recent Flats</h2>
-            <Link
-              to={ROUTES.ENGINEER_FLATS}
-              className="text-sm font-medium text-brand-600 active:underline"
-            >
-              View All →
+        <Card className="overflow-hidden p-0 lg:col-span-3">
+          <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Recent</p>
+            <Link to={ROUTES.ENGINEER_FLATS} className="text-xs font-semibold text-brand-600">
+              All →
             </Link>
           </div>
-          {flats.length === 0 ? (
-            <EmptyState
-              title="No activity yet"
-              description="Your assigned flats will appear here."
-              className="py-8"
-            />
+          {recent.length === 0 ? (
+            <p className="px-3 py-6 text-center text-caption text-ink-400">No flats yet</p>
           ) : (
-            <ul className="divide-y divide-ink-100">
-              {flats.slice(0, 6).map((f) => (
-                <Link
+            <ul>
+              {recent.map((f, i) => (
+                <motion.li
                   key={f.id}
-                  to={ROUTES.ENGINEER_FLAT(f.id)}
-                  className="flex min-h-[52px] items-center justify-between gap-3 py-3 active:bg-ink-50"
+                  initial={reduced ? false : { opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.2 }}
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink-800">{f.flatNumber}</p>
-                    <p className="truncate text-xs text-ink-500">
-                      {f.towerName}
-                      {isAdmin && f.inspection?.engineerName && ` · ${f.inspection.engineerName}`}
-                    </p>
-                  </div>
-                  <StatusBadge status={f.status} />
-                </Link>
+                  <Link
+                    to={ROUTES.ENGINEER_FLAT(f.id)}
+                    className="flex min-h-[44px] items-center justify-between gap-2 border-b border-ink-50 px-3 py-2 last:border-0 active:bg-brand-50/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink-800">{f.flatNumber}</p>
+                      <p className="truncate text-[11px] text-ink-400">
+                        {f.towerName}
+                        {isAdmin && f.inspection?.engineerName ? ` · ${f.inspection.engineerName}` : ''}
+                      </p>
+                    </div>
+                    <StatusBadge status={f.status} />
+                  </Link>
+                </motion.li>
               ))}
             </ul>
           )}
         </Card>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -19,9 +19,11 @@ import {
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell,
 } from 'recharts'
 import { format } from 'date-fns'
+import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
+import { motion } from 'framer-motion'
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface FilterState {
@@ -55,14 +57,14 @@ const FLAT_STATUS_OPTIONS = [
 ]
 
 const STATUS_COLOR: Record<string, string> = {
-  approved:          '#16A34A',
-  submitted:         '#D97706',
-  in_progress:       '#1A6FE8',
-  revision_required: '#F97316',
-  rejected:          '#DC2626',
-  desnagging:        '#7c3aed',
-  not_started:       '#94a3b8',
-  handed_over:       '#0d9488',
+  approved:          CHART_COLORS.approved,
+  submitted:         CHART_COLORS.submitted,
+  in_progress:       CHART_COLORS.in_progress,
+  revision_required: CHART_COLORS.revision,
+  rejected:          CHART_COLORS.rejected,
+  desnagging:        CHART_COLORS.desnagging,
+  not_started:       CHART_COLORS.not_started,
+  handed_over:       CHART_COLORS.handed_over,
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -89,12 +91,12 @@ function MiniBar({ pct, color }: { pct: number; color: string }) {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-lg text-xs">
-      <p className="mb-2 font-semibold text-slate-800">{label}</p>
+    <div className="rounded-md border border-ink-100 bg-white p-2.5 text-xs shadow-md">
+      <p className="mb-1.5 font-semibold text-ink-800">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.name} className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ background: p.fill }} />
-          {p.name}: <span className="font-bold">{p.value}</span>
+        <p key={p.name} className="flex items-center gap-2 text-ink-600">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: p.fill }} />
+          {p.name}: <span className="font-bold tabular text-ink-800">{p.value}</span>
         </p>
       ))}
     </div>
@@ -228,32 +230,35 @@ export default function AdminDashboard() {
     ? Math.round(((s.approved + (s.handedOver ?? 0)) / s.total) * 100)
     : 0
 
+  const { fadeUp } = useMotionSafe()
+
   return (
-    <div className="space-y-5 pb-8">
+    <motion.div className="space-y-3 pb-4" {...fadeUp}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-h2 text-ink-950">Dashboard</h1>
-          <p className="text-body text-ink-500">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="font-display text-lg font-bold text-ink-950 md:text-xl">Dashboard</h1>
+          <p className="text-[11px] text-ink-400">
             {hasFilters ? `${activeFilterCount} filter${activeFilterCount>1?'s':''} active` : 'All projects — live'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {result && result.flats.length > 0 && (
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download size={14} aria-hidden="true" /> Export
+            <Button variant="outline" size="sm" className="!min-h-[36px] !px-2.5 !py-1.5 text-xs" onClick={exportCsv}>
+              <Download size={13} aria-hidden="true" /> Export
             </Button>
           )}
           <Button
             size="sm"
+            className="!min-h-[36px] !px-2.5 !py-1.5 text-xs"
             variant={filtersOpen ? 'primary' : 'outline'}
             onClick={() => setFiltersOpen(p => !p)}
           >
-            <Filter size={14} aria-hidden="true" />
+            <Filter size={13} aria-hidden="true" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-primary">
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-brand-600">
                 {activeFilterCount}
               </span>
             )}
@@ -323,148 +328,110 @@ export default function AdminDashboard() {
 
       {/* ── Stat cards — ALWAYS from filtered API result ─────────────── */}
       {loading ? (
-        <div className="flex justify-center py-8"><Spinner size="lg" /></div>
+        <div className="flex justify-center py-6"><Spinner size="lg" /></div>
       ) : s ? (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Total Flats"   value={s.total}              icon={Home} />
-            <StatCard label="Approved"      value={s.approved}           icon={CheckCircle}  colorClass="text-success-600 bg-success-100" />
-            <StatCard label="Submitted"     value={s.submitted}          icon={Send}         colorClass="text-warning-600 bg-warning-100" />
-            <StatCard label="In Progress"   value={s.inProgress}         icon={Clock}        colorClass="text-brand-600 bg-brand-100" />
-            <StatCard label="Not Started"   value={s.notStarted}         icon={Building2}    colorClass="text-ink-500 bg-ink-100" />
-            <StatCard label="Revision Req"  value={s.revisionRequired}   icon={RotateCcw}    colorClass="text-warning-600 bg-warning-100" />
-            <StatCard label="Rejected"      value={s.rejected}           icon={XCircle}      colorClass="text-danger-600 bg-danger-100" />
-            <StatCard label="Handed Over"   value={s.handedOver ?? 0}    icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" />
-            <StatCard label="Open Snags"    value={s.openSnags}          icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+            <StatCard index={0} label="Total" value={s.total} icon={Home} />
+            <StatCard index={1} label="Approved" value={s.approved} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
+            <StatCard index={2} label="Submitted" value={s.submitted} icon={Send} colorClass="text-warning-600 bg-warning-100" />
+            <StatCard index={3} label="In Progress" value={s.inProgress} icon={Clock} colorClass="text-brand-600 bg-brand-100" />
+            <StatCard index={4} label="Not Started" value={s.notStarted} icon={Building2} colorClass="text-ink-600 bg-ink-100" />
+            <StatCard index={5} label="Revision" value={s.revisionRequired} icon={RotateCcw} colorClass="text-warning-600 bg-warning-100" />
+            <StatCard index={6} label="Rejected" value={s.rejected} icon={XCircle} colorClass="text-danger-600 bg-danger-100" />
+            <StatCard index={7} label="Handed Over" value={s.handedOver ?? 0} icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" />
+            <StatCard index={8} label="Open Snags" value={s.openSnags} icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" />
           </div>
 
-          {/* Completion progress bar */}
           {s.total > 0 && (
-            <Card className="p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-ink-700">
-                  Completion Rate
-                  {hasFilters && <span className="ml-2 text-xs font-normal text-ink-400">(filtered)</span>}
-                </span>
-                <span className="text-lg font-bold text-success-600">{completionPct}%</span>
-              </div>
-              {/* Segmented bar */}
-              <div className="flex h-3 w-full overflow-hidden rounded-full">
-                {donutData.map((d, i) => (
-                  <div
-                    key={i}
-                    title={`${d.name}: ${d.value}`}
-                    style={{
-                      width: `${(d.value / s.total) * 100}%`,
-                      background: d.fill,
-                      minWidth: d.value > 0 ? 2 : 0,
-                    }}
-                  />
-                ))}
-                {/* Empty remainder */}
-                {s.total - donutData.reduce((a,d)=>a+d.value,0) > 0 && (
-                  <div className="flex-1 bg-slate-100" />
-                )}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-                {donutData.map(d => (
-                  <span key={d.name} className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: d.fill }} />
-                    {d.name} <span className="font-semibold">{d.value}</span>
+            <div className="grid gap-2 lg:grid-cols-5">
+              <Card className="p-3 lg:col-span-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    Completion
                   </span>
-                ))}
-              </div>
-            </Card>
+                  <span className="font-display text-lg font-bold tabular text-success-600">{completionPct}%</span>
+                </div>
+                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-ink-100">
+                  {donutData.map((d, i) => (
+                    <div
+                      key={i}
+                      title={`${d.name}: ${d.value}`}
+                      className="transition-[width] duration-slow ease-out"
+                      style={{
+                        width: `${(d.value / s.total) * 100}%`,
+                        background: d.fill,
+                        minWidth: d.value > 0 ? 2 : 0,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  {donutData.map(d => (
+                    <span key={d.name} className="flex items-center gap-1 text-[10px] text-ink-600">
+                      <span className="h-1.5 w-1.5 rounded-sm" style={{ background: d.fill }} />
+                      {d.name} <span className="font-semibold tabular">{d.value}</span>
+                    </span>
+                  ))}
+                </div>
+              </Card>
+              <Card className="p-3 lg:col-span-2">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400">Distribution</p>
+                <StatusDonut
+                  data={donutData}
+                  height={120}
+                  centerValue={`${completionPct}%`}
+                  centerLabel="done"
+                />
+              </Card>
+            </div>
           )}
         </>
       ) : (
-        <EmptyState title="No data available" description="Try adjusting your filters or check back later." className="py-8" />
+        <EmptyState title="No data available" description="Try adjusting your filters or check back later." className="py-6" />
       )}
 
       {/* ── Charts ─────────────────────────────────────────────────── */}
       {!loading && barData.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Stacked bar chart — built from filtered flat rows */}
-          <Card className="p-4 lg:col-span-2">
-            <h2 className="mb-4 text-label uppercase tracking-wide text-ink-700">
-              Flat Status by Project
-            </h2>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart
-                data={barData}
-                margin={{ top: 4, right: 8, left: -24, bottom: 0 }}
-                barCategoryGap="30%"
-              >
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#64748b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
-                <Bar dataKey="Approved"   stackId="a" fill={STATUS_COLOR.approved}          name="Approved" />
-                <Bar dataKey="Submitted"  stackId="a" fill={STATUS_COLOR.submitted}         name="Submitted" />
-                <Bar dataKey="InProgress" stackId="a" fill={STATUS_COLOR.in_progress}       name="In Progress" />
-                <Bar dataKey="Revision"   stackId="a" fill={STATUS_COLOR.revision_required} name="Revision" />
-                <Bar dataKey="Rejected"   stackId="a" fill={STATUS_COLOR.rejected}          name="Rejected" />
-                <Bar dataKey="Desnagging" stackId="a" fill={STATUS_COLOR.desnagging}        name="Desnagging" />
-                <Bar dataKey="HandedOver" stackId="a" fill={STATUS_COLOR.handed_over}       name="Handed Over" />
-                <Bar dataKey="NotStarted" stackId="a" fill={STATUS_COLOR.not_started}       name="Not Started" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* Donut chart */}
-          <Card className="p-4">
-            <h2 className="mb-4 text-label uppercase tracking-wide text-ink-700">
-              Distribution
-            </h2>
-            {donutData.length > 0 ? (
-              <>
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      dataKey="value"
-                      innerRadius={46}
-                      outerRadius={70}
-                      paddingAngle={2}
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {donutData.map((d,i) => <Cell key={i} fill={d.fill} />)}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1.5">
-                  {donutData.map(d => (
-                    <div key={d.name} className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1.5 text-slate-600">
-                        <span className="h-2 w-2 rounded-full" style={{ background: d.fill }} />
-                        {d.name}
-                      </span>
-                      <span className="font-semibold text-slate-800">{d.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="py-8 text-center text-caption text-ink-400">No data to display</p>
-            )}
-          </Card>
-        </div>
+        <Card className="p-3">
+          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+            Flat Status by Project
+          </h2>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart
+              data={barData}
+              margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
+              barCategoryGap="28%"
+            >
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10, fill: '#94A3B8' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: '#94A3B8' }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(0,155,255,0.06)' }} />
+              <Legend
+                wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
+                iconType="circle"
+                iconSize={7}
+              />
+              <Bar dataKey="Approved"   stackId="a" fill={STATUS_COLOR.approved}          name="Approved" isAnimationActive animationDuration={500} />
+              <Bar dataKey="Submitted"  stackId="a" fill={STATUS_COLOR.submitted}         name="Submitted" />
+              <Bar dataKey="InProgress" stackId="a" fill={STATUS_COLOR.in_progress}       name="In Progress" />
+              <Bar dataKey="Revision"   stackId="a" fill={STATUS_COLOR.revision_required} name="Revision" />
+              <Bar dataKey="Rejected"   stackId="a" fill={STATUS_COLOR.rejected}          name="Rejected" />
+              <Bar dataKey="Desnagging" stackId="a" fill={STATUS_COLOR.desnagging}        name="Desnagging" />
+              <Bar dataKey="HandedOver" stackId="a" fill={STATUS_COLOR.handed_over}       name="Handed Over" />
+              <Bar dataKey="NotStarted" stackId="a" fill={STATUS_COLOR.not_started}       name="Not Started" radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
       )}
 
       {/* ── Engineer performance ────────────────────────────────────── */}
@@ -660,6 +627,6 @@ export default function AdminDashboard() {
           onAction={clearFilters}
         />
       )}
-    </div>
+    </motion.div>
   )
 }

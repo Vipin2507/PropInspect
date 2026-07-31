@@ -17,6 +17,8 @@ import {
   Activity,
   ScrollText,
   Settings2,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { useAuthStore } from '../../store/authStore'
@@ -27,7 +29,6 @@ import { useQaChangesCount } from '../../hooks/useQaChanges'
 import { useEngineerFeedbackCount } from '../../hooks/useEngineerFeedback'
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard }
-
 type NavSection = { title?: string; items: NavItem[] }
 
 const adminSections: NavSection[] = [
@@ -45,17 +46,17 @@ const adminSections: NavSection[] = [
       { to: ROUTES.ENGINEER_CHANGES, label: 'QA Feedback', icon: ScrollText },
       { to: ROUTES.QA_ALL_FLATS, label: 'QA All Flats', icon: Building2 },
       { to: ROUTES.QA_CHANGES, label: 'Changes Log', icon: ScrollText },
-      { to: ROUTES.QA_REVIEWS, label: 'Submitted Reviews', icon: ClipboardCheck },
-      { to: ROUTES.QA_HISTORY, label: 'Review History', icon: History },
+      { to: ROUTES.QA_REVIEWS, label: 'Reviews', icon: ClipboardCheck },
+      { to: ROUTES.QA_HISTORY, label: 'History', icon: History },
     ],
   },
   {
-    title: 'Operations',
+    title: 'Ops',
     items: [
       { to: ROUTES.DESNAGGING, label: 'De-Snagging', icon: Wrench },
       { to: ROUTES.ADMIN_MONITORING, label: 'Monitoring', icon: MonitorDot },
-      { to: ROUTES.ADMIN_ACTIVITY, label: 'Activity Log', icon: Activity },
-      { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
+      { to: ROUTES.ADMIN_ACTIVITY, label: 'Activity', icon: Activity },
+      { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Alerts', icon: Bell },
     ],
   },
   {
@@ -78,7 +79,7 @@ const sectionsByRole: Record<string, NavSection[]> = {
         { to: ROUTES.ENGINEER_FLATS, label: 'All Flats', icon: Building2 },
         { to: ROUTES.ENGINEER_CHANGES, label: 'QA Feedback', icon: ScrollText },
         { to: ROUTES.DESNAGGING, label: 'De-Snagging', icon: Wrench },
-        { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
+        { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Alerts', icon: Bell },
       ],
     },
   ],
@@ -87,11 +88,11 @@ const sectionsByRole: Record<string, NavSection[]> = {
       items: [
         { to: ROUTES.QA_DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
         { to: ROUTES.QA_ALL_FLATS, label: 'All Flats', icon: Building2 },
-        { to: ROUTES.QA_CHANGES, label: 'Changes Log', icon: ScrollText },
-        { to: ROUTES.QA_REVIEWS, label: 'Submitted Reviews', icon: ClipboardCheck },
+        { to: ROUTES.QA_CHANGES, label: 'Changes', icon: ScrollText },
+        { to: ROUTES.QA_REVIEWS, label: 'Reviews', icon: ClipboardCheck },
         { to: ROUTES.QA_HISTORY, label: 'History', icon: FileText },
         { to: ROUTES.DESNAGGING, label: 'De-Snagging', icon: Wrench },
-        { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
+        { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Alerts', icon: Bell },
       ],
     },
   ],
@@ -105,15 +106,10 @@ const sectionsByRole: Record<string, NavSection[]> = {
   ],
 }
 
-function NavBadge({ count, pulse }: { count: number; pulse?: boolean }) {
+function NavBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <span
-      className={cn(
-        'ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1.5 text-[10px] font-bold text-white',
-        pulse && 'animate-badge-pulse'
-      )}
-    >
+    <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger-600 px-1 text-[9px] font-bold text-white">
       {count > 9 ? '9+' : count}
     </span>
   )
@@ -140,11 +136,17 @@ function SidebarNav({
   }
 
   return (
-    <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-1">
+    <nav className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-1.5 py-1">
       {sections.map((section, si) => (
         <div key={si} className="space-y-0.5">
-          {section.title && !isCollapsed && (
-            <p className="px-3 pb-1 pt-2 text-caption uppercase tracking-wide text-white/40">
+          {section.title && (
+            <p
+              className={cn(
+                'px-2.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase tracking-wider text-white/35',
+                'transition-opacity duration-200',
+                isCollapsed ? 'h-0 overflow-hidden opacity-0' : 'opacity-100'
+              )}
+            >
               {section.title}
             </p>
           )}
@@ -159,10 +161,11 @@ function SidebarNav({
                 title={label}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium touch-manipulation transition-colors duration-fast',
-                    isCollapsed ? 'justify-center' : 'justify-start',
+                    'relative flex min-h-[40px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium touch-manipulation',
+                    'transition-colors duration-150',
+                    isCollapsed ? 'justify-center px-0' : 'justify-start',
                     isActive
-                      ? 'bg-brand-600/20 font-semibold text-white'
+                      ? 'bg-brand-600/25 font-semibold text-white'
                       : 'text-white/70 hover:bg-white/10 hover:text-white active:bg-white/10'
                   )
                 }
@@ -170,18 +173,25 @@ function SidebarNav({
                 {({ isActive }) => (
                   <>
                     {isActive && (
-                      <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-400" />
+                      <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-400" />
                     )}
                     <div className="relative shrink-0">
-                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} aria-hidden />
+                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} aria-hidden />
                       {isCollapsed && count > 0 && (
-                        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-600 text-[9px] font-bold text-white animate-badge-pulse">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger-600 text-[8px] font-bold text-white">
                           {count > 9 ? '9+' : count}
                         </span>
                       )}
                     </div>
-                    {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
-                    {!isCollapsed && <NavBadge count={count} pulse={count > 0} />}
+                    <span
+                      className={cn(
+                        'flex-1 truncate transition-opacity duration-200',
+                        isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100'
+                      )}
+                    >
+                      {label}
+                    </span>
+                    {!isCollapsed && <NavBadge count={count} />}
                   </>
                 )}
               </NavLink>
@@ -198,11 +208,13 @@ export function Sidebar({
   isMobile,
   isOpen,
   onClose,
+  onToggleCollapse,
 }: {
   isCollapsed?: boolean
   isMobile?: boolean
   isOpen?: boolean
   onClose?: () => void
+  onToggleCollapse?: () => void
 }) {
   const { logout } = useAuthStore()
   const location = useLocation()
@@ -213,63 +225,71 @@ export function Sidebar({
   }, [location.pathname])
 
   const shellClass =
-    'flex flex-col text-white bg-[linear-gradient(180deg,var(--brand-950),var(--brand-900))]'
+    'flex h-full w-full flex-col text-white bg-[linear-gradient(180deg,var(--brand-950),var(--brand-900))]'
 
   const content = (
     <>
       <div
         className={cn(
-          'flex h-16 shrink-0 items-center px-4',
+          'flex h-12 shrink-0 items-center gap-1 px-2',
           isCollapsed ? 'justify-center' : 'justify-between'
         )}
       >
         {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/95 font-display text-sm font-bold text-brand-700 shadow-md">
+          <div className="flex min-w-0 flex-1 items-center gap-2 px-1">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/95 font-display text-xs font-bold text-brand-600 shadow-sm">
               S
             </div>
-            <div className="leading-tight">
-              <p className="font-display text-base font-bold text-white">SnagDesk</p>
-              <p className="text-[11px] text-white/45">by Buildesk</p>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate font-display text-sm font-bold text-white">SnagDesk</p>
+              <p className="truncate text-[9px] text-white/40">by Buildesk</p>
             </div>
-          </div>
-        )}
-        {isCollapsed && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/95 font-display text-sm font-bold text-brand-700 shadow-md">
-            S
           </div>
         )}
         {isMobile && (
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-white/70 active:bg-white/10"
+            className="ml-auto flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full text-white/70 active:bg-white/10"
             aria-label="Close menu"
           >
-            <X size={24} aria-hidden />
+            <X size={20} aria-hidden />
+          </button>
+        )}
+        {!isMobile && onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {isCollapsed ? <PanelLeftOpen size={16} aria-hidden /> : <PanelLeftClose size={16} aria-hidden />}
           </button>
         )}
       </div>
 
       <SidebarNav isCollapsed={isCollapsed} onNavigate={onClose} />
 
-      <div className="shrink-0 space-y-0.5 border-t border-white/10 p-2 pb-safe">
+      <div className="shrink-0 space-y-0.5 border-t border-white/10 p-1.5 pb-safe">
         <NavLink
           to={ROUTES.PROFILE}
           onClick={onClose}
           title="My Profile"
           className={({ isActive }) =>
             cn(
-              'flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium touch-manipulation',
-              isCollapsed ? 'justify-center' : 'justify-start',
+              'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium touch-manipulation',
+              isCollapsed ? 'justify-center px-0' : 'justify-start',
               isActive
-                ? 'bg-brand-600/20 text-white'
+                ? 'bg-brand-600/25 text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white active:bg-white/10'
             )
           }
         >
-          <UserCircle size={20} className="shrink-0" aria-hidden />
-          {!isCollapsed && <span>My Profile</span>}
+          <UserCircle size={18} className="shrink-0" aria-hidden />
+          <span className={cn('truncate transition-opacity duration-200', isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100')}>
+            Profile
+          </span>
         </NavLink>
 
         <button
@@ -277,18 +297,16 @@ export function Sidebar({
           onClick={logout}
           title="Logout"
           className={cn(
-            'flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-danger-100/90 touch-manipulation',
+            'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-danger-100/80 touch-manipulation',
             'hover:bg-danger-600/20 hover:text-white active:bg-danger-600/20',
-            isCollapsed ? 'justify-center' : 'justify-start'
+            isCollapsed ? 'justify-center px-0' : 'justify-start'
           )}
         >
-          <LogOut size={20} className="shrink-0" aria-hidden />
-          {!isCollapsed && <span>Logout</span>}
+          <LogOut size={18} className="shrink-0" aria-hidden />
+          <span className={cn('truncate transition-opacity duration-200', isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100')}>
+            Logout
+          </span>
         </button>
-
-        {!isCollapsed && (
-          <p className="px-3 py-1 text-center text-caption text-white/30">v1.0.0</p>
-        )}
       </div>
     </>
   )
@@ -298,15 +316,15 @@ export function Sidebar({
       <>
         <div
           className={cn(
-            'fixed inset-0 z-40 bg-ink-950/60 backdrop-blur-sm transition-opacity md:hidden',
-            isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            'fixed inset-0 z-40 bg-ink-950/60 backdrop-blur-sm transition-opacity duration-300 md:hidden',
+            isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
           )}
           onClick={onClose}
           aria-hidden
         />
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-[min(80%,280px)] shadow-lg transition-transform md:hidden',
+            'fixed inset-y-0 left-0 z-50 w-[min(78%,220px)] shadow-lg transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:hidden',
             shellClass,
             isOpen ? 'translate-x-0' : '-translate-x-full'
           )}
@@ -319,9 +337,5 @@ export function Sidebar({
     )
   }
 
-  return (
-    <aside className={cn(shellClass, 'h-full', isCollapsed ? 'w-[68px]' : 'w-[280px]')}>
-      {content}
-    </aside>
-  )
+  return <aside className={shellClass}>{content}</aside>
 }
