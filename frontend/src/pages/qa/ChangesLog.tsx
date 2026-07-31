@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,12 +8,19 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusBadge } from '../../components/ui/Badge'
 import { Card } from '../../components/ui/Card'
+import { StatCard } from '../../components/ui/StatCard'
 import { Button } from '../../components/ui/Button'
 import { cn } from '../../utils/cn'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 import toast from 'react-hot-toast'
-import { CheckCheck, ChevronDown, Eye } from 'lucide-react'
+import {
+  CheckCheck, ChevronDown, Eye, RefreshCw, Building2,
+  ScrollText, AlertCircle, MessageSquare,
+} from 'lucide-react'
 import type { TaskChangeLogEntry } from '../../types'
+
+const compactBtn = '!min-h-[32px] !px-2 !py-1 text-[11px]'
+const easeOut = [0.22, 1, 0.36, 1] as const
 
 function formatChangeValue(change: TaskChangeLogEntry): string {
   if (change.changeType === 'status_change') {
@@ -26,8 +33,25 @@ function formatChangeValue(change: TaskChangeLogEntry): string {
 export default function ChangesLog() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [markingFlat, setMarkingFlat] = useState<string | null>(null)
-  const { reduced } = useMotionSafe()
+  const { fadeUp, reduced, stagger } = useMotionSafe()
   const { groups, totalUnreviewed, loading, markFlatReviewed, reload } = useQaChanges()
+
+  const stats = useMemo(() => {
+    let fails = 0
+    let remarks = 0
+    let statusChanges = 0
+    for (const g of groups) {
+      for (const c of g.changes) {
+        if (c.changeType === 'status_change') {
+          statusChanges++
+          if (c.newValue === 'fail') fails++
+        } else {
+          remarks++
+        }
+      }
+    }
+    return { flats: groups.length, updates: totalUnreviewed, fails, remarks, statusChanges }
+  }, [groups, totalUnreviewed])
 
   const toggleExpand = (flatId: string) => {
     setExpanded((prev) => {
@@ -42,7 +66,9 @@ export default function ChangesLog() {
     setMarkingFlat(flatId)
     try {
       const count = await markFlatReviewed(flatId)
-      toast.success(`Marked ${count} change${count === 1 ? '' : 's'} reviewed for Flat ${flatNumber}`)
+      toast.success(
+        `Marked ${count} change${count === 1 ? '' : 's'} reviewed for Flat ${flatNumber}`
+      )
     } catch {
       toast.error('Could not mark as reviewed')
     } finally {
@@ -51,154 +77,201 @@ export default function ChangesLog() {
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-h2 text-ink-950">Changes Log</h1>
-          <p className="mt-1 text-body text-ink-500">
-            Engineer task updates — review as work progresses
+    <motion.div className="space-y-3 pb-4" {...fadeUp}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="font-display text-lg font-bold text-ink-950 md:text-xl">Changes Log</h1>
+          <p className="text-[11px] text-ink-400">
+            Engineer task updates
+            {totalUnreviewed > 0 ? ` · ${totalUnreviewed} unreviewed` : ''}
           </p>
         </div>
-        {totalUnreviewed > 0 && (
-          <span className="shrink-0 rounded-full bg-warning-100 px-3 py-1 text-sm font-semibold text-warning-600">
-            {totalUnreviewed} unreviewed
-          </span>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className={compactBtn}
+          onClick={() => reload()}
+          aria-label="Refresh"
+        >
+          <RefreshCw size={13} aria-hidden="true" />
+        </Button>
       </div>
 
+      {groups.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatCard index={0} label="Flats" value={stats.flats} icon={Building2} />
+          <StatCard
+            index={1}
+            label="Updates"
+            value={stats.updates}
+            icon={ScrollText}
+            colorClass="text-brand-600 bg-brand-100"
+          />
+          <StatCard
+            index={2}
+            label="Fails"
+            value={stats.fails}
+            icon={AlertCircle}
+            colorClass="text-danger-600 bg-danger-100"
+          />
+          <StatCard
+            index={3}
+            label="Remarks"
+            value={stats.remarks}
+            icon={MessageSquare}
+            colorClass="text-warning-600 bg-warning-100"
+          />
+        </div>
+      )}
+
       {loading && groups.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-20">
+        <div className="flex flex-1 items-center justify-center py-16">
           <Spinner size="lg" />
         </div>
       ) : groups.length === 0 ? (
         <EmptyState
+          icon={ScrollText}
           title="No unreviewed changes"
           description="Engineer task updates will appear here as inspections are filled in."
+          className="py-10"
         />
       ) : (
-        <div className="space-y-3">
-          {groups.map((group) => {
+        <div className="space-y-1.5">
+          {groups.map((group, i) => {
             const isOpen = expanded.has(group.flatId)
             const inspectionId = group.changes[0]?.inspectionId
             const previewCount = Math.min(3, group.changes.length)
 
             return (
-              <Card
+              <motion.div
                 key={group.flatId}
-                className="relative overflow-hidden border-l-[3px] border-l-warning-500"
+                layout={!reduced}
+                initial={reduced ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={stagger(Math.min(i, 12))}
               >
-                <div className="flex items-start gap-3 p-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-bold text-ink-800">
-                        Flat {group.flatNumber}
-                      </h2>
-                      <StatusBadge status={group.flatStatus} />
-                      <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-label font-semibold text-warning-600">
-                        {group.unreviewedCount} update{group.unreviewedCount === 1 ? '' : 's'}
-                      </span>
-                      <span className="text-caption text-ink-500">{group.completionPct}% complete</span>
+                <Card className="relative overflow-hidden shadow-xs">
+                  <span className="absolute inset-y-0 left-0 w-0.5 bg-brand-500" aria-hidden />
+
+                  <div className="flex items-start gap-2 pl-3 pr-2 pt-2.5 pb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <h2 className="text-sm font-semibold text-ink-950">
+                          Flat {group.flatNumber}
+                        </h2>
+                        <StatusBadge status={group.flatStatus} />
+                        <span className="rounded-full bg-warning-100 px-1.5 py-0.5 text-[10px] font-bold text-warning-600">
+                          {group.unreviewedCount} update
+                          {group.unreviewedCount === 1 ? '' : 's'}
+                        </span>
+                        <span className="text-[10px] tabular text-ink-400">
+                          {group.completionPct}%
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-ink-400">
+                        {group.towerName} · {group.engineerName} ·{' '}
+                        {group.lastChangeAt
+                          ? formatDistanceToNow(new Date(group.lastChangeAt), { addSuffix: true })
+                          : '—'}
+                      </p>
                     </div>
-                    <p className="mt-1 text-caption text-ink-500">
-                      {group.towerName} · {group.engineerName} ·{' '}
-                      {group.lastChangeAt
-                        ? formatDistanceToNow(new Date(group.lastChangeAt), { addSuffix: true })
-                        : '—'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-                    {inspectionId && (
-                      <Link
-                        to={ROUTES.QA_REVIEW_DETAIL(inspectionId)}
-                        className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-md border border-ink-200 px-3 text-xs font-medium text-ink-700 active:bg-ink-50"
+                    <div className="flex shrink-0 items-center gap-1">
+                      {inspectionId && (
+                        <Link
+                          to={ROUTES.QA_REVIEW_DETAIL(inspectionId)}
+                          className={cn(
+                            'inline-flex items-center justify-center gap-1 rounded-md border border-ink-200 bg-white px-2',
+                            compactBtn,
+                            'font-semibold text-ink-700 hover:border-brand-300 hover:text-brand-600 touch-manipulation'
+                          )}
+                        >
+                          <Eye size={12} aria-hidden="true" />
+                          View
+                        </Link>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={markingFlat === group.flatId}
+                        onClick={() => handleMarkFlatReviewed(group.flatId, group.flatNumber)}
+                        className={compactBtn}
                       >
-                        <Eye size={14} aria-hidden="true" />
-                        View flat
-                      </Link>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      loading={markingFlat === group.flatId}
-                      onClick={() => handleMarkFlatReviewed(group.flatId, group.flatNumber)}
-                      className="text-xs"
-                    >
-                      <CheckCheck size={14} className="mr-1" aria-hidden="true" />
-                      Mark reviewed
-                    </Button>
+                        <CheckCheck size={12} aria-hidden="true" />
+                        Done
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(group.flatId)}
-                  className="flex w-full items-center justify-between border-t border-ink-100 bg-ink-50/80 px-4 py-2.5 text-xs font-medium text-ink-600 active:bg-ink-100"
-                >
-                  <span>
-                    {isOpen ? 'Hide' : 'Show'} {group.changes.length} change
-                    {group.changes.length === 1 ? '' : 's'}
-                  </span>
-                  <motion.span
-                    animate={{ rotate: isOpen ? 180 : 0 }}
-                    transition={reduced ? { duration: 0 } : { duration: 0.2 }}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(group.flatId)}
+                    className="flex w-full items-center justify-between border-t border-ink-100 bg-ink-50/60 px-3 py-1.5 text-[11px] font-semibold text-ink-500 hover:bg-ink-50 touch-manipulation"
                   >
-                    <ChevronDown size={16} />
-                  </motion.span>
-                </button>
-
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.ul
-                      initial={reduced ? false : { height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={reduced ? undefined : { height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      className="divide-y divide-ink-100 overflow-hidden border-t border-ink-100"
+                    <span>
+                      {isOpen ? 'Hide' : 'Show'} {group.changes.length} change
+                      {group.changes.length === 1 ? '' : 's'}
+                    </span>
+                    <motion.span
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={reduced ? { duration: 0 } : { duration: 0.28, ease: easeOut }}
                     >
-                      {group.changes.map((change) => (
-                        <li key={change.id} className="px-4 py-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-ink-800">{change.itemLabel}</p>
-                              <p className="text-caption text-ink-500">{change.categoryName}</p>
-                              <p
-                                className={cn(
-                                  'mt-1 text-sm',
-                                  change.changeType === 'status_change' && change.newValue === 'fail'
-                                    ? 'font-medium text-danger-600'
-                                    : 'text-ink-700'
-                                )}
-                              >
-                                {change.changeType === 'status_change' ? 'Status: ' : 'Remark: '}
-                                {formatChangeValue(change)}
-                              </p>
-                            </div>
-                            <span className="shrink-0 text-caption text-ink-400">
-                              {formatDistanceToNow(new Date(change.createdAt), { addSuffix: true })}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </motion.ul>
-                  )}
-                </AnimatePresence>
+                      <ChevronDown size={14} />
+                    </motion.span>
+                  </button>
 
-                {!isOpen && group.changes.length > previewCount && (
-                  <p className="px-4 pb-3 text-caption text-ink-400">
-                    +{group.changes.length - previewCount} more…
-                  </p>
-                )}
-              </Card>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.ul
+                        initial={reduced ? false : { height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={reduced ? undefined : { height: 0, opacity: 0 }}
+                        transition={{ duration: 0.32, ease: easeOut }}
+                        className="divide-y divide-ink-100 overflow-hidden border-t border-ink-100"
+                      >
+                        {group.changes.map((change) => (
+                          <li key={change.id} className="px-3 py-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-[13px] font-semibold text-ink-950">
+                                  {change.itemLabel}
+                                </p>
+                                <p className="text-[10px] text-ink-400">{change.categoryName}</p>
+                                <p
+                                  className={cn(
+                                    'mt-0.5 text-[11px]',
+                                    change.changeType === 'status_change' &&
+                                      change.newValue === 'fail'
+                                      ? 'font-semibold text-danger-600'
+                                      : 'text-ink-600'
+                                  )}
+                                >
+                                  {change.changeType === 'status_change' ? 'Status: ' : 'Remark: '}
+                                  {formatChangeValue(change)}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-[10px] text-ink-400">
+                                {formatDistanceToNow(new Date(change.createdAt), {
+                                  addSuffix: true,
+                                })}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </motion.ul>
+                    )}
+                  </AnimatePresence>
+
+                  {!isOpen && group.changes.length > previewCount && (
+                    <p className="px-3 pb-2 text-[10px] text-ink-400">
+                      +{group.changes.length - previewCount} more…
+                    </p>
+                  )}
+                </Card>
+              </motion.div>
             )
           })}
         </div>
       )}
-
-      {!loading && groups.length > 0 && (
-        <Button variant="secondary" className="mx-auto" onClick={() => reload()}>
-          Refresh
-        </Button>
-      )}
-    </div>
+    </motion.div>
   )
 }
