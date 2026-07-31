@@ -97,9 +97,7 @@ export async function resolveNotificationRoute(
 
     case 'qa_task_revision':
     case 'qa_task_rejected':
-      if (role === 'engineer' || role === 'admin') {
-        return ROUTES.ENGINEER_CHANGES
-      }
+      // relatedId is always the flat id (set when QA decides on a task)
       return ROUTES.ENGINEER_FLAT(id)
 
     case 'revision_required':
