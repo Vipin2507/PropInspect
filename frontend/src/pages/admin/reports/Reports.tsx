@@ -1,40 +1,157 @@
+import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+} from 'recharts'
+import {
+  Download, FileText, Users, AlertTriangle, CheckCircle, Wrench, Clock,
+} from 'lucide-react'
 import { useReportsOverview } from '../../../hooks/useReports'
 import { Button } from '../../../components/ui/Button'
-import { reportsApi, projectsApi } from '../../../utils/api'
-import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Card } from '../../../components/ui/Card'
+import { StatCard } from '../../../components/ui/StatCard'
+import { Select } from '../../../components/ui/Select'
 import { Spinner } from '../../../components/ui/Spinner'
+import { EmptyState } from '../../../components/ui/EmptyState'
+import { SegmentedControl } from '../../../components/ui/SegmentedControl'
+import { StatusDonut, CHART_COLORS } from '../../../components/ui/StatusDonut'
+import { reportsApi, projectsApi } from '../../../utils/api'
+import { useMotionSafe } from '../../../hooks/useMotionSafe'
 import { cn } from '../../../utils/cn'
-import { Download } from 'lucide-react'
+import toast from 'react-hot-toast'
 
-const TABS = [
-  { id: 'overview',  label: 'Overview' },
-  { id: 'engineers', label: 'Engineers' },
-  { id: 'snags',     label: 'Snags' },
+type TabId = 'overview' | 'engineers' | 'snags'
+
+const easeOut = [0.22, 1, 0.36, 1] as const
+const compactBtn = '!min-h-[36px] !px-2.5 !py-1.5 text-xs'
+const fieldLabel = 'mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400'
+
+const TABS: { value: TabId; label: string }[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'engineers', label: 'Engineers' },
+  { value: 'snags', label: 'Snags' },
 ]
+
+function ChartTip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: { name: string; value: number; color: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-md border border-ink-100 bg-white p-2.5 text-xs shadow-md">
+      <p className="mb-1.5 font-semibold text-ink-800">{label}</p>
+      {payload.map((p) => (
+        <p key={p.name} className="flex items-center gap-2 text-ink-600">
+          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          {p.name}: <span className="font-bold tabular text-ink-800">{p.value}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
 
 export default function Reports() {
   const { data, loading } = useReportsOverview()
-  const [projects, setProjects]   = useState<{ id: string; name: string }[]>([])
-  const [activeTab, setActiveTab] = useState('overview')
+  const { fadeUp, reduced, stagger } = useMotionSafe()
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([])
+  const [exportProjectId, setExportProjectId] = useState('')
+  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
-    projectsApi.list().then(({ data }) => setProjects(data))
+    projectsApi.list().then(({ data: list }) => {
+      setProjects(list)
+      if (list[0]) setExportProjectId(list[0].id)
+    })
   }, [])
 
-  const exportCsv = async (projectId: string, type: string) => {
-    const { data } = await reportsApi.export(projectId, type)
-    const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
-    const a   = document.createElement('a')
-    a.href = url
-    a.download = `report-${type}-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  const totals = useMemo(() => {
+    if (!data) {
+      return {
+        flats: 0,
+        approved: 0,
+        pending: 0,
+        revision: 0,
+        snagOpen: 0,
+        snagRectified: 0,
+        snagClosed: 0,
+        engineers: 0,
+      }
+    }
+    let flats = 0
+    let approved = 0
+    let pending = 0
+    let revision = 0
+    for (const p of data.projectStats) {
+      flats += p.totalFlats
+      approved += p.approved
+      pending += p.notStarted + p.inProgress
+      revision += p.revisionRequired
+    }
+    return {
+      flats,
+      approved,
+      pending,
+      revision,
+      snagOpen: data.snagSummary.open,
+      snagRectified: data.snagSummary.rectified,
+      snagClosed: data.snagSummary.closed,
+      engineers: data.engineerLeaderboard.length,
+    }
+  }, [data])
+
+  const barData = useMemo(() => {
+    if (!data) return []
+    return data.projectStats.map((p) => ({
+      name: p.projectName.slice(0, 14),
+      Approved: p.approved,
+      Pending: p.notStarted + p.inProgress,
+      Revision: p.revisionRequired,
+    }))
+  }, [data])
+
+  const snagDonut = useMemo(
+    () => [
+      { name: 'Open', value: totals.snagOpen, fill: CHART_COLORS.rejected },
+      { name: 'Rectified', value: totals.snagRectified, fill: CHART_COLORS.submitted },
+      { name: 'Closed', value: totals.snagClosed, fill: CHART_COLORS.approved },
+    ],
+    [totals]
+  )
+
+  const snagTotal = totals.snagOpen + totals.snagRectified + totals.snagClosed
+
+  const exportCsv = async (type: string) => {
+    const projectId = exportProjectId || projects[0]?.id
+    if (!projectId) {
+      toast.error('No project to export')
+      return
+    }
+    setExporting(true)
+    try {
+      const { data: csv } = await reportsApi.export(projectId, type)
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `report-${type}-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Export downloaded')
+    } catch {
+      toast.error('Export failed')
+    } finally {
+      setExporting(false)
+    }
   }
 
-  if (!data) {
+  if (loading && !data) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
         <Spinner size="lg" />
@@ -42,106 +159,428 @@ export default function Reports() {
     )
   }
 
-  const barData = data.projectStats.map((p) => ({
-    name:           p.projectName.slice(0, 12),
-    Approved:       p.approved,
-    Pending:        p.notStarted + p.inProgress,
-    'Revision Req': p.revisionRequired,
-  }))
+  if (!data) {
+    return (
+      <EmptyState
+        icon={FileText}
+        title="No report data"
+        description="Reports will appear once projects have activity."
+      />
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Reports</h1>
-        {projects.length > 0 && (
-          <Button variant="outline" size="sm" onClick={() => exportCsv(projects[0].id, 'flat')}>
-            <Download size={16} aria-hidden="true" />
-            Export CSV
-          </Button>
-        )}
+    <motion.div className="space-y-3 pb-4" {...fadeUp}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="font-display text-lg font-bold text-ink-950 md:text-xl">Reports</h1>
+          <p className="text-[11px] text-ink-400">
+            {totals.flats} flats · {totals.engineers} engineer
+            {totals.engineers !== 1 ? 's' : ''} · {snagTotal} snag{snagTotal !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className={compactBtn}
+          loading={exporting}
+          disabled={!projects.length}
+          onClick={() => exportCsv('flat')}
+        >
+          <Download size={14} aria-hidden />
+          <span className="sm:hidden">CSV</span>
+          <span className="hidden sm:inline">Export CSV</span>
+        </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setActiveTab(t.id)}
-            className={cn(
-              'shrink-0 border-b-2 px-4 py-2.5 text-sm font-semibold min-h-[44px] touch-manipulation',
-              activeTab === t.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-slate-500 active:bg-slate-50'
-            )}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatCard
+          index={0}
+          label="Approved"
+          value={totals.approved}
+          icon={CheckCircle}
+          colorClass="text-success-600 bg-success-100"
+        />
+        <StatCard
+          index={1}
+          label="Pending"
+          value={totals.pending}
+          icon={Clock}
+          colorClass="text-warning-600 bg-warning-100"
+        />
+        <StatCard
+          index={2}
+          label="Revision"
+          value={totals.revision}
+          icon={AlertTriangle}
+          colorClass="text-warning-600 bg-warning-100"
+        />
+        <StatCard
+          index={3}
+          label="Open Snags"
+          value={totals.snagOpen}
+          icon={Wrench}
+          colorClass="text-danger-600 bg-danger-100"
+        />
+      </div>
+
+      {projects.length > 0 && (
+        <Card className="border-ink-100 bg-surface p-3 shadow-xs">
+          <label className={fieldLabel}>Export project</label>
+          <Select
+            value={exportProjectId}
+            onChange={(e) => setExportProjectId(e.target.value)}
+            aria-label="Project for CSV export"
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {activeTab === 'overview' && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-slate-800">Project Status Overview</h2>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={barData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ borderRadius: '0.75rem', fontSize: 13 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Approved"     stackId="a" fill="#16A34A" />
-              <Bar dataKey="Pending"      stackId="a" fill="#D97706" />
-              <Bar dataKey="Revision Req" stackId="a" fill="#F97316" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {activeTab === 'engineers' && (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
-          <h2 className="px-4 pt-4 text-base font-semibold text-slate-800">Engineer Leaderboard</h2>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="px-4 py-3 font-medium text-slate-600">Name</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Assigned</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Submitted</th>
-                <th className="px-4 py-3 font-medium text-slate-600">Approved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.engineerLeaderboard.map((e) => (
-                <tr key={e.engineerId} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-slate-800">{e.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{e.assigned}</td>
-                  <td className="px-4 py-3 text-slate-600">{e.submitted}</td>
-                  <td className="px-4 py-3 text-slate-600">{e.approved}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'snags' && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-slate-800">Snag Summary</h2>
-          <div className="space-y-3">
-            {[
-              { label: 'Open',      value: data.snagSummary.open,      color: 'text-fail' },
-              { label: 'Rectified', value: data.snagSummary.rectified, color: 'text-secondary' },
-              { label: 'Closed',    value: data.snagSummary.closed,    color: 'text-pass' },
-            ].map((row) => (
-              <div key={row.label} className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3">
-                <span className="text-sm font-medium text-slate-700">{row.label}</span>
-                <span className={cn('text-lg font-bold', row.color)}>{row.value}</span>
-              </div>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
-          </div>
-        </div>
+          </Select>
+        </Card>
       )}
-    </div>
+
+      <SegmentedControl
+        options={TABS}
+        value={activeTab}
+        onChange={setActiveTab}
+        layoutId="reports-tab"
+      />
+
+      <AnimatePresence mode="wait" initial={false}>
+        {activeTab === 'overview' && (
+          <motion.div
+            key="overview"
+            className="space-y-3"
+            initial={reduced ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.32, ease: easeOut }}
+          >
+            <Card className="overflow-hidden p-3 shadow-xs">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                  Project status
+                </h2>
+                <span className="text-[10px] tabular text-ink-400">
+                  {barData.length} project{barData.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {barData.length === 0 ? (
+                <p className="py-10 text-center text-[11px] text-ink-400">No project stats yet</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={barData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E8EEF4" vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 10, fill: '#64748B' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: '#64748B' }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <Tooltip content={<ChartTip />} cursor={{ fill: 'rgba(0,155,255,0.06)' }} />
+                      <Bar
+                        dataKey="Approved"
+                        stackId="a"
+                        fill={CHART_COLORS.approved}
+                        isAnimationActive={!reduced}
+                      />
+                      <Bar
+                        dataKey="Pending"
+                        stackId="a"
+                        fill={CHART_COLORS.submitted}
+                        isAnimationActive={!reduced}
+                      />
+                      <Bar
+                        dataKey="Revision"
+                        stackId="a"
+                        fill={CHART_COLORS.revision}
+                        radius={[3, 3, 0, 0]}
+                        isAnimationActive={!reduced}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-ink-50 pt-2">
+                    {[
+                      { key: 'Approved', fill: CHART_COLORS.approved },
+                      { key: 'Pending', fill: CHART_COLORS.submitted },
+                      { key: 'Revision', fill: CHART_COLORS.revision },
+                    ].map((s) => (
+                      <span
+                        key={s.key}
+                        className="inline-flex items-center gap-1.5 text-[11px] text-ink-600"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ background: s.fill }}
+                        />
+                        {s.key}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {data.projectStats.map((p, i) => {
+                const total =
+                  p.approved + p.notStarted + p.inProgress + p.revisionRequired || 1
+                const pct = Math.round((p.approved / total) * 100)
+                return (
+                  <motion.div
+                    key={p.projectId ?? p.projectName}
+                    initial={reduced ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={stagger(Math.min(i, 12))}
+                  >
+                    <Card className="p-3 shadow-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-ink-950">
+                          {p.projectName}
+                        </p>
+                        <span className="shrink-0 text-[11px] font-bold tabular text-brand-600">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                        <motion.div
+                          className="h-full rounded-full bg-success-500"
+                          initial={reduced ? false : { width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.5, ease: easeOut, delay: Math.min(i, 8) * 0.04 }}
+                        />
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-ink-500">
+                        <span>
+                          <span className="font-semibold text-success-600">{p.approved}</span> approved
+                        </span>
+                        <span>
+                          <span className="font-semibold text-warning-600">
+                            {p.notStarted + p.inProgress}
+                          </span>{' '}
+                          pending
+                        </span>
+                        <span>
+                          <span className="font-semibold text-warning-700">
+                            {p.revisionRequired}
+                          </span>{' '}
+                          revision
+                        </span>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'engineers' && (
+          <motion.div
+            key="engineers"
+            className="space-y-1.5"
+            initial={reduced ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.32, ease: easeOut }}
+          >
+            {data.engineerLeaderboard.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No engineer stats"
+                description="Leaderboard fills as inspections are assigned."
+                className="py-10"
+              />
+            ) : (
+              <>
+                <div className="hidden items-center gap-3 rounded-md border border-ink-100/80 bg-ink-50/80 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-ink-400 md:grid md:grid-cols-[1.4fr_70px_70px_70px]">
+                  <span>Engineer</span>
+                  <span className="text-right">Assigned</span>
+                  <span className="text-right">Submitted</span>
+                  <span className="text-right">Approved</span>
+                </div>
+                {data.engineerLeaderboard.map((e, i) => {
+                  const rate =
+                    e.assigned > 0 ? Math.round((e.approved / e.assigned) * 100) : 0
+                  return (
+                    <motion.div
+                      key={e.engineerId}
+                      layout={!reduced}
+                      initial={reduced ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={stagger(Math.min(i, 12))}
+                    >
+                      <Card className="overflow-hidden p-0 shadow-xs">
+                        {/* Mobile */}
+                        <div className="flex items-center gap-2.5 p-3 md:hidden">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-sm font-bold text-brand-600">
+                            {i + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-ink-950">{e.name}</p>
+                            <p className="mt-0.5 text-[11px] text-ink-400">
+                              {e.assigned} assigned · {e.submitted} submitted ·{' '}
+                              <span className="font-semibold text-success-600">{e.approved}</span>{' '}
+                              approved
+                            </p>
+                            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-100">
+                              <div
+                                className="h-full rounded-full bg-brand-500"
+                                style={{ width: `${rate}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="shrink-0 text-[11px] font-bold tabular text-ink-500">
+                            {rate}%
+                          </span>
+                        </div>
+                        {/* Desktop */}
+                        <div className="hidden items-center gap-3 px-3 py-2.5 md:grid md:grid-cols-[1.4fr_70px_70px_70px]">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-xs font-bold text-brand-600">
+                              {i + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-ink-950">{e.name}</p>
+                              <p className="text-[10px] text-ink-400">{rate}% approval rate</p>
+                            </div>
+                          </div>
+                          <span className="text-right text-sm tabular text-ink-600">{e.assigned}</span>
+                          <span className="text-right text-sm tabular text-ink-600">{e.submitted}</span>
+                          <span className="text-right text-sm font-semibold tabular text-success-600">
+                            {e.approved}
+                          </span>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  )
+                })}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'snags' && (
+          <motion.div
+            key="snags"
+            className="space-y-3"
+            initial={reduced ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.32, ease: easeOut }}
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <StatCard
+                index={0}
+                label="Open"
+                value={totals.snagOpen}
+                icon={AlertTriangle}
+                colorClass="text-danger-600 bg-danger-100"
+              />
+              <StatCard
+                index={1}
+                label="Rectified"
+                value={totals.snagRectified}
+                icon={Wrench}
+                colorClass="text-warning-600 bg-warning-100"
+              />
+              <StatCard
+                index={2}
+                label="Closed"
+                value={totals.snagClosed}
+                icon={CheckCircle}
+                colorClass="text-success-600 bg-success-100"
+              />
+            </div>
+
+            <Card className="p-3 shadow-xs">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                Distribution
+              </p>
+              <StatusDonut
+                data={snagDonut}
+                centerLabel="Total"
+                centerValue={snagTotal}
+                height={160}
+              />
+              <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                {snagDonut.map((s) => (
+                  <span
+                    key={s.name}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-ink-600"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.fill }} />
+                    {s.name}
+                    <span className="font-bold tabular text-ink-800">{s.value}</span>
+                  </span>
+                ))}
+              </div>
+            </Card>
+
+            <div className="space-y-1.5">
+              {[
+                {
+                  label: 'Open',
+                  value: totals.snagOpen,
+                  color: 'bg-danger-500',
+                  text: 'text-danger-600',
+                },
+                {
+                  label: 'Rectified',
+                  value: totals.snagRectified,
+                  color: 'bg-warning-500',
+                  text: 'text-warning-600',
+                },
+                {
+                  label: 'Closed',
+                  value: totals.snagClosed,
+                  color: 'bg-success-500',
+                  text: 'text-success-600',
+                },
+              ].map((row, i) => {
+                const pct = snagTotal > 0 ? Math.round((row.value / snagTotal) * 100) : 0
+                return (
+                  <motion.div
+                    key={row.label}
+                    initial={reduced ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={stagger(i)}
+                  >
+                    <Card className="p-3 shadow-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-ink-700">{row.label}</span>
+                        <span className={cn('text-sm font-bold tabular', row.text)}>
+                          {row.value}
+                          <span className="ml-1 text-[10px] font-semibold text-ink-400">
+                            {pct}%
+                          </span>
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                        <motion.div
+                          className={cn('h-full rounded-full', row.color)}
+                          initial={reduced ? false : { width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.5, ease: easeOut, delay: i * 0.06 }}
+                        />
+                      </div>
+                    </Card>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
