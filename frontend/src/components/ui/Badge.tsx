@@ -20,6 +20,9 @@ const statusStyles: Record<string, string> = {
   rectified: 'bg-accent-100 text-accent-500 border-accent-500/20',
   verified: 'bg-success-100 text-success-600 border-success-600/20',
   closed: 'bg-ink-100 text-ink-600 border-ink-200',
+  active: 'bg-brand-100 text-brand-700 border-brand-200',
+  completed: 'bg-success-100 text-success-600 border-success-600/20',
+  on_hold: 'bg-warning-100 text-warning-600 border-warning-600/20',
 }
 
 const dotStyles: Record<string, string> = {
@@ -41,6 +44,9 @@ const dotStyles: Record<string, string> = {
   rectified: 'bg-accent-500',
   verified: 'bg-success-600',
   closed: 'bg-ink-400',
+  active: 'bg-brand-500',
+  completed: 'bg-success-600',
+  on_hold: 'bg-warning-600',
 }
 
 function formatStatus(status: string) {
