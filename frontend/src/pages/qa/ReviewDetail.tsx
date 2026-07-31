@@ -1,5 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { reviewsApi } from '../../utils/api'
 import { queueChange } from '../../utils/sync'
 import { cacheReviewDetailImages } from '../../utils/imageCache'
@@ -13,9 +14,11 @@ import toast from 'react-hot-toast'
 import type { Inspection } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { StatusBadge } from '../../components/ui/Badge'
 import { ArrowLeft, Info } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 import { cn } from '../../utils/cn'
 
 export default function ReviewDetail() {
@@ -196,12 +199,13 @@ export default function ReviewDetail() {
     }
   }
 
+  const { fadeUp } = useMotionSafe()
   const backLinkClass =
-    'inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-ink-600 transition-colors active:text-brand-600'
+    'inline-flex min-h-[36px] items-center gap-1.5 text-xs font-semibold text-ink-500 transition-colors duration-fast hover:text-brand-600 touch-manipulation'
 
   if (loading && !data) {
     return (
-      <div className="flex flex-1 items-center justify-center py-24">
+      <div className="flex flex-1 items-center justify-center py-16">
         <Spinner size="lg" />
       </div>
     )
@@ -209,65 +213,73 @@ export default function ReviewDetail() {
 
   if (loadError && !data) {
     return (
-      <div className="flex flex-col gap-4 py-8">
+      <motion.div className="space-y-3 py-6" {...fadeUp}>
         <Link to={ROUTES.QA_REVIEWS} className={backLinkClass}>
-          <ArrowLeft size={18} aria-hidden="true" />
-          Back to Reviews
+          <ArrowLeft size={14} aria-hidden="true" />
+          Reviews
         </Link>
-        <EmptyState
-          title="Review not found"
-          description={loadError}
-        />
-        <Button className="mx-auto w-full max-w-xs" onClick={() => navigate(ROUTES.QA_REVIEWS)}>
+        <EmptyState title="Review not found" description={loadError} className="py-10" />
+        <Button
+          size="sm"
+          className="mx-auto w-full max-w-xs !min-h-[36px] text-xs"
+          onClick={() => navigate(ROUTES.QA_REVIEWS)}
+        >
           Back to queue
         </Button>
-      </div>
+      </motion.div>
     )
   }
 
   if (!data) {
     return (
-      <div className="flex flex-1 items-center justify-center py-24">
+      <div className="flex flex-1 items-center justify-center py-16">
         <Spinner size="lg" />
       </div>
     )
   }
 
   const isFormalReview = data.inspection.status === 'submitted'
-  const canReviewTasks = ['draft', 'submitted', 'revision_required'].includes(data.inspection.status)
+  const canReviewTasks = ['draft', 'submitted', 'revision_required'].includes(
+    data.inspection.status
+  )
 
   return (
-    <div className={cn('flex flex-col gap-4', isFormalReview ? 'pb-[160px] md:pb-6' : 'pb-6')}>
-      {/* Header */}
+    <motion.div
+      className={cn('space-y-3', isFormalReview ? 'pb-[150px] md:pb-4' : 'pb-4')}
+      {...fadeUp}
+    >
       <Link to={ROUTES.QA_REVIEWS} className={backLinkClass}>
-        <ArrowLeft size={18} aria-hidden="true" />
-        Back to Reviews
+        <ArrowLeft size={14} aria-hidden="true" />
+        Reviews
       </Link>
 
-      <div>
-        <h1 className="font-display text-h2 text-ink-950">
-          {isFormalReview ? 'Review' : 'View'}: {data.flatNumber}
-        </h1>
-        <p className="text-body text-ink-500">
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <h1 className="truncate font-display text-lg font-bold text-ink-950 md:text-xl">
+            {data.flatNumber}
+          </h1>
+          <StatusBadge status={data.inspection.status} />
+        </div>
+        <p className="mt-0.5 text-[11px] text-ink-400">
           {isFormalReview ? 'Submitted' : 'In progress'} by {data.engineerName}
         </p>
         {!isFormalReview && canReviewTasks && (
-          <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-info-100 px-3.5 py-2.5">
-            <Info size={16} className="mt-0.5 shrink-0 text-info-600" aria-hidden="true" />
-            <p className="text-xs leading-relaxed text-info-600">
-              Expand a task, type your remark, add photos if needed, then tap <strong>Revision</strong>.
-              You can upload evidence photos before saving.
+          <div className="mt-2 flex items-start gap-2 rounded-md bg-info-100 px-2.5 py-2">
+            <Info size={13} className="mt-0.5 shrink-0 text-info-600" aria-hidden="true" />
+            <p className="text-[11px] leading-relaxed text-info-600">
+              Expand a task, add a remark, then tap <strong>Revision</strong>. Photos optional before
+              save.
             </p>
           </div>
         )}
         {!canReviewTasks && (
-          <p className="mt-3 rounded-lg bg-ink-50 px-3.5 py-2.5 text-xs text-ink-600">
+          <p className="mt-2 rounded-md bg-ink-50 px-2.5 py-2 text-[11px] text-ink-600">
             This inspection is closed for editing.
           </p>
         )}
         {isOffline && (
-          <p className="mt-2 text-xs font-medium text-warning-600">
-            Showing cached data — connect to submit review
+          <p className="mt-1.5 text-[11px] font-medium text-warning-600">
+            Showing cached data — connect to submit
           </p>
         )}
       </div>
@@ -284,58 +296,61 @@ export default function ReviewDetail() {
       />
 
       {isFormalReview && (
-      <>
-      {/* Fixed bottom actions panel — compact on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink-100 bg-surface/95 px-4 pt-2 pb-safe backdrop-blur-sm lg:left-60">
-        <div className="mx-auto max-w-2xl">
-          {/* Overall comments — single line on mobile, expands on focus */}
-          <Textarea
-            value={overallComments}
-            onChange={(e) => setOverallComments(e.target.value)}
-            rows={1}
-            className="mb-2 text-sm resize-none"
-            placeholder="Overall comments (required for revision/rejection)…"
-            onFocus={(e) => { e.target.rows = 3 }}
-            onBlur={(e) => { if (!overallComments) e.target.rows = 1 }}
-          />
-          <ReviewActions
-            onApprove={() => submitReview('approved')}
-            onRevision={() => setRevisionDrawerOpen(true)}
-            onReject={() => submitReview('rejected')}
-            isSubmitting={isSubmitting}
-          />
-        </div>
-      </div>
+        <>
+          <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink-100 bg-surface/95 px-3 pt-2 pb-safe backdrop-blur-sm lg:left-52">
+            <div className="mx-auto max-w-2xl">
+              <Textarea
+                value={overallComments}
+                onChange={(e) => setOverallComments(e.target.value)}
+                rows={1}
+                className="mb-2 !min-h-[36px] !px-2.5 !py-1.5 text-sm resize-none"
+                placeholder="Overall comments (required for revision/rejection)…"
+                onFocus={(e) => {
+                  e.target.rows = 3
+                }}
+                onBlur={(e) => {
+                  if (!overallComments) e.target.rows = 1
+                }}
+              />
+              <ReviewActions
+                onApprove={() => submitReview('approved')}
+                onRevision={() => setRevisionDrawerOpen(true)}
+                onReject={() => submitReview('rejected')}
+                isSubmitting={isSubmitting}
+              />
+            </div>
+          </div>
 
-      {/* Revision drawer */}
-      <Drawer
-        isOpen={revisionDrawerOpen}
-        onClose={() => setRevisionDrawerOpen(false)}
-        title="Request Revision"
-      >
-        <p className="mb-4 text-sm text-ink-600">
-          Provide clear comments so the engineer knows what to fix.
-        </p>
-        <Textarea
-          value={overallComments}
-          onChange={(e) => setOverallComments(e.target.value)}
-          rows={5}
-          placeholder="e.g. Paint touch-up needed in master bedroom…"
-        />
-        <Button
-          className="mt-4 w-full"
-          onClick={() => submitReview('revision_required')}
-          loading={isSubmitting}
-        >
-          Send for Revision
-        </Button>
-      </Drawer>
-      </>
+          <Drawer
+            isOpen={revisionDrawerOpen}
+            onClose={() => setRevisionDrawerOpen(false)}
+            title="Request Revision"
+          >
+            <p className="mb-3 text-xs text-ink-600">
+              Provide clear comments so the engineer knows what to fix.
+            </p>
+            <Textarea
+              value={overallComments}
+              onChange={(e) => setOverallComments(e.target.value)}
+              rows={4}
+              placeholder="e.g. Paint touch-up needed in master bedroom…"
+              className="!px-2.5 !py-2 text-sm"
+            />
+            <Button
+              className="mt-3 w-full"
+              size="sm"
+              onClick={() => submitReview('revision_required')}
+              loading={isSubmitting}
+            >
+              Send for Revision
+            </Button>
+          </Drawer>
+        </>
       )}
 
       {lightboxImage && (
         <Lightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
       )}
-    </div>
+    </motion.div>
   )
 }
