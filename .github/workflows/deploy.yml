@@ -29,11 +29,38 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
-          HOST="${VPS_HOST:-147.93.30.96}"
-          PORT="${VPS_PORT:-22}"
+          set -euo pipefail
+          # Empty GitHub secrets count as "set", so :- defaults never apply — normalize first.
+          HOST="${VPS_HOST:-}"
+          PORT="${VPS_PORT:-}"
+          HOST="${HOST:-147.93.30.96}"
+          PORT="${PORT:-22}"
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts
+
+          echo "Scanning ${HOST} port ${PORT}..."
+          ok=0
+          for i in 1 2 3; do
+            if ssh-keyscan -T 10 -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err; then
+              if grep -q "$HOST\|ssh-" ~/.ssh/known_hosts; then
+                ok=1
+                break
+              fi
+            fi
+            echo "Attempt $i failed:"
+            cat /tmp/keyscan.err || true
+            sleep 2
+          done
+
+          if [ "$ok" != 1 ]; then
+            echo "::error::ssh-keyscan failed for ${HOST}:${PORT}."
+            echo "Check: VPS_HOST is correct, SSH is reachable from the public internet,"
+            echo "and delete the VPS_PORT secret if you created it empty (leave it unset)."
+            echo "If the hostinger firewall restricts SSH, allow GitHub Actions IPs or open port ${PORT}."
+            exit 1
+          fi
+          echo "known_hosts updated."
 
       - name: Deploy over SSH
         env:
@@ -45,16 +72,25 @@ jobs:
           WEB_ROOT: ${{ secrets.WEB_ROOT }}
         run: |
           set -euo pipefail
-          HOST="${VPS_HOST:?Set secret VPS_HOST}"
-          USER="${VPS_USER:?Set secret VPS_USER}"
-          PORT="${VPS_PORT:-22}"
-          PATH_ON_VPS="${DEPLOY_PATH:?Set secret DEPLOY_PATH (e.g. /opt/propinspect)}"
-          APP_NAME="${PM2_APP_NAME:-propinspect-api}"
+          HOST="${VPS_HOST:-}"
+          USER="${VPS_USER:-}"
+          PORT="${VPS_PORT:-}"
+          PATH_ON_VPS="${DEPLOY_PATH:-}"
+          APP_NAME="${PM2_APP_NAME:-}"
           WEB="${WEB_ROOT:-}"
+
+          HOST="${HOST:-147.93.30.96}"
+          USER="${USER:?Set secret VPS_USER (e.g. deploy)}"
+          PORT="${PORT:-22}"
+          PATH_ON_VPS="${PATH_ON_VPS:?Set secret DEPLOY_PATH (e.g. /home/deploy/apps/PropInspect)}"
+          APP_NAME="${APP_NAME:-propinspect-api}"
+
+          echo "Deploying to ${USER}@${HOST}:${PORT} path=${PATH_ON_VPS} pm2=${APP_NAME}"
 
           ssh -p "$PORT" \
             -o StrictHostKeyChecking=yes \
             -o ServerAliveInterval=30 \
+            -o ConnectTimeout=30 \
             "${USER}@${HOST}" \
             "export DEPLOY_PATH='${PATH_ON_VPS}' PM2_APP_NAME='${APP_NAME}' WEB_ROOT='${WEB}' GIT_BRANCH='main'; bash -s" \
             < scripts/deploy.sh
