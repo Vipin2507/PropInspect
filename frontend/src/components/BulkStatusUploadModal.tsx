@@ -27,6 +27,8 @@ interface Props {
   onSuccess: () => void
 }
 
+const sectionLabel = 'text-[10px] font-semibold uppercase tracking-wide text-ink-400'
+
 export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectName, onSuccess }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -35,14 +37,25 @@ export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectNa
   const [result, setResult] = useState<UploadResult | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const reset = () => { setFile(null); setResult(null); setUploading(false) }
+  const reset = () => {
+    setFile(null)
+    setResult(null)
+    setUploading(false)
+  }
 
-  const handleClose = (v: boolean) => { if (!v) reset(); onOpenChange(v) }
+  const handleClose = (v: boolean) => {
+    if (!v) reset()
+    onOpenChange(v)
+  }
 
   const pickFile = (f: File | undefined | null) => {
     if (!f) return
-    if (!f.name.match(/\.(xlsx|xls)$/i)) { toast.error('Only .xlsx or .xls files are accepted'); return }
-    setFile(f); setResult(null)
+    if (!f.name.match(/\.(xlsx|xls)$/i)) {
+      toast.error('Only .xlsx or .xls files are accepted')
+      return
+    }
+    setFile(f)
+    setResult(null)
   }
 
   const downloadTemplate = async () => {
@@ -75,7 +88,8 @@ export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectNa
         toast('No responses were updated', { icon: 'ℹ️' })
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Upload failed'
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Upload failed'
       toast.error(msg)
     } finally {
       setUploading(false)
@@ -84,73 +98,91 @@ export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectNa
 
   return (
     <Modal open={open} onOpenChange={handleClose} title="Bulk Upload Checklist">
-      <div className="space-y-4">
-
-        {/* Format info */}
-        <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">
+      <div className="space-y-3">
+        <div className="flex gap-2 rounded-md border border-brand-200 bg-brand-50 p-2.5 text-xs text-brand-700">
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <div>
             <p className="font-semibold">Expected format</p>
-            <p className="mt-0.5 text-blue-600">
-              Row 1: "Flat number" | 106 | 107 | 108 …<br />
+            <p className="mt-0.5 text-brand-600/90">
+              Row 1: &quot;Flat number&quot; | 106 | 107 | 108 …
+              <br />
               Each item row: item label | Pass / N.A / (blank) per flat
             </p>
           </div>
         </div>
 
-        {/* Step 1 */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <p className="mb-1 text-sm font-semibold text-slate-700">Step 1 — Download template</p>
-          <p className="mb-3 text-xs text-slate-500">
-            Pre-filled with all items &amp; current statuses for{' '}
-            <span className="font-medium">{projectName}</span>. Fill in each flat column and re-upload.
+        <div className="rounded-md border border-ink-100 bg-ink-50/40 p-3">
+          <p className={cn(sectionLabel, 'mb-1')}>Step 1 — Download template</p>
+          <p className="mb-2.5 text-[11px] text-ink-500">
+            Pre-filled with items &amp; current statuses for{' '}
+            <span className="font-semibold text-ink-700">{projectName}</span>. Fill columns and
+            re-upload.
           </p>
-          <Button variant="outline" size="sm" onClick={downloadTemplate} disabled={downloading} className="gap-2">
-            {downloading
-              ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-              : <Download size={14} aria-hidden="true" />
-            }
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={downloadTemplate}
+            disabled={downloading}
+            className="!min-h-[36px] !px-2.5 !py-1.5 text-xs gap-1.5"
+          >
+            {downloading ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-300 border-t-transparent" />
+            ) : (
+              <Download size={13} aria-hidden="true" />
+            )}
             Download Template (.xlsx)
           </Button>
         </div>
 
-        {/* Step 2 */}
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-700">Step 2 — Upload filled file</p>
+          <p className={cn(sectionLabel, 'mb-1.5')}>Step 2 — Upload filled file</p>
           <div
             role="button"
             tabIndex={0}
             aria-label="Select Excel file"
             onClick={() => inputRef.current?.click()}
             onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
             onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); pickFile(e.dataTransfer.files[0]) }}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragging(false)
+              pickFile(e.dataTransfer.files[0])
+            }}
             className={cn(
-              'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors',
-              dragging     ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary/50 hover:bg-slate-50',
-              file && !dragging && 'border-primary/40 bg-primary/5'
+              'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed p-5 text-center transition-all duration-fast touch-manipulation',
+              dragging
+                ? 'border-brand-500 bg-brand-50'
+                : 'border-ink-200 hover:border-brand-400 hover:bg-ink-50/60',
+              file && !dragging && 'border-brand-300 bg-brand-50/50'
             )}
           >
             {file ? (
               <>
-                <FileSpreadsheet size={28} className="text-primary" aria-hidden="true" />
-                <p className="text-sm font-medium text-slate-800">{file.name}</p>
-                <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+                <FileSpreadsheet size={24} className="text-brand-600" aria-hidden="true" />
+                <p className="text-sm font-medium text-ink-800">{file.name}</p>
+                <p className="text-[11px] text-ink-400">{(file.size / 1024).toFixed(1)} KB</p>
                 <button
                   type="button"
                   aria-label="Remove file"
-                  onClick={(e) => { e.stopPropagation(); setFile(null); setResult(null) }}
-                  className="mt-1 flex items-center gap-1 text-xs font-medium text-red-500 hover:underline"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setFile(null)
+                    setResult(null)
+                  }}
+                  className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-danger-600 hover:underline"
                 >
                   <X size={12} /> Remove
                 </button>
               </>
             ) : (
               <>
-                <Upload size={28} className="text-slate-400" aria-hidden="true" />
-                <p className="text-sm font-medium text-slate-600">Drag &amp; drop or click to browse</p>
-                <p className="text-xs text-slate-400">.xlsx or .xls · max 10 MB</p>
+                <Upload size={24} className="text-ink-300" aria-hidden="true" />
+                <p className="text-sm font-medium text-ink-600">Drag &amp; drop or click to browse</p>
+                <p className="text-[11px] text-ink-400">.xlsx or .xls · max 10 MB</p>
               </>
             )}
           </div>
@@ -163,39 +195,56 @@ export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectNa
           />
         </div>
 
-        {/* Result */}
         {result && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3 text-center">
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 rounded-md border border-ink-100 bg-surface p-2.5 text-center shadow-xs">
               <div>
-                <p className={cn('text-xl font-bold', result.flatsAffected > 0 ? 'text-green-600' : 'text-slate-400')}>
+                <p
+                  className={cn(
+                    'font-display text-xl font-bold tabular',
+                    result.flatsAffected > 0 ? 'text-success-600' : 'text-ink-300'
+                  )}
+                >
                   {result.flatsAffected}
                 </p>
-                <p className="text-xs text-slate-500">Flats updated</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                  Flats updated
+                </p>
               </div>
               <div>
-                <p className={cn('text-xl font-bold', result.responsesUpdated > 0 ? 'text-primary' : 'text-slate-400')}>
+                <p
+                  className={cn(
+                    'font-display text-xl font-bold tabular',
+                    result.responsesUpdated > 0 ? 'text-brand-600' : 'text-ink-300'
+                  )}
+                >
                   {result.responsesUpdated}
                 </p>
-                <p className="text-xs text-slate-500">Responses saved</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                  Responses
+                </p>
               </div>
             </div>
 
             {result.flatsAffected > 0 && result.skipped.length === 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                <CheckCircle size={15} aria-hidden="true" /> All rows processed successfully.
+              <div className="flex items-center gap-2 rounded-md border border-success-600/20 bg-success-100 px-3 py-2 text-xs font-medium text-success-600">
+                <CheckCircle size={14} aria-hidden="true" /> All rows processed successfully.
               </div>
             )}
 
             {(result.skipped.length > 0 || result.unknownItems.length > 0) && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-700">
-                  <AlertTriangle size={14} aria-hidden="true" />
-                  {result.skipped.length} unrecognised item{result.skipped.length !== 1 ? 's' : ''} skipped
+              <div className="rounded-md border border-warning-600/20 bg-warning-100 p-2.5">
+                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-warning-600">
+                  <AlertTriangle size={13} aria-hidden="true" />
+                  {result.skipped.length} unrecognised item
+                  {result.skipped.length !== 1 ? 's' : ''} skipped
                 </div>
-                <ul className="max-h-36 space-y-1 overflow-y-auto text-xs text-amber-800">
+                <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px] text-warning-600/90">
                   {result.skipped.map((s, i) => (
-                    <li key={i}>Row {s.row} · <span className="font-medium">"{s.label}"</span> — {s.reason}</li>
+                    <li key={i}>
+                      Row {s.row} · <span className="font-semibold">&quot;{s.label}&quot;</span> —{' '}
+                      {s.reason}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -203,21 +252,28 @@ export function BulkStatusUploadModal({ open, onOpenChange, projectId, projectNa
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-3 pt-1">
+        <div className="flex gap-2 pt-0.5">
           <Button variant="outline" onClick={() => handleClose(false)} className="flex-1">
             {result ? 'Close' : 'Cancel'}
           </Button>
           {!result && (
-            <Button onClick={upload} disabled={!file || uploading} className="flex-1 gap-2">
-              {uploading
-                ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Uploading…</>
-                : <><Upload size={14} aria-hidden="true" /> Upload &amp; Save</>
-              }
+            <Button onClick={upload} disabled={!file || uploading} className="flex-1 gap-1.5">
+              {uploading ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />{' '}
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload size={14} aria-hidden="true" /> Upload &amp; Save
+                </>
+              )}
             </Button>
           )}
           {result && result.flatsAffected > 0 && (
-            <Button onClick={reset} variant="outline" className="flex-1">Upload Another</Button>
+            <Button onClick={reset} variant="outline" className="flex-1">
+              Upload Another
+            </Button>
           )}
         </div>
       </div>
