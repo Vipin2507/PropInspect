@@ -166,7 +166,7 @@ function SidebarNav({
                 title={label}
                 className={({ isActive }) =>
                   cn(
-                    'relative touch-manipulation transition-colors duration-150',
+                    'relative touch-manipulation transition-colors duration-300',
                     isCollapsed
                       ? cn(
                           'flex h-9 w-9 items-center justify-center rounded-lg',
@@ -339,7 +339,7 @@ export function Sidebar({
       <>
         <div
           className={cn(
-            'fixed inset-0 z-40 bg-ink-950/60 backdrop-blur-sm transition-opacity duration-300 md:hidden',
+            'fixed inset-0 z-40 bg-ink-950/60 backdrop-blur-sm transition-opacity duration-500 md:hidden',
             isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
           )}
           onClick={onClose}
@@ -347,7 +347,7 @@ export function Sidebar({
         />
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-[min(78%,220px)] shadow-lg transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] md:hidden',
+            'fixed inset-y-0 left-0 z-50 w-[min(78%,220px)] shadow-lg transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:hidden',
             shellClass,
             isOpen ? 'translate-x-0' : '-translate-x-full'
           )}

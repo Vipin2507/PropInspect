@@ -52,7 +52,7 @@ export function DashboardDrilldown({
             initial={reduced ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             onClick={onClose}
             aria-hidden
           />
@@ -66,10 +66,15 @@ export function DashboardDrilldown({
               'rounded-t-2xl border border-ink-100 bg-surface shadow-lg',
               'md:inset-x-auto md:left-1/2 md:w-full md:max-w-lg md:-translate-x-1/2'
             )}
-            initial={reduced ? false : { y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', stiffness: 380, damping: 36, mass: 0.85 }}
+            initial={reduced ? false : { y: '105%', opacity: 0.85 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '105%', opacity: 0.85 }}
+            transition={{
+              type: 'spring',
+              stiffness: 160,
+              damping: 26,
+              mass: 1,
+            }}
           >
             <div className="flex justify-center pt-2.5 pb-1 shrink-0 md:hidden">
               <div className="h-1 w-9 rounded-full bg-ink-200" />
@@ -100,9 +105,9 @@ export function DashboardDrilldown({
                   {items.map((item, i) => (
                     <motion.li
                       key={item.id}
-                      initial={reduced ? false : { opacity: 0, y: 8 }}
+                      initial={reduced ? false : { opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: Math.min(i, 12) * 0.03, duration: 0.18 }}
+                      transition={{ delay: Math.min(i, 12) * 0.05, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                     >
                       <Link
                         to={item.href}

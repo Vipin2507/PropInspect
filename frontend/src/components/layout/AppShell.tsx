@@ -148,7 +148,7 @@ export function AppShell() {
       <div
         className={cn(
           'hidden h-full shrink-0 overflow-hidden md:flex',
-          'transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           sidebarCollapsed ? 'w-14' : 'w-52'
         )}
       >

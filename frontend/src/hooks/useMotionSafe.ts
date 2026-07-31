@@ -8,13 +8,13 @@ export function useMotionSafe() {
     fadeUp: reduced
       ? { initial: false, animate: { opacity: 1 }, transition: { duration: 0 } }
       : {
-          initial: { opacity: 0, y: 12 },
+          initial: { opacity: 0, y: 10 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const },
+          transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
         },
     stagger: (i: number) =>
       reduced
         ? { delay: 0 }
-        : { delay: i * 0.04, duration: 0.2, ease: [0.16, 1, 0.3, 1] as const },
+        : { delay: i * 0.055, duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
   }
 }

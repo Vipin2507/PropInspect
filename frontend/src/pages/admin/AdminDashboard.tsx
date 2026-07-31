@@ -20,7 +20,7 @@ import {
   Users, ChevronDown, ChevronUp, Download, Building2, PackageCheck,
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { format } from 'date-fns'
 import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
@@ -238,6 +238,25 @@ export default function AdminDashboard() {
     ? Math.round(((s.approved + (s.handedOver ?? 0)) / s.total) * 100)
     : 0
 
+  const barSeries = useMemo(() => {
+    const series = [
+      { key: 'Approved',   name: 'Approved',    fill: STATUS_COLOR.approved },
+      { key: 'Submitted',  name: 'Submitted',   fill: STATUS_COLOR.submitted },
+      { key: 'InProgress', name: 'In Progress', fill: STATUS_COLOR.in_progress },
+      { key: 'Revision',   name: 'Revision',    fill: STATUS_COLOR.revision_required },
+      { key: 'Rejected',   name: 'Rejected',    fill: STATUS_COLOR.rejected },
+      { key: 'Desnagging', name: 'Desnagging',  fill: STATUS_COLOR.desnagging },
+      { key: 'HandedOver', name: 'Handed Over', fill: STATUS_COLOR.handed_over },
+      { key: 'NotStarted', name: 'Not Started', fill: STATUS_COLOR.not_started },
+    ] as const
+    return series.filter((s) =>
+      barData.some((row) => Number((row as unknown as Record<string, number>)[s.key] || 0) > 0)
+    )
+  }, [barData])
+
+  const fewProjects = barData.length <= 2
+  const barMaxSize = barData.length <= 1 ? 48 : barData.length <= 3 ? 40 : 28
+
   const { fadeUp, reduced } = useMotionSafe()
 
   const selectCard = (key: string) => {
@@ -321,7 +340,7 @@ export default function AdminDashboard() {
             initial={reduced ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={reduced ? undefined : { height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
             <Card className="border-ink-100 bg-surface p-3 shadow-xs">
@@ -488,43 +507,101 @@ export default function AdminDashboard() {
       {/* ── Charts ─────────────────────────────────────────────────── */}
       {!loading && barData.length > 0 && (
         <Card className="p-3">
-          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
-            Flat Status by Project
-          </h2>
-          <ResponsiveContainer width="100%" height={180}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+              Flat status by project
+            </h2>
+            <span className="text-[10px] tabular text-ink-400">
+              {barData.length} project{barData.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <ResponsiveContainer width="100%" height={fewProjects ? Math.max(120, barData.length * 56) : 200}>
             <BarChart
+              layout={fewProjects ? 'vertical' : 'horizontal'}
               data={barData}
-              margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
-              barCategoryGap="28%"
+              margin={
+                fewProjects
+                  ? { top: 4, right: 12, left: 4, bottom: 4 }
+                  : { top: 8, right: 8, left: 0, bottom: 4 }
+              }
+              barCategoryGap={fewProjects ? '28%' : barData.length === 1 ? '55%' : '22%'}
             >
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 10, fill: '#94A3B8' }}
-                axisLine={false}
-                tickLine={false}
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#E2E8F0"
+                horizontal={!fewProjects}
+                vertical={fewProjects}
               />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#94A3B8' }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
+              {fewProjects ? (
+                <>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={72}
+                    tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                </>
+              ) : (
+                <>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                    width={36}
+                  />
+                </>
+              )}
               <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(0,155,255,0.06)' }} />
-              <Legend
-                wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
-                iconType="circle"
-                iconSize={7}
-              />
-              <Bar dataKey="Approved"   stackId="a" fill={STATUS_COLOR.approved}          name="Approved" isAnimationActive animationDuration={500} />
-              <Bar dataKey="Submitted"  stackId="a" fill={STATUS_COLOR.submitted}         name="Submitted" />
-              <Bar dataKey="InProgress" stackId="a" fill={STATUS_COLOR.in_progress}       name="In Progress" />
-              <Bar dataKey="Revision"   stackId="a" fill={STATUS_COLOR.revision_required} name="Revision" />
-              <Bar dataKey="Rejected"   stackId="a" fill={STATUS_COLOR.rejected}          name="Rejected" />
-              <Bar dataKey="Desnagging" stackId="a" fill={STATUS_COLOR.desnagging}        name="Desnagging" />
-              <Bar dataKey="HandedOver" stackId="a" fill={STATUS_COLOR.handed_over}       name="Handed Over" />
-              <Bar dataKey="NotStarted" stackId="a" fill={STATUS_COLOR.not_started}       name="Not Started" radius={[3,3,0,0]} />
+              {barSeries.map((s, i) => (
+                <Bar
+                  key={s.key}
+                  dataKey={s.key}
+                  stackId="a"
+                  fill={s.fill}
+                  name={s.name}
+                  maxBarSize={barMaxSize}
+                  isAnimationActive
+                  animationDuration={700}
+                  radius={
+                    i === barSeries.length - 1
+                      ? fewProjects
+                        ? [0, 4, 4, 0]
+                        : [4, 4, 0, 0]
+                      : [0, 0, 0, 0]
+                  }
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
+
+          {barSeries.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-ink-50 pt-2">
+              {barSeries.map((s) => (
+                <span key={s.key} className="inline-flex items-center gap-1.5 text-[11px] text-ink-600">
+                  <span className="h-2 w-2 rounded-full" style={{ background: s.fill }} />
+                  {s.name}
+                </span>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
