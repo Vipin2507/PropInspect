@@ -255,9 +255,13 @@ export function Sidebar({
       >
         {!isCollapsed && (
           <div className="flex min-w-0 flex-1 items-center gap-2 px-1">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/95 font-display text-xs font-bold text-brand-600 shadow-sm">
-              S
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt=""
+              className="h-7 w-7 shrink-0 rounded-lg shadow-sm"
+              width={28}
+              height={28}
+            />
             <div className="min-w-0 leading-tight">
               <p className="truncate font-display text-sm font-bold text-white">SnagDesk</p>
               <p className="truncate text-[9px] text-white/40">by Buildesk</p>

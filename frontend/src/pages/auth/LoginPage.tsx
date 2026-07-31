@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Building2, Mail, Lock } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../../store/authStore'
 import { Button } from '../../components/ui/Button'
@@ -133,9 +133,13 @@ export default function LoginPage() {
           className="flex flex-1 flex-col items-center justify-end pb-8 pt-16"
           {...fadeUp}
         >
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/20">
-            <Building2 size={36} className="text-white" aria-hidden="true" />
-          </div>
+          <img
+            src="/icons/icon-192.png"
+            alt=""
+            className="h-20 w-20 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-white/20"
+            width={80}
+            height={80}
+          />
           <h1 className="mt-5 font-display text-3xl font-bold text-white">SnagDesk</h1>
           <p className="mt-2 text-body text-white/70">Snagging &amp; De-Snagging Platform</p>
           <p className="mt-3 text-caption text-white/50">by Buildesk</p>
@@ -160,9 +164,13 @@ export default function LoginPage() {
           {...fadeUp}
         >
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-100 text-brand-600 shadow-sm">
-              <Building2 size={28} aria-hidden="true" />
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt=""
+              className="mx-auto mb-4 h-16 w-16 rounded-2xl shadow-sm"
+              width={64}
+              height={64}
+            />
             <h1 className="font-display text-h2 text-ink-950">SnagDesk</h1>
             <p className="mt-1 text-body text-ink-500">Snagging &amp; De-Snagging Platform</p>
             <p className="mt-2 text-caption text-ink-400">by Buildesk</p>
