@@ -11,6 +11,8 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
+import { DashboardDrilldown, type DrilldownItem } from '../../components/ui/DashboardDrilldown'
+import { ROUTES } from '../../constants/routes'
 import { cn } from '../../utils/cn'
 import {
   Home, CheckCircle, Clock, AlertTriangle,
@@ -22,7 +24,7 @@ import {
 } from 'recharts'
 import { format } from 'date-fns'
 import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -70,10 +72,15 @@ const STATUS_COLOR: Record<string, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────
 function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-600">
+    <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
       {label}
-      <button type="button" onClick={onRemove} className="ml-0.5 touch-manipulation" aria-label="Remove filter">
-        <X size={11} aria-hidden="true" />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full touch-manipulation hover:bg-brand-100"
+        aria-label="Remove filter"
+      >
+        <X size={10} aria-hidden />
       </button>
     </span>
   )
@@ -116,6 +123,7 @@ export default function AdminDashboard() {
   const [showTable, setShowTable]   = useState(false)
   const [sortCol, setSortCol]       = useState<keyof FlatRow>('flatNumber')
   const [sortAsc, setSortAsc]       = useState(true)
+  const [activeCard, setActiveCard] = useState<string | null>(null)
 
   const activeFilterCount = [filters.projectId, filters.engineerId, filters.status, filters.dateFrom, filters.dateTo].filter(Boolean).length
   const hasFilters = activeFilterCount > 0
@@ -230,7 +238,46 @@ export default function AdminDashboard() {
     ? Math.round(((s.approved + (s.handedOver ?? 0)) / s.total) * 100)
     : 0
 
-  const { fadeUp } = useMotionSafe()
+  const { fadeUp, reduced } = useMotionSafe()
+
+  const selectCard = (key: string) => {
+    setActiveCard((prev) => (prev === key ? null : key))
+  }
+
+  const adminDrill = useMemo(() => {
+    const flats = result?.flats ?? []
+    const titles: Record<string, string> = {
+      total: 'All flats',
+      approved: 'Approved flats',
+      submitted: 'Submitted flats',
+      in_progress: 'In progress flats',
+      not_started: 'Not started flats',
+      revision_required: 'Revision required',
+      rejected: 'Rejected flats',
+      handed_over: 'Handed over flats',
+      open_snags: 'Flats with open snags',
+    }
+    if (!activeCard) return { title: '', items: [] as DrilldownItem[] }
+
+    const filtered =
+      activeCard === 'total'
+        ? flats
+        : activeCard === 'open_snags'
+          ? flats.filter((f) => f.openSnags > 0)
+          : flats.filter((f) => f.flatStatus === activeCard)
+
+    return {
+      title: titles[activeCard] || 'Flats',
+      items: filtered.map((f) => ({
+        id: f.flatId,
+        title: f.flatNumber,
+        subtitle: [f.towerName, f.projectName].filter(Boolean).join(' · '),
+        meta: f.engineerName || undefined,
+        status: f.flatStatus,
+        href: ROUTES.ENGINEER_FLAT(f.flatId),
+      })),
+    }
+  }, [activeCard, result])
 
   return (
     <motion.div className="space-y-3 pb-4" {...fadeUp}>
@@ -267,53 +314,100 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Filter panel ───────────────────────────────────────────── */}
-      {filtersOpen && (
-        <Card className="border-brand-200 bg-brand-50/50 p-4 space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Project</label>
-              <Select value={filters.projectId} onChange={e => setFilters(p => ({...p, projectId: e.target.value}))}>
-                <option value="">All Projects</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Engineer</label>
-              <Select value={filters.engineerId} onChange={e => setFilters(p => ({...p, engineerId: e.target.value}))}>
-                <option value="">All Engineers</option>
-                {engineers.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Flat Status</label>
-              <Select value={filters.status} onChange={e => setFilters(p => ({...p, status: e.target.value}))}>
-                {FLAT_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Updated From</label>
-              <input type="date" value={filters.dateFrom}
-                onChange={e => setFilters(p => ({...p, dateFrom: e.target.value}))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light"
-                style={{fontSize:'16px'}}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Updated To</label>
-              <input type="date" value={filters.dateTo}
-                onChange={e => setFilters(p => ({...p, dateTo: e.target.value}))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light"
-                style={{fontSize:'16px'}}
-              />
-            </div>
-          </div>
-          {hasFilters && (
-            <button onClick={clearFilters} className="text-sm font-semibold text-danger-600 active:underline">
-              Clear all filters
-            </button>
-          )}
-        </Card>
-      )}
+      <AnimatePresence initial={false}>
+        {filtersOpen && (
+          <motion.div
+            key="filters"
+            initial={reduced ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduced ? undefined : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <Card className="border-ink-100 bg-surface p-3 shadow-xs">
+              <div className="mb-2.5 flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Filters</p>
+                {hasFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-[11px] font-semibold text-danger-600 hover:underline"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    Project
+                  </label>
+                  <Select
+                    value={filters.projectId}
+                    onChange={(e) => setFilters((p) => ({ ...p, projectId: e.target.value }))}
+                  >
+                    <option value="">All Projects</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    Engineer
+                  </label>
+                  <Select
+                    value={filters.engineerId}
+                    onChange={(e) => setFilters((p) => ({ ...p, engineerId: e.target.value }))}
+                  >
+                    <option value="">All Engineers</option>
+                    {engineers.map((e) => (
+                      <option key={e.id} value={e.id}>{e.name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    Status
+                  </label>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}
+                  >
+                    {FLAT_STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    From
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters((p) => ({ ...p, dateFrom: e.target.value }))}
+                    className="w-full min-h-[40px] rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-950 outline-none transition-all duration-fast focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+                    To
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters((p) => ({ ...p, dateTo: e.target.value }))}
+                    className="w-full min-h-[40px] rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-950 outline-none transition-all duration-fast focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Active filter pills ─────────────────────────────────────── */}
       {hasFilters && (
@@ -332,15 +426,15 @@ export default function AdminDashboard() {
       ) : s ? (
         <>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-            <StatCard index={0} label="Total" value={s.total} icon={Home} />
-            <StatCard index={1} label="Approved" value={s.approved} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
-            <StatCard index={2} label="Submitted" value={s.submitted} icon={Send} colorClass="text-warning-600 bg-warning-100" />
-            <StatCard index={3} label="In Progress" value={s.inProgress} icon={Clock} colorClass="text-brand-600 bg-brand-100" />
-            <StatCard index={4} label="Not Started" value={s.notStarted} icon={Building2} colorClass="text-ink-600 bg-ink-100" />
-            <StatCard index={5} label="Revision" value={s.revisionRequired} icon={RotateCcw} colorClass="text-warning-600 bg-warning-100" />
-            <StatCard index={6} label="Rejected" value={s.rejected} icon={XCircle} colorClass="text-danger-600 bg-danger-100" />
-            <StatCard index={7} label="Handed Over" value={s.handedOver ?? 0} icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" />
-            <StatCard index={8} label="Open Snags" value={s.openSnags} icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" />
+            <StatCard index={0} label="Total" value={s.total} icon={Home} selected={activeCard === 'total'} onClick={() => selectCard('total')} />
+            <StatCard index={1} label="Approved" value={s.approved} icon={CheckCircle} colorClass="text-success-600 bg-success-100" selected={activeCard === 'approved'} onClick={() => selectCard('approved')} />
+            <StatCard index={2} label="Submitted" value={s.submitted} icon={Send} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'submitted'} onClick={() => selectCard('submitted')} />
+            <StatCard index={3} label="In Progress" value={s.inProgress} icon={Clock} colorClass="text-brand-600 bg-brand-100" selected={activeCard === 'in_progress'} onClick={() => selectCard('in_progress')} />
+            <StatCard index={4} label="Not Started" value={s.notStarted} icon={Building2} colorClass="text-ink-600 bg-ink-100" selected={activeCard === 'not_started'} onClick={() => selectCard('not_started')} />
+            <StatCard index={5} label="Revision" value={s.revisionRequired} icon={RotateCcw} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'revision_required'} onClick={() => selectCard('revision_required')} />
+            <StatCard index={6} label="Rejected" value={s.rejected} icon={XCircle} colorClass="text-danger-600 bg-danger-100" selected={activeCard === 'rejected'} onClick={() => selectCard('rejected')} />
+            <StatCard index={7} label="Handed Over" value={s.handedOver ?? 0} icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" selected={activeCard === 'handed_over'} onClick={() => selectCard('handed_over')} />
+            <StatCard index={8} label="Open Snags" value={s.openSnags} icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" selected={activeCard === 'open_snags'} onClick={() => selectCard('open_snags')} />
           </div>
 
           {s.total > 0 && (
@@ -627,6 +721,16 @@ export default function AdminDashboard() {
           onAction={clearFilters}
         />
       )}
+
+      <DashboardDrilldown
+        open={activeCard != null}
+        title={adminDrill.title}
+        count={adminDrill.items.length}
+        items={adminDrill.items}
+        onClose={() => setActiveCard(null)}
+        emptyTitle="No flats here"
+        emptyDescription="Nothing matches this card with the current filters."
+      />
     </motion.div>
   )
 }

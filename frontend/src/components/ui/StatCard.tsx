@@ -11,6 +11,7 @@ export function StatCard({
   className,
   index = 0,
   onClick,
+  selected,
 }: {
   label: string
   value: string | number
@@ -19,6 +20,7 @@ export function StatCard({
   className?: string
   index?: number
   onClick?: () => void
+  selected?: boolean
 }) {
   const { reduced, stagger } = useMotionSafe()
   const interactive = !!onClick
@@ -31,6 +33,7 @@ export function StatCard({
       onClick={onClick}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
+      aria-pressed={interactive ? !!selected : undefined}
       onKeyDown={
         interactive
           ? (e) => {
@@ -42,10 +45,13 @@ export function StatCard({
           : undefined
       }
       className={cn(
-        'rounded-md border border-ink-100/80 bg-surface p-2.5 shadow-xs',
+        'rounded-md border bg-surface p-2.5 shadow-xs',
         'transition-all duration-fast ease-out',
+        selected
+          ? 'border-brand-500 ring-2 ring-brand-100 shadow-sm'
+          : 'border-ink-100/80',
         interactive &&
-          'cursor-pointer touch-manipulation hover:shadow-sm hover:border-brand-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100',
+          'cursor-pointer touch-manipulation hover:shadow-sm hover:border-brand-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100',
         className
       )}
     >

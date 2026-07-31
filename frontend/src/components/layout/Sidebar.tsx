@@ -17,8 +17,8 @@ import {
   Activity,
   ScrollText,
   Settings2,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { useAuthStore } from '../../store/authStore'
@@ -136,19 +136,24 @@ function SidebarNav({
   }
 
   return (
-    <nav className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-1.5 py-1">
+    <nav
+      className={cn(
+        'flex-1 overflow-y-auto overflow-x-hidden py-1',
+        isCollapsed ? 'flex flex-col items-center gap-1 px-0' : 'space-y-3 px-1.5'
+      )}
+    >
       {sections.map((section, si) => (
-        <div key={si} className="space-y-0.5">
-          {section.title && (
-            <p
-              className={cn(
-                'px-2.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase tracking-wider text-white/35',
-                'transition-opacity duration-200',
-                isCollapsed ? 'h-0 overflow-hidden opacity-0' : 'opacity-100'
-              )}
-            >
+        <div
+          key={si}
+          className={cn(isCollapsed ? 'flex w-full flex-col items-center gap-1' : 'space-y-0.5')}
+        >
+          {section.title && !isCollapsed && (
+            <p className="px-2.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase tracking-wider text-white/35">
               {section.title}
             </p>
+          )}
+          {isCollapsed && si > 0 && (
+            <div className="my-0.5 h-px w-5 bg-white/10" aria-hidden />
           )}
           {section.items.map(({ to, label, icon: Icon }) => {
             const count = badgeFor(to)
@@ -161,37 +166,42 @@ function SidebarNav({
                 title={label}
                 className={({ isActive }) =>
                   cn(
-                    'relative flex min-h-[40px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium touch-manipulation',
-                    'transition-colors duration-150',
-                    isCollapsed ? 'justify-center px-0' : 'justify-start',
-                    isActive
-                      ? 'bg-brand-600/25 font-semibold text-white'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white active:bg-white/10'
+                    'relative touch-manipulation transition-colors duration-150',
+                    isCollapsed
+                      ? cn(
+                          'flex h-9 w-9 items-center justify-center rounded-lg',
+                          isActive
+                            ? 'bg-brand-600 text-white shadow-sm'
+                            : 'text-white/70 hover:bg-white/15 hover:text-white active:bg-white/20'
+                        )
+                      : cn(
+                          'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium',
+                          isActive
+                            ? 'bg-brand-600/25 font-semibold text-white'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white active:bg-white/10'
+                        )
                   )
                 }
               >
                 {({ isActive }) => (
                   <>
-                    {isActive && (
+                    {!isCollapsed && isActive && (
                       <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-400" />
                     )}
-                    <div className="relative shrink-0">
+                    <div className="relative flex shrink-0 items-center justify-center">
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} aria-hidden />
                       {isCollapsed && count > 0 && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger-600 text-[8px] font-bold text-white">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-danger-600 px-0.5 text-[8px] font-bold leading-none text-white">
                           {count > 9 ? '9+' : count}
                         </span>
                       )}
                     </div>
-                    <span
-                      className={cn(
-                        'flex-1 truncate transition-opacity duration-200',
-                        isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100'
-                      )}
-                    >
-                      {label}
-                    </span>
-                    {!isCollapsed && <NavBadge count={count} />}
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 truncate">{label}</span>
+                        <NavBadge count={count} />
+                      </>
+                    )}
                   </>
                 )}
               </NavLink>
@@ -227,12 +237,20 @@ export function Sidebar({
   const shellClass =
     'flex h-full w-full flex-col text-white bg-[linear-gradient(180deg,var(--brand-950),var(--brand-900))]'
 
+  const iconBtn = (active?: boolean) =>
+    cn(
+      'flex h-9 w-9 items-center justify-center rounded-lg touch-manipulation transition-colors duration-150',
+      active
+        ? 'bg-brand-600 text-white shadow-sm'
+        : 'text-white/70 hover:bg-white/15 hover:text-white active:bg-white/20'
+    )
+
   const content = (
     <>
       <div
         className={cn(
-          'flex h-12 shrink-0 items-center gap-1 px-2',
-          isCollapsed ? 'justify-center' : 'justify-between'
+          'flex h-12 shrink-0 items-center',
+          isCollapsed ? 'justify-center px-0' : 'justify-between gap-1 px-2'
         )}
       >
         {!isCollapsed && (
@@ -250,62 +268,67 @@ export function Sidebar({
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full text-white/70 active:bg-white/10"
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:bg-white/15"
             aria-label="Close menu"
           >
-            <X size={20} aria-hidden />
+            <X size={18} aria-hidden />
           </button>
         )}
         {!isMobile && onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            className={iconBtn()}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isCollapsed ? 'Expand' : 'Collapse'}
           >
-            {isCollapsed ? <PanelLeftOpen size={16} aria-hidden /> : <PanelLeftClose size={16} aria-hidden />}
+            {isCollapsed ? <ChevronsRight size={18} aria-hidden /> : <ChevronsLeft size={18} aria-hidden />}
           </button>
         )}
       </div>
 
       <SidebarNav isCollapsed={isCollapsed} onNavigate={onClose} />
 
-      <div className="shrink-0 space-y-0.5 border-t border-white/10 p-1.5 pb-safe">
+      <div
+        className={cn(
+          'shrink-0 border-t border-white/10 pb-safe',
+          isCollapsed ? 'flex flex-col items-center gap-1 p-1.5' : 'space-y-0.5 p-1.5'
+        )}
+      >
         <NavLink
           to={ROUTES.PROFILE}
           onClick={onClose}
           title="My Profile"
           className={({ isActive }) =>
-            cn(
-              'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium touch-manipulation',
-              isCollapsed ? 'justify-center px-0' : 'justify-start',
-              isActive
-                ? 'bg-brand-600/25 text-white'
-                : 'text-white/70 hover:bg-white/10 hover:text-white active:bg-white/10'
-            )
+            isCollapsed
+              ? iconBtn(isActive)
+              : cn(
+                  'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium touch-manipulation',
+                  isActive
+                    ? 'bg-brand-600/25 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                )
           }
         >
           <UserCircle size={18} className="shrink-0" aria-hidden />
-          <span className={cn('truncate transition-opacity duration-200', isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100')}>
-            Profile
-          </span>
+          {!isCollapsed && <span className="truncate">Profile</span>}
         </NavLink>
 
         <button
           type="button"
           onClick={logout}
           title="Logout"
-          className={cn(
-            'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-danger-100/80 touch-manipulation',
-            'hover:bg-danger-600/20 hover:text-white active:bg-danger-600/20',
-            isCollapsed ? 'justify-center px-0' : 'justify-start'
-          )}
+          className={
+            isCollapsed
+              ? cn(iconBtn(), 'text-danger-100/80 hover:bg-danger-600/25 hover:text-white')
+              : cn(
+                  'flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-danger-100/80 touch-manipulation',
+                  'hover:bg-danger-600/20 hover:text-white'
+                )
+          }
         >
           <LogOut size={18} className="shrink-0" aria-hidden />
-          <span className={cn('truncate transition-opacity duration-200', isCollapsed ? 'w-0 overflow-hidden opacity-0' : 'opacity-100')}>
-            Logout
-          </span>
+          {!isCollapsed && <span className="truncate">Logout</span>}
         </button>
       </div>
     </>

@@ -1,8 +1,10 @@
+import { useMemo, useState } from 'react'
 import { Building2, CheckCircle, Clock, AlertTriangle, Plus, Bell, ScrollText } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { StatCard } from '../../components/ui/StatCard'
 import { Card } from '../../components/ui/Card'
 import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
+import { DashboardDrilldown, type DrilldownItem } from '../../components/ui/DashboardDrilldown'
 import { useFlats } from '../../hooks/useFlats'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
@@ -13,6 +15,25 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../constants/routes'
 import { useEngineerFeedbackCount } from '../../hooks/useEngineerFeedback'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
+import type { Flat } from '../../types'
+
+type CardKey = 'total' | 'pending' | 'done' | 'revision'
+
+const CARD_META: Record<CardKey, { title: string; match: (f: Flat) => boolean }> = {
+  total: { title: 'All flats', match: () => true },
+  pending: {
+    title: 'Pending flats',
+    match: (f) => f.status === 'not_started' || f.status === 'in_progress',
+  },
+  done: {
+    title: 'Completed flats',
+    match: (f) => f.status === 'approved' || f.status === 'submitted',
+  },
+  revision: {
+    title: 'Revision required',
+    match: (f) => f.status === 'revision_required',
+  },
+}
 
 export default function EngineerDashboard() {
   const user = useAuthStore((s) => s.user)
@@ -22,6 +43,25 @@ export default function EngineerDashboard() {
   const { count: unseenFeedback } = useEngineerFeedbackCount()
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const { fadeUp, reduced } = useMotionSafe()
+  const [activeCard, setActiveCard] = useState<CardKey | null>(null)
+
+  const selectCard = (key: CardKey) => {
+    setActiveCard((prev) => (prev === key ? null : key))
+  }
+
+  const drillItems: DrilldownItem[] = useMemo(() => {
+    if (!activeCard) return []
+    return flats
+      .filter(CARD_META[activeCard].match)
+      .map((f) => ({
+        id: f.id,
+        title: f.flatNumber,
+        subtitle: f.towerName,
+        meta: isAdmin && f.inspection?.engineerName ? f.inspection.engineerName : undefined,
+        status: f.status,
+        href: ROUTES.ENGINEER_FLAT(f.id),
+      }))
+  }, [activeCard, flats, isAdmin])
 
   if (loading && flats.length === 0) {
     return (
@@ -64,10 +104,10 @@ export default function EngineerDashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatCard index={0} label="Total" value={total} icon={Building2} onClick={() => navigate(ROUTES.ENGINEER_FLATS)} />
-        <StatCard index={1} label="Pending" value={pending} icon={Clock} colorClass="text-warning-600 bg-warning-100" onClick={() => navigate(ROUTES.ENGINEER_FLATS)} />
-        <StatCard index={2} label="Done" value={completed} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
-        <StatCard index={3} label="Revision" value={revision} icon={AlertTriangle} colorClass="text-warning-600 bg-warning-100" onClick={() => unseenFeedback ? navigate(ROUTES.ENGINEER_CHANGES) : navigate(ROUTES.ENGINEER_FLATS)} />
+        <StatCard index={0} label="Total" value={total} icon={Building2} selected={activeCard === 'total'} onClick={() => selectCard('total')} />
+        <StatCard index={1} label="Pending" value={pending} icon={Clock} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'pending'} onClick={() => selectCard('pending')} />
+        <StatCard index={2} label="Done" value={completed} icon={CheckCircle} colorClass="text-success-600 bg-success-100" selected={activeCard === 'done'} onClick={() => selectCard('done')} />
+        <StatCard index={3} label="Revision" value={revision} icon={AlertTriangle} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'revision'} onClick={() => selectCard('revision')} />
       </div>
 
       {(unreadCount > 0 || (!isAdmin && unseenFeedback > 0)) && (
@@ -96,12 +136,7 @@ export default function EngineerDashboard() {
       <div className="grid gap-2 lg:grid-cols-5">
         <Card className="p-3 lg:col-span-2">
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400">Status</p>
-          <StatusDonut
-            data={chartData}
-            height={132}
-            centerValue={total}
-            centerLabel="flats"
-          />
+          <StatusDonut data={chartData} height={132} centerValue={total} centerLabel="flats" />
           {chartData.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
               {chartData.map((d) => (
@@ -151,6 +186,16 @@ export default function EngineerDashboard() {
           )}
         </Card>
       </div>
+
+      <DashboardDrilldown
+        open={activeCard != null}
+        title={activeCard ? CARD_META[activeCard].title : ''}
+        count={drillItems.length}
+        items={drillItems}
+        onClose={() => setActiveCard(null)}
+        emptyTitle="No flats here"
+        emptyDescription="Nothing matches this status right now."
+      />
     </motion.div>
   )
 }

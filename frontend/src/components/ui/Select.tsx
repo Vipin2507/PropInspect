@@ -6,11 +6,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
     <select
       ref={ref}
       className={cn(
-        'w-full rounded-xl border border-slate-200 bg-white px-4 py-3',
-        'text-base text-slate-900',
-        'outline-none transition appearance-none',
-        'focus:border-primary focus:ring-2 focus:ring-primary-light',
-        'disabled:bg-slate-50 disabled:text-slate-400',
+        'w-full rounded-md border border-ink-200 bg-white px-3 py-2',
+        'min-h-[40px] text-sm text-ink-950',
+        'outline-none transition-all duration-fast ease-out appearance-none',
+        'focus:border-brand-500 focus:ring-4 focus:ring-brand-100',
+        'disabled:bg-ink-50 disabled:text-ink-400',
         className
       )}
       style={{ fontSize: '16px', ...style }}

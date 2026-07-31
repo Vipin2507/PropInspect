@@ -1,9 +1,11 @@
+import { useMemo, useState } from 'react'
 import { ClipboardCheck, CheckCircle, List, ScrollText, Bell } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { StatCard } from '../../components/ui/StatCard'
 import { Card } from '../../components/ui/Card'
 import { StatusDonut, CHART_COLORS } from '../../components/ui/StatusDonut'
-import { useReviewQueue } from '../../hooks/useReviews'
+import { DashboardDrilldown, type DrilldownItem } from '../../components/ui/DashboardDrilldown'
+import { useReviewHistory, useReviewQueue } from '../../hooks/useReviews'
 import { useQaChangesCount } from '../../hooks/useQaChanges'
 import { useNotificationStore } from '../../store/notificationStore'
 import { Link, useNavigate } from 'react-router-dom'
@@ -11,24 +13,100 @@ import { ROUTES } from '../../constants/routes'
 import { Spinner } from '../../components/ui/Spinner'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 
+type CardKey = 'submitted' | 'changes' | 'approved' | 'reviewed'
+
+type QueueItem = {
+  inspectionId: string
+  flatNumber: string
+  engineerName: string
+  submittedAt: string
+  towerName?: string
+}
+
+type HistoryItem = {
+  id: string
+  inspectionId: string
+  flatNumber: string
+  engineerName?: string
+  decision?: string
+  status?: string
+  reviewedAt?: string
+}
+
 export default function QADashboard() {
   const { items, loading } = useReviewQueue()
+  const { history, loading: historyLoading } = useReviewHistory()
   const { count: unreviewedChanges } = useQaChangesCount()
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const navigate = useNavigate()
   const { fadeUp, reduced } = useMotionSafe()
+  const [activeCard, setActiveCard] = useState<CardKey | null>(null)
 
-  const queue = (
-    items as {
-      inspectionId: string
-      flatNumber: string
-      engineerName: string
-      submittedAt: string
-    }[]
-  ).slice(0, 5)
+  const queue = items as QueueItem[]
+  const historyItems = history as HistoryItem[]
+
+  const approvedCount = historyItems.filter(
+    (h) => (h.decision || h.status) === 'approved'
+  ).length
+
+  const selectCard = (key: CardKey) => {
+    if (key === 'changes') {
+      navigate(ROUTES.QA_CHANGES)
+      return
+    }
+    setActiveCard((prev) => (prev === key ? null : key))
+  }
+
+  const drill = useMemo(() => {
+    if (!activeCard) return { title: '', items: [] as DrilldownItem[] }
+
+    if (activeCard === 'submitted') {
+      return {
+        title: 'Submitted for review',
+        items: queue.map((q) => ({
+          id: q.inspectionId,
+          title: q.flatNumber,
+          subtitle: q.engineerName,
+          meta: q.submittedAt ? new Date(q.submittedAt).toLocaleDateString() : undefined,
+          status: 'submitted',
+          href: ROUTES.QA_REVIEW_DETAIL(q.inspectionId),
+        })),
+      }
+    }
+
+    if (activeCard === 'approved') {
+      const approved = historyItems.filter((h) => (h.decision || h.status) === 'approved')
+      return {
+        title: 'Approved reviews',
+        items: approved.map((h) => ({
+          id: h.id || h.inspectionId,
+          title: h.flatNumber,
+          subtitle: h.engineerName,
+          meta: h.reviewedAt ? new Date(h.reviewedAt).toLocaleDateString() : undefined,
+          status: 'approved',
+          href: ROUTES.QA_REVIEW_DETAIL(h.inspectionId),
+        })),
+      }
+    }
+
+    // reviewed = full history
+    return {
+      title: 'Review history',
+      items: historyItems.map((h) => ({
+        id: h.id || h.inspectionId,
+        title: h.flatNumber,
+        subtitle: h.engineerName,
+        meta: h.reviewedAt ? new Date(h.reviewedAt).toLocaleDateString() : undefined,
+        status: h.decision || h.status || 'submitted',
+        href: ROUTES.QA_REVIEW_DETAIL(h.inspectionId),
+      })),
+    }
+  }, [activeCard, queue, historyItems])
+
+  const preview = queue.slice(0, 5)
 
   const chartData = [
-    { name: 'In queue', value: items.length, fill: CHART_COLORS.submitted },
+    { name: 'In queue', value: queue.length, fill: CHART_COLORS.submitted },
     { name: 'Changes', value: unreviewedChanges, fill: CHART_COLORS.revision },
   ].filter((d) => d.value > 0)
 
@@ -40,9 +118,10 @@ export default function QADashboard() {
         <StatCard
           index={0}
           label="Submitted"
-          value={items.length}
+          value={queue.length}
           icon={ClipboardCheck}
-          onClick={() => navigate(ROUTES.QA_REVIEWS)}
+          selected={activeCard === 'submitted'}
+          onClick={() => selectCard('submitted')}
         />
         <StatCard
           index={1}
@@ -50,10 +129,25 @@ export default function QADashboard() {
           value={unreviewedChanges}
           icon={ScrollText}
           colorClass="text-warning-600 bg-warning-100"
-          onClick={() => navigate(ROUTES.QA_CHANGES)}
+          onClick={() => selectCard('changes')}
         />
-        <StatCard index={2} label="Approved" value={0} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
-        <StatCard index={3} label="Reviewed" value={0} icon={List} onClick={() => navigate(ROUTES.QA_HISTORY)} />
+        <StatCard
+          index={2}
+          label="Approved"
+          value={historyLoading ? '…' : approvedCount}
+          icon={CheckCircle}
+          colorClass="text-success-600 bg-success-100"
+          selected={activeCard === 'approved'}
+          onClick={() => selectCard('approved')}
+        />
+        <StatCard
+          index={3}
+          label="Reviewed"
+          value={historyLoading ? '…' : historyItems.length}
+          icon={List}
+          selected={activeCard === 'reviewed'}
+          onClick={() => selectCard('reviewed')}
+        />
       </div>
 
       {(unreadCount > 0 || unreviewedChanges > 0) && (
@@ -89,11 +183,11 @@ export default function QADashboard() {
               <StatusDonut
                 data={chartData.length ? chartData : [{ name: 'Idle', value: 1, fill: '#E2E8F0' }]}
                 height={132}
-                centerValue={items.length}
+                centerValue={queue.length}
                 centerLabel="queue"
               />
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                {(chartData.length ? chartData : []).map((d) => (
+                {chartData.map((d) => (
                   <span key={d.name} className="flex items-center gap-1 text-[10px] text-ink-600">
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: d.fill }} />
                     {d.name} <span className="font-semibold tabular">{d.value}</span>
@@ -107,17 +201,21 @@ export default function QADashboard() {
         <Card className="overflow-hidden p-0 lg:col-span-3">
           <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Submitted reviews</p>
-            <Link to={ROUTES.QA_REVIEWS} className="text-xs font-semibold text-brand-600">
+            <button
+              type="button"
+              className="text-xs font-semibold text-brand-600"
+              onClick={() => selectCard('submitted')}
+            >
               All →
-            </Link>
+            </button>
           </div>
           {loading ? (
             <div className="flex justify-center py-8"><Spinner /></div>
-          ) : queue.length === 0 ? (
+          ) : preview.length === 0 ? (
             <p className="px-3 py-6 text-center text-caption text-ink-400">No pending reviews</p>
           ) : (
             <ul>
-              {queue.map((item, i) => (
+              {preview.map((item, i) => (
                 <motion.li
                   key={item.inspectionId}
                   initial={reduced ? false : { opacity: 0, x: -6 }}
@@ -142,6 +240,16 @@ export default function QADashboard() {
           )}
         </Card>
       </div>
+
+      <DashboardDrilldown
+        open={activeCard != null && activeCard !== 'changes'}
+        title={drill.title}
+        count={drill.items.length}
+        items={drill.items}
+        onClose={() => setActiveCard(null)}
+        emptyTitle="Nothing here"
+        emptyDescription="No items for this filter yet."
+      />
     </motion.div>
   )
 }
