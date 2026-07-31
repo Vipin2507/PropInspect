@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { reviewsApi } from '../../utils/api'
 import { queueChange } from '../../utils/sync'
@@ -13,7 +13,7 @@ import toast from 'react-hot-toast'
 import type { Inspection } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Info } from 'lucide-react'
 import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
 import { cn } from '../../utils/cn'
@@ -196,6 +196,9 @@ export default function ReviewDetail() {
     }
   }
 
+  const backLinkClass =
+    'inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-ink-600 transition-colors active:text-brand-600'
+
   if (loading && !data) {
     return (
       <div className="flex flex-1 items-center justify-center py-24">
@@ -207,14 +210,10 @@ export default function ReviewDetail() {
   if (loadError && !data) {
     return (
       <div className="flex flex-col gap-4 py-8">
-        <button
-          type="button"
-          onClick={() => navigate(ROUTES.QA_REVIEWS)}
-          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
-        >
+        <Link to={ROUTES.QA_REVIEWS} className={backLinkClass}>
           <ArrowLeft size={18} aria-hidden="true" />
           Back to Reviews
-        </button>
+        </Link>
         <EmptyState
           title="Review not found"
           description={loadError}
@@ -240,36 +239,35 @@ export default function ReviewDetail() {
   return (
     <div className={cn('flex flex-col gap-4', isFormalReview ? 'pb-[160px] md:pb-6' : 'pb-6')}>
       {/* Header */}
-      <button
-        type="button"
-        onClick={() => navigate(ROUTES.QA_REVIEWS)}
-        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
-      >
+      <Link to={ROUTES.QA_REVIEWS} className={backLinkClass}>
         <ArrowLeft size={18} aria-hidden="true" />
         Back to Reviews
-      </button>
+      </Link>
 
       <div>
-        <h1 className="text-xl font-bold text-slate-900">
+        <h1 className="font-display text-h2 text-ink-950">
           {isFormalReview ? 'Review' : 'View'}: {data.flatNumber}
         </h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-body text-ink-500">
           {isFormalReview ? 'Submitted' : 'In progress'} by {data.engineerName}
         </p>
         {!isFormalReview && canReviewTasks && (
-          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Expand a task, type your remark, add photos if needed, then tap <strong>Revision</strong>.
-            You can upload evidence photos before saving.
-          </p>
+          <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-info-100 px-3.5 py-2.5">
+            <Info size={16} className="mt-0.5 shrink-0 text-info-600" aria-hidden="true" />
+            <p className="text-xs leading-relaxed text-info-600">
+              Expand a task, type your remark, add photos if needed, then tap <strong>Revision</strong>.
+              You can upload evidence photos before saving.
+            </p>
+          </div>
         )}
         {!canReviewTasks && (
-          <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <p className="mt-3 rounded-lg bg-ink-50 px-3.5 py-2.5 text-xs text-ink-600">
             This inspection is closed for editing.
           </p>
         )}
         {isOffline && (
-          <p className="mt-1 text-xs font-medium text-amber-600">
-            ⚡ Showing cached data — connect to submit review
+          <p className="mt-2 text-xs font-medium text-warning-600">
+            Showing cached data — connect to submit review
           </p>
         )}
       </div>
@@ -288,7 +286,7 @@ export default function ReviewDetail() {
       {isFormalReview && (
       <>
       {/* Fixed bottom actions panel — compact on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-safe backdrop-blur-sm lg:left-60">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink-100 bg-surface/95 px-4 pt-2 pb-safe backdrop-blur-sm lg:left-60">
         <div className="mx-auto max-w-2xl">
           {/* Overall comments — single line on mobile, expands on focus */}
           <Textarea
@@ -315,7 +313,7 @@ export default function ReviewDetail() {
         onClose={() => setRevisionDrawerOpen(false)}
         title="Request Revision"
       >
-        <p className="mb-4 text-sm text-slate-600">
+        <p className="mb-4 text-sm text-ink-600">
           Provide clear comments so the engineer knows what to fix.
         </p>
         <Textarea

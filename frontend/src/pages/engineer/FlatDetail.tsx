@@ -9,12 +9,13 @@ import { ProgressBar } from '../../components/ui/ProgressBar'
 import { InspectionSummary } from '../../components/inspection/InspectionSummary'
 import { FlatHistoryTab } from '../../components/flat/FlatHistoryTab'
 import { Button } from '../../components/ui/Button'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
+import { Card } from '../../components/ui/Card'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { ROUTES } from '../../constants/routes'
 import { RevisionBanner } from '../../components/review/RevisionBanner'
 import { Spinner } from '../../components/ui/Spinner'
-import { cn } from '../../utils/cn'
 import { DEFAULT_CHECKLIST_CATEGORIES, TOTAL_ITEMS } from '../../constants/checklist'
 import { flatsApi } from '../../utils/api'
 import { useState } from 'react'
@@ -106,7 +107,7 @@ export default function FlatDetail() {
     <div className="flex flex-col gap-4 pb-32 md:pb-6">
       <Link
         to={ROUTES.ENGINEER_FLATS}
-        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-slate-600 active:text-primary"
+        className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-ink-600 active:text-brand-600"
       >
         <ArrowLeft size={18} aria-hidden="true" />
         {backLabel}
@@ -117,45 +118,45 @@ export default function FlatDetail() {
       )}
 
       {currentFlatStatus === 'handed_over' && (
-        <div className="flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 p-4">
-          <PackageCheck size={22} className="shrink-0 text-teal-600" aria-hidden="true" />
+        <Card className="flex items-center gap-3 border-accent-500/20 bg-accent-100/40 p-4">
+          <PackageCheck size={22} className="shrink-0 text-accent-500" aria-hidden="true" />
           <div>
-            <p className="text-sm font-bold text-teal-800">Handed Over to Client</p>
-            <p className="text-xs text-teal-600">This flat has been delivered to the client.</p>
+            <p className="text-sm font-bold text-accent-500">Handed Over to Client</p>
+            <p className="text-xs text-accent-500/80">This flat has been delivered to the client.</p>
           </div>
-        </div>
+        </Card>
       )}
 
-      <div className="rounded-2xl bg-white p-4 shadow-sm md:p-6">
+      <Card className="p-4 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-900 md:text-2xl">
+            <h1 className="font-display text-h2 text-ink-950">
               {flat?.flatNumber || `Flat ${flatId}`}
             </h1>
             {flat && (
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-body text-ink-500">
                 {flat.towerName} · {flat.floorLabel}
               </p>
             )}
           </div>
-          <Badge status={currentFlatStatus ?? inspection?.status ?? 'not_started'} />
+          <StatusBadge status={currentFlatStatus ?? inspection?.status ?? 'not_started'} />
         </div>
 
         {canHandover && flat?.assignment && (
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-ink-50 p-3 text-sm">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-400">Engineer</p>
-              <p className="mt-0.5 font-medium text-slate-700">{flat.assignment.engineerName || '—'}</p>
+              <p className="text-label uppercase text-ink-400">Engineer</p>
+              <p className="mt-0.5 font-medium text-ink-700">{flat.assignment.engineerName || '—'}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-400">QA Reviewer</p>
-              <p className="mt-0.5 font-medium text-slate-700">{flat.assignment.qaName || '—'}</p>
+              <p className="text-label uppercase text-ink-400">QA Reviewer</p>
+              <p className="mt-0.5 font-medium text-ink-700">{flat.assignment.qaName || '—'}</p>
             </div>
           </div>
         )}
 
         {activeTab === 'overview' && waitingForInspection && (
-          <div className="mt-4 flex items-center justify-center gap-2 py-6 text-sm text-slate-500">
+          <div className="mt-4 flex items-center justify-center gap-2 py-6 text-sm text-ink-500">
             <Spinner size="sm" />
             Loading inspection…
           </div>
@@ -164,18 +165,18 @@ export default function FlatDetail() {
         {totalCount > 0 && activeTab === 'overview' && !waitingForInspection && (
           <div className="mt-4">
             <div className="mb-1.5 flex justify-between text-sm font-medium">
-              <span className="text-slate-600">Overall Progress</span>
-              <span className="font-semibold text-primary">{Math.round(completionPct)}%</span>
+              <span className="text-ink-600">Overall Progress</span>
+              <span className="font-semibold tabular text-brand-600">{Math.round(completionPct)}%</span>
             </div>
             <ProgressBar pct={completionPct} />
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-caption text-ink-400">
               {doneCount} of {totalCount} checklist items completed
             </p>
           </div>
         )}
 
         {!isAdmin && !isQA && isComplete && inspection?.status === 'draft' && activeTab === 'overview' && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-success-600/20 bg-success-100/40 px-3 py-2 text-sm font-medium text-success-600">
             <CheckCircle2 size={16} aria-hidden="true" />
             All items complete — ready to submit for QA review!
           </div>
@@ -190,31 +191,17 @@ export default function FlatDetail() {
             }}
           />
         )}
-      </div>
+      </Card>
 
-      <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors touch-manipulation',
-            activeTab === 'overview' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
-          )}
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-colors touch-manipulation',
-            activeTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
-          )}
-        >
-          <History size={16} aria-hidden="true" />
-          History
-        </button>
-      </div>
+      <SegmentedControl
+        options={[
+          { value: 'overview' as FlatTab, label: 'Overview' },
+          { value: 'history' as FlatTab, label: 'History' },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+        layoutId="flat-detail-tab"
+      />
 
       {activeTab === 'overview' ? (
         <>
@@ -222,29 +209,29 @@ export default function FlatDetail() {
             <button
               type="button"
               onClick={() => navigate(ROUTES.ENGINEER_FLAT_SNAGS?.(flatId!) ?? ROUTES.DESNAGGING)}
-              className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left touch-manipulation active:bg-red-100"
+              className="flex items-center justify-between rounded-lg border border-danger-600/20 bg-danger-100/40 px-4 py-3 text-left touch-manipulation active:bg-danger-100"
             >
               <div className="flex items-center gap-2">
-                <Wrench size={18} className="text-fail" aria-hidden="true" />
-                <span className="text-sm font-semibold text-fail">
+                <Wrench size={18} className="text-danger-600" aria-hidden="true" />
+                <span className="text-sm font-semibold text-danger-600">
                   {openSnagCount} open snag{openSnagCount !== 1 ? 's' : ''} need rectification
                 </span>
               </div>
-              <span className="text-sm font-semibold text-fail">View →</span>
+              <span className="text-sm font-semibold text-danger-600">View →</span>
             </button>
           )}
 
           <div>
-            <h2 className="mb-3 text-base font-bold text-slate-800 md:text-lg">Inspection Checklist</h2>
+            <h2 className="mb-3 font-display text-base font-bold text-ink-800 md:text-lg">Inspection Checklist</h2>
             {waitingForInspection ? (
-              <div className="flex items-center justify-center gap-2 rounded-2xl bg-white py-12 shadow-sm text-sm text-slate-500">
+              <Card className="flex items-center justify-center gap-2 py-12 text-sm text-ink-500">
                 <Spinner size="sm" />
                 Loading inspection…
-              </div>
+              </Card>
             ) : !inspection ? (
-              <div className="rounded-2xl bg-white px-4 py-12 text-center shadow-sm">
-                <h3 className="text-base font-semibold text-slate-800">No Inspection Started</h3>
-                <p className="mb-6 mt-2 text-sm text-slate-500">
+              <Card className="px-4 py-12 text-center">
+                <h3 className="text-base font-semibold text-ink-800">No Inspection Started</h3>
+                <p className="mb-6 mt-2 text-body text-ink-500">
                   {canHandover
                     ? 'The engineer has not started this inspection yet.'
                     : 'Start the inspection to fill in the checklist.'}
@@ -254,7 +241,7 @@ export default function FlatDetail() {
                     Start Inspection
                   </Button>
                 )}
-              </div>
+              </Card>
             ) : (
               <InspectionSummary responses={responses} flatId={flatId!} />
             )}
@@ -265,10 +252,7 @@ export default function FlatDetail() {
       )}
 
       {activeTab === 'overview' && (
-        <div className={cn(
-          'fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 pb-safe backdrop-blur-sm',
-          'md:relative md:bottom-auto md:left-auto md:right-auto md:border-none md:bg-transparent md:p-0'
-        )}>
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface/95 px-4 py-3 pb-safe shadow-[0_-8px_24px_rgba(15,23,42,0.06)] backdrop-blur-sm md:relative md:bottom-auto md:left-auto md:right-auto md:bg-transparent md:p-0 md:shadow-none">
           <div className="mx-auto flex max-w-md flex-col gap-3">
             {canHandover && inspection && (
               <>
@@ -283,7 +267,7 @@ export default function FlatDetail() {
 
                 {canMarkHandover && (
                   <Button
-                    className="w-full bg-teal-600 active:bg-teal-700"
+                    className="w-full bg-accent-500 hover:brightness-95"
                     onClick={() => setHandoverConfirmOpen(true)}
                     loading={handoverLoading}
                   >
@@ -293,7 +277,7 @@ export default function FlatDetail() {
                 )}
 
                 {currentFlatStatus === 'handed_over' && (
-                  <p className="text-center text-sm font-medium text-teal-600">
+                  <p className="text-center text-sm font-medium text-accent-500">
                     ✓ Already handed over to client
                   </p>
                 )}

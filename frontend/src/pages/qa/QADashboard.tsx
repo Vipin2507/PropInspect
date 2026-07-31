@@ -1,5 +1,7 @@
 import { ClipboardCheck, CheckCircle, List, ScrollText, Bell } from 'lucide-react'
 import { StatCard } from '../../components/ui/StatCard'
+import { Card } from '../../components/ui/Card'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { useReviewQueue } from '../../hooks/useReviews'
 import { useQaChangesCount } from '../../hooks/useQaChanges'
 import { useNotificationStore } from '../../store/notificationStore'
@@ -14,48 +16,47 @@ export default function QADashboard() {
 
   return (
     <div className="space-y-6 pb-6">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">QA Dashboard</h1>
+      <h1 className="font-display text-h2 text-ink-950">QA Dashboard</h1>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Submitted for Review" value={items.length} icon={ClipboardCheck} />
         <StatCard
           label="Unreviewed Changes"
           value={unreviewedChanges}
           icon={ScrollText}
-          colorClass="text-amber-700 bg-amber-100"
+          colorClass="text-warning-600 bg-warning-100"
         />
-        <StatCard label="Approved Today" value={0} icon={CheckCircle} colorClass="text-pass bg-green-100" />
+        <StatCard label="Approved Today" value={0} icon={CheckCircle} colorClass="text-success-600 bg-success-100" />
         <StatCard label="Total Reviewed" value={0} icon={List} />
       </div>
 
       {unreadCount > 0 && (
-        <Link
-          to={ROUTES.ENGINEER_NOTIFICATIONS}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-              <Bell size={18} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-sky-900">
-                {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
-              </p>
-              <p className="text-xs text-sky-700">Tap to open notifications</p>
+        <Link to={ROUTES.ENGINEER_NOTIFICATIONS} className="block">
+          <Card className="overflow-hidden border-0 bg-gradient-to-r from-brand-600 to-brand-500 p-4 text-white shadow-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                  <Bell size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">
+                    {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
+                  </p>
+                  <p className="text-xs text-white/80">Tap to open notifications</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-brand-600">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             </div>
-          </div>
-          <span className="rounded-full bg-sky-600 px-2.5 py-0.5 text-xs font-bold text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          </Card>
         </Link>
       )}
 
-      {/* Pending list */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+      <Card className="p-4 md:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-800">Submitted Reviews</h2>
-          <Link to={ROUTES.QA_REVIEWS} className="text-sm font-medium text-primary active:underline">
+          <h2 className="font-display text-base font-semibold text-ink-800">Submitted Reviews</h2>
+          <Link to={ROUTES.QA_REVIEWS} className="text-sm font-medium text-brand-600 active:underline">
             View All →
           </Link>
         </div>
@@ -64,43 +65,47 @@ export default function QADashboard() {
             <Spinner />
           </div>
         ) : items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No pending submitted reviews.</p>
+          <EmptyState
+            title="No pending reviews"
+            description="Submitted inspections will appear here."
+            className="py-8"
+          />
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-ink-100">
             {(items as { flatNumber: string; engineerName: string; submittedAt: string }[])
               .slice(0, 5)
               .map((item, i) => (
                 <li key={i} className="flex min-h-[56px] items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">{item.flatNumber}</p>
-                    <p className="truncate text-xs text-slate-500">{item.engineerName}</p>
+                    <p className="text-sm font-semibold text-ink-800">{item.flatNumber}</p>
+                    <p className="truncate text-xs text-ink-500">{item.engineerName}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-slate-400">
+                  <span className="shrink-0 text-xs text-ink-400">
                     {new Date(item.submittedAt).toLocaleDateString()}
                   </span>
                 </li>
               ))}
           </ul>
         )}
-      </div>
+      </Card>
 
       {unreviewedChanges > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+        <Card className="overflow-hidden border-0 bg-gradient-to-r from-warning-600 to-warning-500 p-4 text-white shadow-md">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-amber-900">
+              <p className="text-sm font-semibold">
                 {unreviewedChanges} engineer update{unreviewedChanges === 1 ? '' : 's'} to review
               </p>
-              <p className="text-xs text-amber-700">Check the Changes Log for in-progress work</p>
+              <p className="text-xs text-white/80">Check the Changes Log for in-progress work</p>
             </div>
             <Link
               to={ROUTES.QA_CHANGES}
-              className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white active:bg-amber-700"
+              className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-semibold text-warning-600 active:brightness-95"
             >
               Open Log
             </Link>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )

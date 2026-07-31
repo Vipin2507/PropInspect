@@ -52,7 +52,15 @@ function HomeRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Toaster position="bottom-right" />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          duration: 3000,
+          className: '!rounded-lg !bg-ink-950 !text-white !shadow-lg !text-sm !font-medium',
+          success: { iconTheme: { primary: '#0F9D58', secondary: '#fff' } },
+          error: { iconTheme: { primary: '#DC2626', secondary: '#fff' } },
+        }}
+      />
       <Routes>
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
         <Route path={ROUTES.OTP}   element={<OTPPage />} />

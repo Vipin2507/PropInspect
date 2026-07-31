@@ -1,10 +1,12 @@
 import { Building2, CheckCircle, Clock, Send, AlertTriangle, Plus, Bell } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts'
 import { StatCard } from '../../components/ui/StatCard'
+import { Card } from '../../components/ui/Card'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { useFlats } from '../../hooks/useFlats'
 import { useAuthStore } from '../../store/authStore'
 import { useNotificationStore } from '../../store/notificationStore'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
 import { Spinner } from '../../components/ui/Spinner'
 import { Button } from '../../components/ui/Button'
 import { Link, useNavigate } from 'react-router-dom'
@@ -47,7 +49,7 @@ export default function EngineerDashboard() {
   return (
     <div className="space-y-6 pb-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-900 md:text-2xl">
+        <h1 className="font-display text-h2 text-ink-950">
           {isAdmin ? 'All Flats Overview' : `Hi, ${user?.name?.split(' ')[0] || 'Maker'}`}
         </h1>
         {!isAdmin && (
@@ -57,82 +59,79 @@ export default function EngineerDashboard() {
         )}
       </div>
 
-      {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label={isAdmin ? 'Total Flats' : 'Total Flats'}
-          value={total}
-          icon={Building2}
-        />
+        <StatCard label="Total Flats" value={total} icon={Building2} />
         <StatCard
           label="Pending"
           value={pending}
           icon={Clock}
-          colorClass="text-pending bg-amber-100"
+          colorClass="text-warning-600 bg-warning-100"
         />
         <StatCard
           label="Completed"
           value={completed}
           icon={CheckCircle}
-          colorClass="text-pass bg-green-100"
+          colorClass="text-success-600 bg-success-100"
         />
         <StatCard
           label="Revision"
           value={revision}
           icon={AlertTriangle}
-          colorClass="text-secondary bg-orange-100"
+          colorClass="text-warning-600 bg-warning-100"
         />
       </div>
 
       {unreadCount > 0 && (
-        <Link
-          to={ROUTES.ENGINEER_NOTIFICATIONS}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-              <Bell size={18} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-sky-900">
-                {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
-              </p>
-              <p className="text-xs text-sky-700">Tap to open notifications</p>
+        <Link to={ROUTES.ENGINEER_NOTIFICATIONS} className="block">
+          <Card className="overflow-hidden border-0 bg-gradient-to-r from-brand-600 to-brand-500 p-4 text-white shadow-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                  <Bell size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">
+                    {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
+                  </p>
+                  <p className="text-xs text-white/80">Tap to open notifications</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-brand-600">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
             </div>
-          </div>
-          <span className="rounded-full bg-sky-600 px-2.5 py-0.5 text-xs font-bold text-white">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          </Card>
         </Link>
       )}
 
       {!isAdmin && unseenFeedback > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+        <Card className="overflow-hidden border-0 bg-gradient-to-r from-warning-600 to-warning-500 p-4 text-white shadow-md">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-amber-900">
+              <p className="text-sm font-semibold">
                 {unseenFeedback} QA feedback item{unseenFeedback === 1 ? '' : 's'} waiting
               </p>
-              <p className="text-xs text-amber-700">Tasks sent for revision — open the QA Feedback log</p>
+              <p className="text-xs text-white/80">Tasks sent for revision — open the QA Feedback log</p>
             </div>
             <Link
               to={ROUTES.ENGINEER_CHANGES}
-              className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white active:bg-amber-700"
+              className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-semibold text-warning-600 active:brightness-95"
             >
               View Log
             </Link>
           </div>
-        </div>
+        </Card>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Pie chart */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-base font-semibold text-slate-800">Status Breakdown</h2>
+        <Card className="p-4">
+          <h2 className="mb-3 font-display text-base font-semibold text-ink-800">Status Breakdown</h2>
           {total === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">
-              No flats in the system yet.
-            </p>
+            <EmptyState
+              title="No flats yet"
+              description="No flats in the system yet."
+              className="py-8"
+            />
           ) : (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
@@ -145,42 +144,45 @@ export default function EngineerDashboard() {
               </PieChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </Card>
 
-        {/* Recent activity */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-800">Recent Flats</h2>
+            <h2 className="font-display text-base font-semibold text-ink-800">Recent Flats</h2>
             <Link
               to={ROUTES.ENGINEER_FLATS}
-              className="text-sm font-medium text-primary active:underline"
+              className="text-sm font-medium text-brand-600 active:underline"
             >
               View All →
             </Link>
           </div>
           {flats.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">No activity yet.</p>
+            <EmptyState
+              title="No activity yet"
+              description="Your assigned flats will appear here."
+              className="py-8"
+            />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-ink-100">
               {flats.slice(0, 6).map((f) => (
                 <Link
                   key={f.id}
                   to={ROUTES.ENGINEER_FLAT(f.id)}
-                  className="flex min-h-[52px] items-center justify-between gap-3 py-3 active:bg-slate-50"
+                  className="flex min-h-[52px] items-center justify-between gap-3 py-3 active:bg-ink-50"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800">{f.flatNumber}</p>
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-sm font-medium text-ink-800">{f.flatNumber}</p>
+                    <p className="truncate text-xs text-ink-500">
                       {f.towerName}
                       {isAdmin && f.inspection?.engineerName && ` · ${f.inspection.engineerName}`}
                     </p>
                   </div>
-                  <Badge status={f.status} />
+                  <StatusBadge status={f.status} />
                 </Link>
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )

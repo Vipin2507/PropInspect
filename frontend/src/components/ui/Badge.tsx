@@ -2,30 +2,52 @@ import { cn } from '../../utils/cn'
 import type { FlatStatus, InspectionStatus, SnagStatus } from '../../types'
 
 const statusStyles: Record<string, string> = {
-  not_started:       'bg-slate-100 text-slate-600',
-  in_progress:       'bg-primary-light text-primary',
-  submitted:         'bg-amber-100 text-amber-800',
-  approved:          'bg-green-100 text-pass',
-  rejected:          'bg-red-100 text-fail',
-  revision_required: 'bg-orange-100 text-secondary-dark',
-  desnagging:        'bg-purple-100 text-purple-700',
-  handed_over:       'bg-teal-100 text-teal-700',
-  pass:              'bg-green-100 text-pass',
-  fail:              'bg-red-100 text-fail',
-  na:                'bg-slate-100 text-slate-600',
-  pending:           'bg-amber-100 text-amber-800',
-  open:              'bg-red-100 text-fail',
-  assigned:          'bg-primary-light text-primary',
-  in_rectification:  'bg-orange-100 text-secondary-dark',
-  rectified:         'bg-teal-100 text-teal-700',
-  verified:          'bg-green-100 text-pass',
-  closed:            'bg-slate-100 text-slate-600',
+  not_started: 'bg-ink-100 text-ink-600 border-ink-200',
+  in_progress: 'bg-brand-100 text-brand-700 border-brand-200',
+  submitted: 'bg-warning-100 text-warning-600 border-warning-600/20',
+  approved: 'bg-success-100 text-success-600 border-success-600/20',
+  rejected: 'bg-danger-100 text-danger-600 border-danger-600/20',
+  revision_required: 'bg-warning-100 text-warning-600 border-warning-600/20',
+  desnagging: 'bg-info-100 text-info-600 border-info-600/20',
+  handed_over: 'bg-accent-100 text-accent-500 border-accent-500/20',
+  pass: 'bg-success-100 text-success-600 border-success-600/20',
+  fail: 'bg-danger-100 text-danger-600 border-danger-600/20',
+  na: 'bg-ink-100 text-ink-600 border-ink-200',
+  pending: 'bg-warning-100 text-warning-600 border-warning-600/20',
+  open: 'bg-danger-100 text-danger-600 border-danger-600/20',
+  assigned: 'bg-brand-100 text-brand-700 border-brand-200',
+  in_rectification: 'bg-warning-100 text-warning-600 border-warning-600/20',
+  rectified: 'bg-accent-100 text-accent-500 border-accent-500/20',
+  verified: 'bg-success-100 text-success-600 border-success-600/20',
+  closed: 'bg-ink-100 text-ink-600 border-ink-200',
+}
+
+const dotStyles: Record<string, string> = {
+  not_started: 'bg-ink-400',
+  in_progress: 'bg-brand-500',
+  submitted: 'bg-warning-600',
+  approved: 'bg-success-600',
+  rejected: 'bg-danger-600',
+  revision_required: 'bg-warning-600',
+  desnagging: 'bg-info-600',
+  handed_over: 'bg-accent-500',
+  pass: 'bg-success-600',
+  fail: 'bg-danger-600',
+  na: 'bg-ink-400',
+  pending: 'bg-warning-600',
+  open: 'bg-danger-600',
+  assigned: 'bg-brand-500',
+  in_rectification: 'bg-warning-600',
+  rectified: 'bg-accent-500',
+  verified: 'bg-success-600',
+  closed: 'bg-ink-400',
 }
 
 function formatStatus(status: string) {
   return status.replace(/_/g, ' ')
 }
 
+/** @deprecated Prefer StatusBadge — kept for existing imports */
 export function Badge({
   children,
   status,
@@ -35,16 +57,40 @@ export function Badge({
   status?: FlatStatus | InspectionStatus | SnagStatus | string
   className?: string
 }) {
+  return (
+    <StatusBadge status={status} className={className}>
+      {children}
+    </StatusBadge>
+  )
+}
+
+export function StatusBadge({
+  children,
+  status,
+  className,
+}: {
+  children?: React.ReactNode
+  status?: FlatStatus | InspectionStatus | SnagStatus | string
+  className?: string
+}) {
+  const key = status || ''
   const label = children ?? (status ? formatStatus(status) : '')
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize leading-none',
-        status ? (statusStyles[status] ?? 'bg-slate-100 text-slate-600') : 'bg-slate-100 text-slate-600',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-label uppercase tracking-wide leading-none',
+        status ? (statusStyles[key] ?? 'bg-ink-100 text-ink-600 border-ink-200') : 'bg-ink-100 text-ink-600 border-ink-200',
         className
       )}
     >
-      {label}
+      <span
+        className={cn(
+          'h-1.5 w-1.5 shrink-0 rounded-full',
+          status ? (dotStyles[key] ?? 'bg-ink-400') : 'bg-ink-400'
+        )}
+        aria-hidden
+      />
+      <span className="normal-case tracking-normal font-semibold text-[11px]">{label}</span>
     </span>
   )
 }

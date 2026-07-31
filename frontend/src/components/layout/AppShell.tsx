@@ -125,8 +125,8 @@ export function AppShell() {
   }, [isMobileMenuOpen])
 
   return (
-    <div className="flex h-full bg-slate-100 text-slate-800">
-      <div className="hidden lg:flex lg:w-60 lg:shrink-0">
+    <div className="flex h-full bg-brand-50 text-ink-800">
+      <div className="hidden lg:flex lg:w-[280px] lg:shrink-0">
         <Sidebar />
       </div>
       <div className="hidden md:flex md:w-[68px] md:shrink-0 lg:hidden">

@@ -6,11 +6,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
     <textarea
       ref={ref}
       className={cn(
-        'w-full rounded-xl border border-slate-200 bg-white px-4 py-3',
-        'text-base text-slate-900 placeholder:text-slate-400',
-        'outline-none transition resize-none',
-        'focus:border-primary focus:ring-2 focus:ring-primary-light',
-        'disabled:bg-slate-50 disabled:text-slate-400',
+        'w-full rounded-md border border-ink-200 bg-white px-4 py-3',
+        'text-base text-ink-950 placeholder:text-ink-400',
+        'outline-none transition-all duration-fast ease-out resize-none',
+        'focus:border-brand-500 focus:ring-4 focus:ring-brand-100',
+        'disabled:bg-ink-50 disabled:text-ink-400',
         className
       )}
       style={{ fontSize: '16px', ...style }}

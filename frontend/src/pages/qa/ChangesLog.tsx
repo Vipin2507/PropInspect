@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useQaChanges } from '../../hooks/useQaChanges'
 import { ROUTES } from '../../constants/routes'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
+import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { cn } from '../../utils/cn'
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 import toast from 'react-hot-toast'
-import { CheckCheck, ChevronDown, ChevronUp, Eye } from 'lucide-react'
+import { CheckCheck, ChevronDown, Eye } from 'lucide-react'
 import type { TaskChangeLogEntry } from '../../types'
 
 function formatChangeValue(change: TaskChangeLogEntry): string {
@@ -23,6 +26,7 @@ function formatChangeValue(change: TaskChangeLogEntry): string {
 export default function ChangesLog() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [markingFlat, setMarkingFlat] = useState<string | null>(null)
+  const { reduced } = useMotionSafe()
   const { groups, totalUnreviewed, loading, markFlatReviewed, reload } = useQaChanges()
 
   const toggleExpand = (flatId: string) => {
@@ -50,13 +54,13 @@ export default function ChangesLog() {
     <div className="flex flex-col gap-4 pb-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Changes Log</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="font-display text-h2 text-ink-950">Changes Log</h1>
+          <p className="mt-1 text-body text-ink-500">
             Engineer task updates — review as work progresses
           </p>
         </div>
         {totalUnreviewed > 0 && (
-          <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+          <span className="shrink-0 rounded-full bg-warning-100 px-3 py-1 text-sm font-semibold text-warning-600">
             {totalUnreviewed} unreviewed
           </span>
         )}
@@ -79,23 +83,23 @@ export default function ChangesLog() {
             const previewCount = Math.min(3, group.changes.length)
 
             return (
-              <div
+              <Card
                 key={group.flatId}
-                className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                className="relative overflow-hidden border-l-[3px] border-l-warning-500"
               >
                 <div className="flex items-start gap-3 p-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-base font-bold text-slate-800">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-bold text-ink-800">
                         Flat {group.flatNumber}
                       </h2>
-                      <Badge status={group.flatStatus} />
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      <StatusBadge status={group.flatStatus} />
+                      <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-label font-semibold text-warning-600">
                         {group.unreviewedCount} update{group.unreviewedCount === 1 ? '' : 's'}
                       </span>
-                      <span className="text-xs text-slate-500">{group.completionPct}% complete</span>
+                      <span className="text-caption text-ink-500">{group.completionPct}% complete</span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-caption text-ink-500">
                       {group.towerName} · {group.engineerName} ·{' '}
                       {group.lastChangeAt
                         ? formatDistanceToNow(new Date(group.lastChangeAt), { addSuffix: true })
@@ -106,7 +110,7 @@ export default function ChangesLog() {
                     {inspectionId && (
                       <Link
                         to={ROUTES.QA_REVIEW_DETAIL(inspectionId)}
-                        className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-medium text-slate-700 active:bg-slate-50"
+                        className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-md border border-ink-200 px-3 text-xs font-medium text-ink-700 active:bg-ink-50"
                       >
                         <Eye size={14} aria-hidden="true" />
                         View flat
@@ -128,50 +132,63 @@ export default function ChangesLog() {
                 <button
                   type="button"
                   onClick={() => toggleExpand(group.flatId)}
-                  className="flex w-full items-center justify-between border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 text-xs font-medium text-slate-600 active:bg-slate-100"
+                  className="flex w-full items-center justify-between border-t border-ink-100 bg-ink-50/80 px-4 py-2.5 text-xs font-medium text-ink-600 active:bg-ink-100"
                 >
                   <span>
                     {isOpen ? 'Hide' : 'Show'} {group.changes.length} change
                     {group.changes.length === 1 ? '' : 's'}
                   </span>
-                  {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  <motion.span
+                    animate={{ rotate: isOpen ? 180 : 0 }}
+                    transition={reduced ? { duration: 0 } : { duration: 0.2 }}
+                  >
+                    <ChevronDown size={16} />
+                  </motion.span>
                 </button>
 
-                {isOpen && (
-                  <ul className="divide-y divide-slate-100 border-t border-slate-100">
-                    {group.changes.map((change) => (
-                      <li key={change.id} className="px-4 py-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-800">{change.itemLabel}</p>
-                            <p className="text-xs text-slate-500">{change.categoryName}</p>
-                            <p
-                              className={cn(
-                                'mt-1 text-sm',
-                                change.changeType === 'status_change' && change.newValue === 'fail'
-                                  ? 'text-fail font-medium'
-                                  : 'text-slate-700'
-                              )}
-                            >
-                              {change.changeType === 'status_change' ? 'Status: ' : 'Remark: '}
-                              {formatChangeValue(change)}
-                            </p>
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.ul
+                      initial={reduced ? false : { height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={reduced ? undefined : { height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="divide-y divide-ink-100 overflow-hidden border-t border-ink-100"
+                    >
+                      {group.changes.map((change) => (
+                        <li key={change.id} className="px-4 py-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-ink-800">{change.itemLabel}</p>
+                              <p className="text-caption text-ink-500">{change.categoryName}</p>
+                              <p
+                                className={cn(
+                                  'mt-1 text-sm',
+                                  change.changeType === 'status_change' && change.newValue === 'fail'
+                                    ? 'font-medium text-danger-600'
+                                    : 'text-ink-700'
+                                )}
+                              >
+                                {change.changeType === 'status_change' ? 'Status: ' : 'Remark: '}
+                                {formatChangeValue(change)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-caption text-ink-400">
+                              {formatDistanceToNow(new Date(change.createdAt), { addSuffix: true })}
+                            </span>
                           </div>
-                          <span className="shrink-0 text-xs text-slate-400">
-                            {formatDistanceToNow(new Date(change.createdAt), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                        </li>
+                      ))}
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
 
                 {!isOpen && group.changes.length > previewCount && (
-                  <p className="px-4 pb-3 text-xs text-slate-400">
+                  <p className="px-4 pb-3 text-caption text-ink-400">
                     +{group.changes.length - previewCount} more…
                   </p>
                 )}
-              </div>
+              </Card>
             )
           })}
         </div>

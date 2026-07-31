@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ProgressBar } from '../ui/ProgressBar'
+import { Card } from '../ui/Card'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
 import type { InspectionResponse } from '../../types'
 import { ChevronRight } from 'lucide-react'
@@ -24,20 +25,22 @@ export function InspectionSummary({
           <Link
             key={cat.id}
             to={ROUTES.ENGINEER_CHECKLIST(flatId, cat.id)}
-            className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.98] transition-transform"
+            className="block"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-slate-800">{cat.name}</h3>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {done} of {total} items checked
-                </p>
+            <Card interactive className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-ink-800">{cat.name}</h3>
+                  <p className="mt-0.5 text-caption text-ink-500">
+                    {done} of {total} items checked
+                  </p>
+                </div>
+                <ChevronRight className="shrink-0 text-ink-400" size={18} aria-hidden="true" />
               </div>
-              <ChevronRight className="shrink-0 text-slate-400" size={18} aria-hidden="true" />
-            </div>
-            <div className="mt-3">
-              <ProgressBar pct={pct} />
-            </div>
+              <div className="mt-3">
+                <ProgressBar pct={pct} />
+              </div>
+            </Card>
           </Link>
         )
       })}

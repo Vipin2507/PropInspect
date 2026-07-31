@@ -5,7 +5,9 @@ import { useProjects } from '../../hooks/useProjects'
 import { useUsers } from '../../hooks/useUsers'
 import { reportsApi } from '../../utils/api'
 import { StatCard } from '../../components/ui/StatCard'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
+import { Card } from '../../components/ui/Card'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { Select } from '../../components/ui/Select'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
@@ -66,7 +68,7 @@ const STATUS_COLOR: Record<string, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────
 function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+    <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-600">
       {label}
       <button type="button" onClick={onRemove} className="ml-0.5 touch-manipulation" aria-label="Remove filter">
         <X size={11} aria-hidden="true" />
@@ -232,8 +234,8 @@ export default function AdminDashboard() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Dashboard</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="font-display text-h2 text-ink-950">Dashboard</h1>
+          <p className="text-body text-ink-500">
             {hasFilters ? `${activeFilterCount} filter${activeFilterCount>1?'s':''} active` : 'All projects — live'}
           </p>
         </div>
@@ -261,7 +263,7 @@ export default function AdminDashboard() {
 
       {/* ── Filter panel ───────────────────────────────────────────── */}
       {filtersOpen && (
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+        <Card className="border-brand-200 bg-brand-50/50 p-4 space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Project</label>
@@ -301,11 +303,11 @@ export default function AdminDashboard() {
             </div>
           </div>
           {hasFilters && (
-            <button onClick={clearFilters} className="text-sm font-semibold text-fail active:underline">
+            <button onClick={clearFilters} className="text-sm font-semibold text-danger-600 active:underline">
               Clear all filters
             </button>
           )}
-        </div>
+        </Card>
       )}
 
       {/* ── Active filter pills ─────────────────────────────────────── */}
@@ -326,25 +328,25 @@ export default function AdminDashboard() {
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard label="Total Flats"   value={s.total}              icon={Home} />
-            <StatCard label="Approved"      value={s.approved}           icon={CheckCircle}  colorClass="text-pass bg-green-100" />
-            <StatCard label="Submitted"     value={s.submitted}          icon={Send}         colorClass="text-amber-600 bg-amber-100" />
-            <StatCard label="In Progress"   value={s.inProgress}         icon={Clock}        colorClass="text-info bg-sky-100" />
-            <StatCard label="Not Started"   value={s.notStarted}         icon={Building2}    colorClass="text-slate-500 bg-slate-100" />
-            <StatCard label="Revision Req"  value={s.revisionRequired}   icon={RotateCcw}    colorClass="text-secondary bg-orange-100" />
-            <StatCard label="Rejected"      value={s.rejected}           icon={XCircle}      colorClass="text-fail bg-red-100" />
-            <StatCard label="Handed Over"   value={s.handedOver ?? 0}    icon={PackageCheck} colorClass="text-teal-600 bg-teal-100" />
-            <StatCard label="Open Snags"    value={s.openSnags}          icon={AlertTriangle} colorClass="text-fail bg-red-100" />
+            <StatCard label="Approved"      value={s.approved}           icon={CheckCircle}  colorClass="text-success-600 bg-success-100" />
+            <StatCard label="Submitted"     value={s.submitted}          icon={Send}         colorClass="text-warning-600 bg-warning-100" />
+            <StatCard label="In Progress"   value={s.inProgress}         icon={Clock}        colorClass="text-brand-600 bg-brand-100" />
+            <StatCard label="Not Started"   value={s.notStarted}         icon={Building2}    colorClass="text-ink-500 bg-ink-100" />
+            <StatCard label="Revision Req"  value={s.revisionRequired}   icon={RotateCcw}    colorClass="text-warning-600 bg-warning-100" />
+            <StatCard label="Rejected"      value={s.rejected}           icon={XCircle}      colorClass="text-danger-600 bg-danger-100" />
+            <StatCard label="Handed Over"   value={s.handedOver ?? 0}    icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" />
+            <StatCard label="Open Snags"    value={s.openSnags}          icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" />
           </div>
 
           {/* Completion progress bar */}
           {s.total > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <Card className="p-4">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-700">
+                <span className="text-sm font-semibold text-ink-700">
                   Completion Rate
-                  {hasFilters && <span className="ml-2 text-xs font-normal text-slate-400">(filtered)</span>}
+                  {hasFilters && <span className="ml-2 text-xs font-normal text-ink-400">(filtered)</span>}
                 </span>
-                <span className="text-lg font-bold text-pass">{completionPct}%</span>
+                <span className="text-lg font-bold text-success-600">{completionPct}%</span>
               </div>
               {/* Segmented bar */}
               <div className="flex h-3 w-full overflow-hidden rounded-full">
@@ -372,19 +374,19 @@ export default function AdminDashboard() {
                   </span>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
         </>
       ) : (
-        <p className="text-center text-sm text-slate-400 py-8">No data available</p>
+        <EmptyState title="No data available" description="Try adjusting your filters or check back later." className="py-8" />
       )}
 
       {/* ── Charts ─────────────────────────────────────────────────── */}
       {!loading && barData.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-3">
           {/* Stacked bar chart — built from filtered flat rows */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold text-slate-700 uppercase tracking-wide">
+          <Card className="p-4 lg:col-span-2">
+            <h2 className="mb-4 text-label uppercase tracking-wide text-ink-700">
               Flat Status by Project
             </h2>
             <ResponsiveContainer width="100%" height={220}>
@@ -421,11 +423,11 @@ export default function AdminDashboard() {
                 <Bar dataKey="NotStarted" stackId="a" fill={STATUS_COLOR.not_started}       name="Not Started" radius={[4,4,0,0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Card>
 
           {/* Donut chart */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-700 uppercase tracking-wide">
+          <Card className="p-4">
+            <h2 className="mb-4 text-label uppercase tracking-wide text-ink-700">
               Distribution
             </h2>
             {donutData.length > 0 ? (
@@ -459,17 +461,17 @@ export default function AdminDashboard() {
                 </div>
               </>
             ) : (
-              <p className="py-8 text-center text-xs text-slate-400">No data to display</p>
+              <p className="py-8 text-center text-caption text-ink-400">No data to display</p>
             )}
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ── Engineer performance ────────────────────────────────────── */}
       {!loading && overview?.engineerLeaderboard && overview.engineerLeaderboard.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-700">
-            <Users size={14} className="text-primary" aria-hidden="true" />
+        <Card className="p-4">
+          <h2 className="mb-4 flex items-center gap-2 text-label uppercase tracking-wide text-ink-700">
+            <Users size={14} className="text-brand-600" aria-hidden="true" />
             Engineer Performance
           </h2>
           <div className="space-y-4">
@@ -500,12 +502,12 @@ export default function AdminDashboard() {
                 )
               })}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Flat detail table ───────────────────────────────────────── */}
       {!loading && result && result.flats.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <Card className="overflow-hidden">
           <button
             type="button"
             onClick={() => setShowTable(p => !p)}
@@ -544,7 +546,7 @@ export default function AdminDashboard() {
                           <p className="text-xs text-slate-500">{f.towerName} · {f.projectName}</p>
                           {f.engineerName && <p className="text-xs text-slate-400">Eng: {f.engineerName}</p>}
                         </div>
-                        <Badge status={f.flatStatus} />
+                        <StatusBadge status={f.flatStatus} />
                       </div>
                       <div className="mt-2 space-y-1">
                         <div className="flex justify-between text-xs text-slate-500">
@@ -600,7 +602,7 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5 text-slate-600">{f.towerName}</td>
                         <td className="px-3 py-2.5 text-slate-600 max-w-[120px] truncate">{f.projectName}</td>
                         <td className="px-3 py-2.5 text-slate-600">{f.engineerName || '—'}</td>
-                        <td className="px-3 py-2.5"><Badge status={f.flatStatus} /></td>
+                        <td className="px-3 py-2.5"><StatusBadge status={f.flatStatus} /></td>
                         <td className="px-3 py-2.5 font-semibold text-pass">{f.passCount}</td>
                         <td className="px-3 py-2.5 font-semibold text-fail">{f.failCount}</td>
                         <td className="px-3 py-2.5 text-slate-400">{f.pendingCount}</td>
@@ -620,14 +622,14 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* ── Recent activity (no filters) ───────────────────────────── */}
       {!hasFilters && !loading && overview?.recentSubmissions && overview.recentSubmissions.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-700">
-            <TrendingUp size={14} className="text-primary" aria-hidden="true" />
+        <Card className="p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-label uppercase tracking-wide text-ink-700">
+            <TrendingUp size={14} className="text-brand-600" aria-hidden="true" />
             Recent Submissions
           </h2>
           <ul className="divide-y divide-slate-100">
@@ -638,7 +640,7 @@ export default function AdminDashboard() {
                   <p className="truncate text-xs text-slate-500">{s.engineerName}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <Badge status={s.status} />
+                  <StatusBadge status={s.status} />
                   <span className="text-xs text-slate-400">
                     {s.submittedAt ? format(new Date(s.submittedAt),'dd MMM') : '—'}
                   </span>
@@ -646,18 +648,17 @@ export default function AdminDashboard() {
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
 
       {/* ── No results ─────────────────────────────────────────────── */}
       {!loading && hasFilters && result?.flats.length === 0 && (
-        <div className="rounded-2xl border-2 border-dashed border-slate-200 py-14 text-center">
-          <p className="text-base font-semibold text-slate-600">No flats match these filters</p>
-          <p className="mt-1 text-sm text-slate-400">Try adjusting or clearing your filters.</p>
-          <button onClick={clearFilters} className="mt-3 text-sm font-semibold text-primary active:underline">
-            Clear all filters
-          </button>
-        </div>
+        <EmptyState
+          title="No flats match these filters"
+          description="Try adjusting or clearing your filters."
+          actionLabel="Clear all filters"
+          onAction={clearFilters}
+        />
       )}
     </div>
   )

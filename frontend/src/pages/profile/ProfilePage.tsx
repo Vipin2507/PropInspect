@@ -3,6 +3,8 @@ import { useAuthStore } from '../../store/authStore'
 import { authApi } from '../../utils/api'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { Card } from '../../components/ui/Card'
+import { Avatar } from '../../components/ui/Avatar'
 import { User, Mail, Phone, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -72,30 +74,30 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 pb-10">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">My Profile</h1>
+      <h1 className="font-display text-h2 text-ink-950">My Profile</h1>
 
       {/* Avatar + role badge */}
-      <div className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-bold text-white">
-          {user.name.charAt(0).toUpperCase()}
-        </div>
+      <Card className="flex items-center gap-5 p-5">
+        <Avatar name={user.name} size="xl" role={user.role} />
         <div>
-          <p className="text-lg font-bold text-slate-900">{user.name}</p>
-          <span className="mt-1 inline-flex rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary">
+          <p className="font-display text-lg font-bold text-ink-950">{user.name}</p>
+          <span className="mt-1.5 inline-flex rounded-full bg-brand-100 px-3 py-1 text-label font-semibold text-brand-700">
             {roleLabel[user.role] ?? user.role}
           </span>
         </div>
-      </div>
+      </Card>
 
       {/* Personal info form */}
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
-          <User size={18} className="text-primary" aria-hidden="true" />
-          Personal Information
-        </h2>
+      <Card className="p-5">
+        <div className="mb-4 flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-brand-600">
+            <User size={16} aria-hidden="true" />
+          </span>
+          <h2 className="font-display text-base font-semibold text-ink-800">Personal Information</h2>
+        </div>
         <form onSubmit={handleInfoSave} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
               Full Name
             </label>
             <Input
@@ -106,48 +108,62 @@ export default function ProfilePage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              <span className="flex items-center gap-1.5">
-                <Mail size={14} aria-hidden="true" /> Email
-              </span>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              Email
             </label>
-            <Input
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="you@example.com"
-              required
-            />
+            <div className="relative">
+              <Mail
+                size={16}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-400"
+                aria-hidden="true"
+              />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="you@example.com"
+                required
+                className="pl-11"
+              />
+            </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              <span className="flex items-center gap-1.5">
-                <Phone size={14} aria-hidden="true" /> Mobile
-              </span>
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
+              Mobile
             </label>
-            <Input
-              type="tel"
-              value={form.mobile}
-              onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-              placeholder="10-digit mobile number"
-            />
+            <div className="relative">
+              <Phone
+                size={16}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-400"
+                aria-hidden="true"
+              />
+              <Input
+                type="tel"
+                value={form.mobile}
+                onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                placeholder="10-digit mobile number"
+                className="pl-11"
+              />
+            </div>
           </div>
           <Button type="submit" className="w-full" loading={savingInfo}>
             <CheckCircle size={18} aria-hidden="true" />
             Save Changes
           </Button>
         </form>
-      </div>
+      </Card>
 
       {/* Change password form */}
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
-          <Lock size={18} className="text-primary" aria-hidden="true" />
-          Change Password
-        </h2>
+      <Card className="p-5">
+        <div className="mb-4 flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning-100 text-warning-600">
+            <Lock size={16} aria-hidden="true" />
+          </span>
+          <h2 className="font-display text-base font-semibold text-ink-800">Change Password</h2>
+        </div>
         <form onSubmit={handlePasswordSave} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
               New Password
             </label>
             <div className="relative">
@@ -162,7 +178,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowNewPass((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 touch-manipulation text-slate-400 active:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 touch-manipulation text-ink-400 active:text-ink-600"
                 aria-label={showNewPass ? 'Hide password' : 'Show password'}
               >
                 {showNewPass ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
@@ -170,7 +186,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            <label className="mb-1.5 block text-sm font-medium text-ink-700">
               Confirm New Password
             </label>
             <div className="relative">
@@ -185,14 +201,14 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPass((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 touch-manipulation text-slate-400 active:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 touch-manipulation text-ink-400 active:text-ink-600"
                 aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
               >
                 {showConfirmPass ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
               </button>
             </div>
             {passwords.confirm && passwords.newPass !== passwords.confirm && (
-              <p className="mt-1.5 text-sm text-fail">Passwords do not match.</p>
+              <p className="mt-1.5 text-sm text-danger-600">Passwords do not match.</p>
             )}
           </div>
           <Button
@@ -205,7 +221,7 @@ export default function ProfilePage() {
             Update Password
           </Button>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }

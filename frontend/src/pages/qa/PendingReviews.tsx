@@ -6,9 +6,10 @@ import { formatDistanceToNow, format } from 'date-fns'
 import { FilterBar } from '../../components/ui/FilterBar'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
+import { Card } from '../../components/ui/Card'
+import { ProgressBar } from '../../components/ui/ProgressBar'
 import { Clock, User, Building } from 'lucide-react'
-import { cn } from '../../utils/cn'
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all',                label: 'All' },
@@ -32,7 +33,7 @@ export default function PendingReviews() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Submitted Reviews</h1>
+      <h1 className="font-display text-h2 text-ink-950">Submitted Reviews</h1>
 
       <FilterBar
         filters={[{ id: 'status', label: 'Status', value: filters.status, options: STATUS_FILTER_OPTIONS }]}
@@ -62,67 +63,52 @@ export default function PendingReviews() {
               <Link
                 key={flat.id}
                 to={inspectionId ? ROUTES.QA_REVIEW_DETAIL(inspectionId) : '#'}
-                className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:scale-[0.98] active:shadow-md transition-transform"
+                className="block"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-base font-bold text-slate-800">{flat.flatNumber}</h2>
-                    <div className="mt-1 flex items-center gap-2 flex-wrap">
-                      <Badge status={flat.status} />
-                      {/* Req 5.2 — completionPct badge */}
-                      <span className={cn(
-                        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-                        pct === 100
-                          ? 'bg-green-100 text-green-700'
-                          : pct >= 75
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-slate-100 text-slate-600'
-                      )}>
-                        {pct}% complete
-                      </span>
+                <Card interactive className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-base font-semibold text-ink-800">{flat.flatNumber}</h2>
+                      <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                        <StatusBadge status={flat.status} />
+                        <span className="text-xs font-semibold tabular text-ink-500">
+                          {pct}% complete
+                        </span>
+                      </div>
                     </div>
+                    {submittedAt && (
+                      <span className="shrink-0 text-xs text-ink-400">
+                        {formatDistanceToNow(new Date(submittedAt), { addSuffix: true })}
+                      </span>
+                    )}
                   </div>
-                  {submittedAt && (
-                    <span className="shrink-0 text-xs text-slate-400">
-                      {formatDistanceToNow(new Date(submittedAt), { addSuffix: true })}
-                    </span>
-                  )}
-                </div>
 
-                <div className="mt-2 space-y-1 text-sm text-slate-600">
-                  {flat.towerName && (
-                    <p className="flex items-center gap-2">
-                      <Building size={14} aria-hidden="true" />
-                      {flat.towerName}
-                      {flat.floorLabel && ` · ${flat.floorLabel}`}
-                    </p>
-                  )}
-                  {engineerName && (
-                    <p className="flex items-center gap-2">
-                      <User size={14} aria-hidden="true" />
-                      {engineerName}
-                    </p>
-                  )}
-                  {submittedAt && (
-                    <p className="flex items-center gap-2">
-                      <Clock size={14} aria-hidden="true" />
-                      {format(new Date(submittedAt), 'PPp')}
-                    </p>
-                  )}
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-3">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={cn(
-                        'h-full rounded-full transition-all',
-                        pct === 100 ? 'bg-green-500' : 'bg-primary'
-                      )}
-                      style={{ width: `${pct}%` }}
-                    />
+                  <div className="mt-2 space-y-1 text-sm text-ink-600">
+                    {flat.towerName && (
+                      <p className="flex items-center gap-2">
+                        <Building size={14} className="text-ink-400" aria-hidden="true" />
+                        {flat.towerName}
+                        {flat.floorLabel && ` · ${flat.floorLabel}`}
+                      </p>
+                    )}
+                    {engineerName && (
+                      <p className="flex items-center gap-2">
+                        <User size={14} className="text-ink-400" aria-hidden="true" />
+                        {engineerName}
+                      </p>
+                    )}
+                    {submittedAt && (
+                      <p className="flex items-center gap-2">
+                        <Clock size={14} className="text-ink-400" aria-hidden="true" />
+                        {format(new Date(submittedAt), 'PPp')}
+                      </p>
+                    )}
                   </div>
-                </div>
+
+                  <div className="mt-3">
+                    <ProgressBar pct={pct} />
+                  </div>
+                </Card>
               </Link>
             )
           })}

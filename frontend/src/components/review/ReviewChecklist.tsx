@@ -3,6 +3,7 @@ import { DEFAULT_CHECKLIST_CATEGORIES } from '../../constants/checklist'
 import { ReviewItemRow } from './ReviewItemRow'
 import type { InspectionResponse } from '../../types'
 import * as Icons from 'lucide-react'
+import { Card } from '../ui/Card'
 import { cn } from '../../utils/cn'
 
 /** Show every task the engineer has evaluated — Checker reviews each separately. */
@@ -76,37 +77,37 @@ export function ReviewChecklist({
         const hasFails = stats.fail > 0
 
         return (
-          <div
+          <Card
             key={cat.id}
             className={cn(
-              'rounded-2xl bg-white shadow-sm overflow-hidden',
-              hasFails ? 'border border-red-100' : 'border border-slate-200'
+              'overflow-hidden',
+              hasFails && 'border-danger-600/20'
             )}
           >
             {/* Category header — always visible, tappable to expand/collapse */}
             <button
               type="button"
               onClick={() => toggleCat(cat.id)}
-              className="flex w-full items-center gap-3 p-4 text-left touch-manipulation active:bg-slate-50"
+              className="flex w-full items-center gap-3 p-4 text-left touch-manipulation transition-colors active:bg-ink-50"
             >
               <div className={cn(
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-                hasFails ? 'bg-red-100 text-fail' : 'bg-primary/10 text-primary'
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                hasFails ? 'bg-danger-100 text-danger-600' : 'bg-brand-100 text-brand-600'
               )}>
                 <Icon size={18} aria-hidden="true" />
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-900">{cat.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="font-semibold text-ink-900">{cat.name}</p>
+                <p className="text-xs text-ink-500 mt-0.5">
                   {stats.total} items evaluated
                   {hasFails && (
-                    <span className="ml-2 font-semibold text-fail">
+                    <span className="ml-2 font-semibold text-danger-600">
                       · {stats.fail} fail{stats.fail !== 1 ? 's' : ''}
                     </span>
                   )}
                   {reviewableItems.length === 0 && (
-                    <span className="ml-2 text-slate-400">· nothing to review</span>
+                    <span className="ml-2 text-ink-400">· nothing to review</span>
                   )}
                 </p>
               </div>
@@ -115,7 +116,7 @@ export function ReviewChecklist({
               <Icons.ChevronDown
                 size={18}
                 className={cn(
-                  'shrink-0 text-slate-400 transition-transform',
+                  'shrink-0 text-ink-400 transition-transform',
                   isExpanded && 'rotate-180'
                 )}
                 aria-hidden="true"
@@ -124,13 +125,13 @@ export function ReviewChecklist({
 
             {/* Reviewable items — only shown when expanded */}
             {isExpanded && (
-              <div className="border-t border-slate-100 px-4 pb-2">
+              <div className="border-t border-ink-100 px-4 pb-3 pt-1">
                 {reviewableItems.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-slate-400">
+                  <p className="py-4 text-center text-sm text-ink-400">
                     All items passed with no remarks or photos.
                   </p>
                 ) : (
-                  <div className="divide-y divide-slate-100">
+                  <div className="space-y-2 pt-2">
                     {reviewableItems.map(({ item, response }, i) => (
                       <ReviewItemRow
                         key={item.id}
@@ -149,7 +150,7 @@ export function ReviewChecklist({
                 )}
               </div>
             )}
-          </div>
+          </Card>
         )
       })}
     </div>

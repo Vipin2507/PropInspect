@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useFlats } from '../../hooks/useFlats'
 import { useProjects } from '../../hooks/useProjects'
 import { useTowers } from '../../hooks/useTowers'
-import { Badge } from '../../components/ui/Badge'
+import { StatusBadge } from '../../components/ui/Badge'
+import { Card } from '../../components/ui/Card'
 import { Select } from '../../components/ui/Select'
 import { Spinner } from '../../components/ui/Spinner'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -62,7 +63,7 @@ export default function FlatMonitoring() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Flat Monitoring</h1>
+      <h1 className="font-display text-h2 text-ink-950">Flat Monitoring</h1>
 
       {/* Filters — stacked on mobile, row on sm+ */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -102,9 +103,9 @@ export default function FlatMonitoring() {
 
       {/* Count */}
       {!loading && filtered.length > 0 && (
-        <p className="text-sm text-slate-500">
+        <p className="text-body text-ink-500">
           Showing{' '}
-          <span className="font-semibold text-slate-700">{displayed.length}</span>
+          <span className="font-semibold text-ink-700">{displayed.length}</span>
           {filtered.length !== displayed.length && ` of ${filtered.length}`}{' '}
           flat{filtered.length !== 1 ? 's' : ''}
         </p>
@@ -120,14 +121,14 @@ export default function FlatMonitoring() {
       ) : (
         <>
           {/* ── Desktop table (sm+) ── */}
-          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
-            <div className="grid grid-cols-[1fr_140px_110px_1fr] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <Card className="hidden overflow-hidden sm:block">
+            <div className="grid grid-cols-[1fr_140px_110px_1fr] gap-3 border-b border-ink-100 bg-ink-50 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
               <span>Flat</span>
               <span>Status</span>
               <span>Open Snags</span>
               <span>Engineer</span>
             </div>
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-ink-100">
               {displayed.map((flat) => {
                 const openSnags = openSnagsByFlat[flat.id] || 0
                 return (
@@ -135,19 +136,19 @@ export default function FlatMonitoring() {
                     <button
                       type="button"
                       onClick={() => handleRowTap(flat)}
-                      className="grid w-full grid-cols-[1fr_140px_110px_1fr] items-center gap-3 px-4 py-3 text-left touch-manipulation active:bg-slate-50"
+                      className="grid w-full grid-cols-[1fr_140px_110px_1fr] items-center gap-3 px-4 py-3 text-left touch-manipulation transition-colors active:bg-ink-50"
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-800">{flat.flatNumber}</p>
-                        <p className="truncate text-xs text-slate-500">
+                        <p className="font-semibold text-ink-800">{flat.flatNumber}</p>
+                        <p className="truncate text-xs text-ink-500">
                           {flat.towerName} · {flat.floorLabel}
                         </p>
                       </div>
-                      <Badge status={flat.status} />
-                      <span className={`text-sm font-semibold ${openSnags > 0 ? 'text-fail' : 'text-slate-400'}`}>
+                      <StatusBadge status={flat.status} />
+                      <span className={`text-sm font-semibold tabular ${openSnags > 0 ? 'text-danger-600' : 'text-ink-400'}`}>
                         {openSnags > 0 ? openSnags : '—'}
                       </span>
-                      <span className="truncate text-sm text-slate-600">
+                      <span className="truncate text-sm text-ink-600">
                         {flat.inspection?.engineerName || flat.engineerName || '—'}
                       </span>
                     </button>
@@ -156,51 +157,51 @@ export default function FlatMonitoring() {
               })}
             </ul>
             {filtered.length > 20 && (
-              <div className="border-t border-slate-100 px-4 py-3 text-center">
+              <div className="border-t border-ink-100 px-4 py-3 text-center">
                 <button
                   type="button"
                   onClick={() => setShowAll((v) => !v)}
-                  className="text-sm font-medium text-primary active:underline touch-manipulation"
+                  className="text-sm font-medium text-brand-600 active:underline touch-manipulation"
                 >
                   {showAll ? 'Show less' : `View all ${filtered.length} flats →`}
                 </button>
               </div>
             )}
-          </div>
+          </Card>
 
           {/* ── Mobile cards (< sm) ── */}
           <div className="space-y-2 sm:hidden">
             {displayed.map((flat) => {
               const openSnags = openSnagsByFlat[flat.id] || 0
               return (
-                <button
+                <Card
                   key={flat.id}
-                  type="button"
+                  interactive
+                  className="flex w-full items-center gap-3 p-4 min-h-[72px]"
                   onClick={() => handleRowTap(flat)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm touch-manipulation active:bg-slate-50 active:scale-[0.99] transition-transform min-h-[72px]"
                 >
                   <div className="min-w-0 flex-1">
                     {/* Top row: flat number + status */}
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-slate-800">{flat.flatNumber}</p>
-                      <Badge status={flat.status} />
+                      <p className="font-semibold text-ink-800">{flat.flatNumber}</p>
+                      <StatusBadge status={flat.status} />
                     </div>
 
                     {/* Tower + floor */}
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-ink-500">
                       {flat.towerName} · {flat.floorLabel}
                     </p>
 
                     {/* Engineer + snags row */}
                     <div className="mt-1.5 flex items-center gap-3 text-xs">
                       {flat.inspection?.engineerName || flat.engineerName ? (
-                        <span className="flex items-center gap-1 text-slate-500">
+                        <span className="flex items-center gap-1 text-ink-500">
                           <User size={11} aria-hidden="true" />
                           {flat.inspection?.engineerName || flat.engineerName}
                         </span>
                       ) : null}
                       {openSnags > 0 && (
-                        <span className="flex items-center gap-1 font-semibold text-fail">
+                        <span className="flex items-center gap-1 font-semibold text-danger-600">
                           <AlertTriangle size={11} aria-hidden="true" />
                           {openSnags} snag{openSnags !== 1 ? 's' : ''}
                         </span>
@@ -208,8 +209,8 @@ export default function FlatMonitoring() {
                     </div>
                   </div>
 
-                  <ChevronRight size={16} className="shrink-0 text-slate-300" aria-hidden="true" />
-                </button>
+                  <ChevronRight size={16} className="shrink-0 text-ink-300" aria-hidden="true" />
+                </Card>
               )
             })}
 
@@ -217,7 +218,7 @@ export default function FlatMonitoring() {
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                className="w-full rounded-2xl border border-slate-200 bg-white py-3 text-center text-sm font-medium text-primary touch-manipulation active:bg-slate-50"
+                className="w-full rounded-lg border border-ink-100 bg-surface py-3 text-center text-sm font-medium text-brand-600 touch-manipulation active:bg-ink-50"
               >
                 {showAll ? 'Show less' : `View all ${filtered.length} flats →`}
               </button>

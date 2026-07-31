@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Badge } from '../ui/Badge'
+import { StatusBadge } from '../ui/Badge'
+import { Card } from '../ui/Card'
 import type { InspectionResponse, SnagImage } from '../../types'
 import { Textarea } from '../ui/Textarea'
 import { Camera, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react'
@@ -188,16 +189,16 @@ export function ReviewItemRow({
   const remarkRequired = pendingDecision !== null || currentDecision === 'revision_required' || currentDecision === 'rejected'
 
   return (
-    <div
+    <Card
       className={cn(
-        'rounded-2xl border bg-white transition-all',
+        'transition-all',
         currentDecision === 'approved'
-          ? 'border-green-200'
+          ? 'border-success-600/20'
           : currentDecision === 'rejected'
-          ? 'border-red-200'
+          ? 'border-danger-600/20'
           : currentDecision === 'revision_required'
-          ? 'border-amber-300'
-          : 'border-slate-200'
+          ? 'border-warning-600/20'
+          : undefined
       )}
     >
       <div
@@ -206,13 +207,15 @@ export function ReviewItemRow({
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-slate-800 text-sm">
+            <span className="font-semibold text-ink-800 text-sm">
               {index}. {label}
             </span>
             {currentDecision && DECISION_CONFIG[currentDecision].badge}
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <Badge status={response.status} />
+            <StatusBadge status={response.status}>
+              {response.status === 'pass' ? 'Pass' : undefined}
+            </StatusBadge>
             {hasImages && (
               <button
                 type="button"
@@ -221,7 +224,7 @@ export function ReviewItemRow({
                   setLightboxIndex(0)
                   setLightboxOpen(true)
                 }}
-                className="flex items-center gap-1 text-xs font-medium text-primary touch-manipulation"
+                className="flex items-center gap-1 text-xs font-medium text-brand-600 touch-manipulation"
               >
                 <Camera size={13} aria-hidden="true" />
                 {allDisplayImages.length} photo{allDisplayImages.length !== 1 ? 's' : ''}
@@ -233,17 +236,17 @@ export function ReviewItemRow({
           )}
         </div>
         {expanded ? (
-          <ChevronUp size={18} className="mt-0.5 shrink-0 text-slate-400" />
+          <ChevronUp size={18} className="mt-0.5 shrink-0 text-ink-400" />
         ) : (
-          <ChevronDown size={18} className="mt-0.5 shrink-0 text-slate-400" />
+          <ChevronDown size={18} className="mt-0.5 shrink-0 text-ink-400" />
         )}
       </div>
 
       {expanded && (
         <div className="space-y-3 px-4 pb-4" onClick={(e) => e.stopPropagation()}>
           {response.remarks && (
-            <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-              <span className="font-semibold text-slate-500">Engineer: </span>
+            <div className="rounded-md bg-ink-50 px-3 py-2 text-sm text-ink-600">
+              <span className="font-semibold text-ink-500">Engineer: </span>
               {response.remarks}
             </div>
           )}
@@ -253,7 +256,7 @@ export function ReviewItemRow({
             <div>
               <label
                 htmlFor={`qa-remark-${response.id}`}
-                className="mb-1 block text-xs font-semibold text-slate-500"
+                className="mb-1 block text-xs font-semibold text-ink-500"
               >
                 QA Remark {remarkRequired ? '(required for Revision/Reject)' : '(optional for Approve)'}
               </label>
@@ -268,11 +271,11 @@ export function ReviewItemRow({
                 rows={3}
                 className={cn(
                   'w-full text-sm',
-                  remarkRequired && !remarkText.trim() && 'border-amber-400'
+                  remarkRequired && !remarkText.trim() && 'border-warning-600'
                 )}
               />
               {pendingDecision && !remarkText.trim() && (
-                <p className="mt-1 text-xs font-medium text-amber-700">
+                <p className="mt-1 text-xs font-medium text-warning-600">
                   Add remark above, then tap {DECISION_CONFIG[pendingDecision].label} again to save.
                 </p>
               )}
@@ -282,10 +285,10 @@ export function ReviewItemRow({
           {/* Evidence photos — available for in-progress and formal review */}
           {!readOnly && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-slate-500">
+              <p className="mb-1.5 text-xs font-semibold text-ink-500">
                 QA Evidence Photos (optional)
               </p>
-              <div className="rounded-xl bg-slate-50 p-3">
+              <div className="rounded-md bg-ink-50 p-3">
                 <ImageUploader
                   images={evidenceImages}
                   onAdd={handleEvidenceAdd}
@@ -312,8 +315,8 @@ export function ReviewItemRow({
                       isActive
                         ? cfg.active
                         : pendingDecision === d
-                        ? 'border-amber-400 bg-amber-50 text-amber-800'
-                        : 'border-slate-200 bg-slate-50 text-slate-500 active:bg-slate-100'
+                        ? 'border-warning-600/30 bg-warning-100 text-warning-600'
+                        : 'border-ink-200 bg-ink-50 text-ink-500 active:bg-ink-100'
                     )}
                   >
                     {cfg.icon}
@@ -325,7 +328,7 @@ export function ReviewItemRow({
           )}
 
           {currentDecision === 'revision_required' && response.qaRemarks && (
-            <p className="text-xs text-green-700 font-medium">
+            <p className="text-xs text-success-600 font-medium">
               Saved — engineer will see this in QA Feedback Log.
             </p>
           )}
@@ -339,6 +342,6 @@ export function ReviewItemRow({
           onClose={() => setLightboxOpen(false)}
         />
       )}
-    </div>
+    </Card>
   )
 }
