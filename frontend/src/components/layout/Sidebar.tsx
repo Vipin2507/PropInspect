@@ -256,7 +256,7 @@ export function Sidebar({
         {!isCollapsed && (
           <div className="flex min-w-0 flex-1 items-center gap-2 px-1">
             <img
-              src="/icons/icon-192.png"
+              src="/icons/image.png"
               alt=""
               className="h-7 w-7 shrink-0 rounded-lg shadow-sm"
               width={28}
