@@ -1,6 +1,6 @@
-import * as Icons from 'lucide-react'
-import { cn } from '../../utils/cn'
 import { ChecklistItem } from './ChecklistItem'
+import { motion } from 'framer-motion'
+import { useMotionSafe } from '../../hooks/useMotionSafe'
 import type { InspectionResponse } from '../../types'
 
 export function ChecklistCategory({
@@ -23,28 +23,31 @@ export function ChecklistCategory({
   onImageRemove: (responseId: string, imageId: string) => void
   readOnly?: boolean
 }) {
-  const doneCount  = responses.filter((r) => r.status !== 'pending').length
-  const totalCount = category.items.length
-  const allDone    = doneCount === totalCount && totalCount > 0
-  const Icon = (Icons as any)[category.icon] || Icons.HelpCircle
+  const { reduced, stagger } = useMotionSafe()
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {category.items.map((item, i) => {
         const response = responses.find((r) => r.itemId === item.id)
         if (!response) return null
         return (
-          <ChecklistItem
+          <motion.div
             key={item.id}
-            index={i + 1}
-            label={item.label}
-            isMandatoryImage={item.isMandatoryImage}
-            response={response}
-            onChange={(patch) => onChange(item.id, patch)}
-            onImageAdd={(file, base64) => onImageAdd(response.id, file, base64)}
-            onImageRemove={(id) => onImageRemove(response.id, id)}
-            readOnly={readOnly}
-          />
+            initial={reduced ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={stagger(Math.min(i, 10))}
+          >
+            <ChecklistItem
+              index={i + 1}
+              label={item.label}
+              isMandatoryImage={item.isMandatoryImage}
+              response={response}
+              onChange={(patch) => onChange(item.id, patch)}
+              onImageAdd={(file, base64) => onImageAdd(response.id, file, base64)}
+              onImageRemove={(id) => onImageRemove(response.id, id)}
+              readOnly={readOnly}
+            />
+          </motion.div>
         )
       })}
     </div>

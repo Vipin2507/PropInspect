@@ -1,0 +1,29 @@
+---
+description: Concise UI upgrades must include seamless Framer Motion animations
+globs: frontend/src/pages/**/*.tsx,frontend/src/components/**/*.tsx
+alwaysApply: false
+---
+
+# Concise UI + Motion
+
+When restyling any remaining SnagDesk page or feature to match the dashboard concise UI, **always ship motion in the same pass** — do not leave animations for a follow-up.
+
+## Concise UI baseline
+- Wrapper: `motion.div` + `useMotionSafe().fadeUp`, `space-y-3 pb-4`
+- Header: `font-display text-lg font-bold md:text-xl`, subtitle `text-[11px] text-ink-400`
+- Compact CTAs: `Button size="sm"` with `!min-h-[36px] !px-2.5 text-xs` where dense
+- Tokens: `ink-*` / `brand-*` / `surface` (no `slate-*` / old `primary` leftovers)
+- Prefer `StatCard`, compact `Card` rows, overflow menus over heavy dual-action bars
+- Responsive: dense on mobile, usable grids on `md+`
+
+## Required motion (use `useMotionSafe`)
+- Page enter: `fadeUp`
+- Lists / grids: stagger children via `stagger(i)` (cap delay ~12 items)
+- Filter / tab / category switches: `AnimatePresence mode="wait"` crossfade or short slide
+- Interactive pills / segmented controls: `layoutId` spring (Tabs / SegmentedControl pattern)
+- Progress bars that change with state: animate width with motion when practical
+- Respect `reduced` — skip or zero-duration motion when `useReducedMotion` is set
+- Timing: ~0.28–0.42s ease `[0.22, 1, 0.36, 1]` or soft springs (stiffness ~160–400, damping ~26–32)
+
+## Reference screens
+Match patterns already used in: AdminDashboard, ProjectsList, ProjectDetail, MyFlats, FlatDetail, FillChecklist.

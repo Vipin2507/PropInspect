@@ -59,17 +59,17 @@ export function ChecklistItem({
         !hasStatus && !needsRevision && 'border-brand-200/60 bg-brand-50/20'
       )}
     >
-      <div className="flex items-start gap-3 p-4 pb-3">
+      <div className="flex items-start gap-2.5 p-3 pb-2">
         <div
           className={cn(
-            'mt-1 h-2.5 w-2.5 shrink-0 rounded-full',
+            'mt-1.5 h-2 w-2 shrink-0 rounded-full',
             response.status === 'pass' && 'bg-success-600',
             response.status === 'fail' && 'bg-danger-600',
             response.status === 'na' && 'bg-ink-400',
             response.status === 'pending' && 'bg-ink-200'
           )}
         />
-        <p className="flex-1 text-sm font-semibold leading-snug text-ink-800 md:text-base">
+        <p className="flex-1 text-sm font-semibold leading-snug text-ink-950">
           {index}. {label}
         </p>
         {!isDisabled && hasStatus && (
@@ -89,27 +89,27 @@ export function ChecklistItem({
       </div>
 
       {locked && (
-        <div className="mx-4 mb-3 flex items-center gap-2 rounded-lg bg-ink-50 px-3 py-2 text-xs font-medium text-ink-600">
-          <Lock size={12} aria-hidden />
+        <div className="mx-3 mb-2 flex items-center gap-2 rounded-md bg-ink-50 px-2.5 py-1.5 text-[11px] font-medium text-ink-600">
+          <Lock size={11} aria-hidden />
           Inspection is locked — contact QA for revision
         </div>
       )}
 
       {needsRevision && (
-        <div className="mx-4 mb-3 rounded-lg border border-warning-600/20 bg-warning-100 px-3 py-2 text-sm text-warning-600">
+        <div className="mx-3 mb-2 rounded-md border border-warning-600/20 bg-warning-100 px-2.5 py-2 text-xs text-warning-600">
           <p className="font-semibold">Sent for revision by QA</p>
           <p className="mt-0.5">{response.qaRemarks || 'Please review and correct this task.'}</p>
         </div>
       )}
       {isRejected && response.qaRemarks && (
-        <div className="mx-4 mb-3 rounded-lg border border-danger-600/20 bg-danger-100 px-3 py-2 text-sm text-danger-600">
+        <div className="mx-3 mb-2 rounded-md border border-danger-600/20 bg-danger-100 px-2.5 py-2 text-xs text-danger-600">
           <p className="font-semibold">Rejected by QA</p>
           <p className="mt-0.5">{response.qaRemarks}</p>
         </div>
       )}
 
       {!isDisabled && (
-        <div className="space-y-3 px-4 pb-4">
+        <div className="space-y-2.5 px-3 pb-3">
           <SegmentedControl
             layoutId={`status-${response.id}`}
             value={hasStatus ? (response.status as 'pass' | 'fail' | 'na') : null}
@@ -134,15 +134,15 @@ export function ChecklistItem({
             )}
           />
 
-          <div className="rounded-lg bg-ink-50 p-3">
+          <div className="rounded-md bg-ink-50 p-2.5">
             <ImageUploader images={response.images} onAdd={onImageAdd} onRemove={onImageRemove} />
           </div>
 
           {hasSnag && <SnagForm itemLabel={label} response={response} onChange={onChange} />}
 
           {isMandatoryImage && hasSnag && response.images.length === 0 && (
-            <p className="flex items-center gap-1.5 text-sm font-medium text-danger-600">
-              <AlertTriangle size={14} aria-hidden />
+            <p className="flex items-center gap-1.5 text-xs font-medium text-danger-600">
+              <AlertTriangle size={13} aria-hidden />
               Photo required for Fail
             </p>
           )}
@@ -150,9 +150,9 @@ export function ChecklistItem({
       )}
 
       {isDisabled && (
-        <div className="space-y-3 px-4 pb-4">
+        <div className="space-y-2.5 px-3 pb-3">
           {response.remarks ? (
-            <p className="rounded-md bg-ink-50 p-3 text-sm italic text-ink-600">
+            <p className="rounded-md bg-ink-50 p-2.5 text-xs italic text-ink-600">
               &ldquo;{response.remarks}&rdquo;
             </p>
           ) : null}
