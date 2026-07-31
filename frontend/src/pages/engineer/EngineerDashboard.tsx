@@ -1,8 +1,9 @@
-import { Building2, CheckCircle, Clock, Send, AlertTriangle, Plus } from 'lucide-react'
+import { Building2, CheckCircle, Clock, Send, AlertTriangle, Plus, Bell } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts'
 import { StatCard } from '../../components/ui/StatCard'
 import { useFlats } from '../../hooks/useFlats'
 import { useAuthStore } from '../../store/authStore'
+import { useNotificationStore } from '../../store/notificationStore'
 import { Badge } from '../../components/ui/Badge'
 import { Spinner } from '../../components/ui/Spinner'
 import { Button } from '../../components/ui/Button'
@@ -18,6 +19,7 @@ export default function EngineerDashboard() {
   const navigate = useNavigate()
   const { flats, loading } = useFlats()
   const { count: unseenFeedback } = useEngineerFeedbackCount()
+  const unreadCount = useNotificationStore((s) => s.unreadCount)
 
   if (loading && flats.length === 0) {
     return (
@@ -81,6 +83,28 @@ export default function EngineerDashboard() {
           colorClass="text-secondary bg-orange-100"
         />
       </div>
+
+      {unreadCount > 0 && (
+        <Link
+          to={ROUTES.ENGINEER_NOTIFICATIONS}
+          className="flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+              <Bell size={18} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-sky-900">
+                {unreadCount} new activit{unreadCount === 1 ? 'y' : 'ies'}
+              </p>
+              <p className="text-xs text-sky-700">Tap to open notifications</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-sky-600 px-2.5 py-0.5 text-xs font-bold text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        </Link>
+      )}
 
       {!isAdmin && unseenFeedback > 0 && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">

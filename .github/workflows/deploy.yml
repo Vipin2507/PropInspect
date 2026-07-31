@@ -1,0 +1,60 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: Add VPS to known_hosts
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          HOST="${VPS_HOST:-147.93.30.96}"
+          PORT="${VPS_PORT:-22}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          PM2_APP_NAME: ${{ secrets.PM2_APP_NAME }}
+          WEB_ROOT: ${{ secrets.WEB_ROOT }}
+        run: |
+          set -euo pipefail
+          HOST="${VPS_HOST:?Set secret VPS_HOST}"
+          USER="${VPS_USER:?Set secret VPS_USER}"
+          PORT="${VPS_PORT:-22}"
+          PATH_ON_VPS="${DEPLOY_PATH:?Set secret DEPLOY_PATH (e.g. /opt/propinspect)}"
+          APP_NAME="${PM2_APP_NAME:-propinspect-api}"
+          WEB="${WEB_ROOT:-}"
+
+          ssh -p "$PORT" \
+            -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            "${USER}@${HOST}" \
+            "export DEPLOY_PATH='${PATH_ON_VPS}' PM2_APP_NAME='${APP_NAME}' WEB_ROOT='${WEB}' GIT_BRANCH='main'; bash -s" \
+            < scripts/deploy.sh

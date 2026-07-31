@@ -16,6 +16,7 @@ import {
   MonitorDot,
   Activity,
   ScrollText,
+  Settings2,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { useAuthStore } from '../../store/authStore'
@@ -40,6 +41,8 @@ const adminNav: NavItem[] = [
   { to: ROUTES.DESNAGGING,        label: 'De-Snagging',    icon: Wrench },
   { to: ROUTES.ADMIN_MONITORING,  label: 'Monitoring',     icon: MonitorDot },
   { to: ROUTES.ADMIN_ACTIVITY,    label: 'Activity Log',   icon: Activity },
+  { to: ROUTES.ENGINEER_NOTIFICATIONS, label: 'Notifications', icon: Bell },
+  { to: ROUTES.ADMIN_NOTIF_SETTINGS, label: 'Notif. Settings', icon: Settings2 },
   { to: ROUTES.ADMIN_USERS,       label: 'Users',          icon: Users },
   { to: ROUTES.ADMIN_TEMPLATES,   label: 'Templates',      icon: ListChecks },
   { to: ROUTES.ADMIN_REPORTS,     label: 'Reports',        icon: FileText },

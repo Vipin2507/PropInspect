@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToResponse, rowToImage } from '../utils/mappers'
-import { createNotification } from '../utils/notifications'
+import { createNotification, touchEngineerActivity, touchQaActivity } from '../utils/notifications'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { logFlatHistory } from '../utils/flatHistory'
 import { logEngineerFeedback, markFeedbackSeenForResponse } from '../utils/engineerFeedbackLog'
@@ -163,6 +163,12 @@ router.patch(
     // Touch inspection last_updated
     db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspection.id)
 
+    touchEngineerActivity({
+      inspectionId: inspection.id,
+      flatId: inspection.flat_id,
+      engineerId: req.user!.id,
+    })
+
     // Req 3.6 — recalculate completion pct; fire flat_completion if newly 100%
     syncInspectionResponses(inspection.id)
     refreshCompletionNotified(inspection.id)
@@ -239,6 +245,13 @@ router.patch(
     db.prepare(
       `UPDATE responses SET qa_decision = ?, qa_remarks = ?, updated_at = datetime('now') WHERE id = ?`
     ).run(body.qaDecision, body.qaRemark ?? '', responseId)
+
+    touchQaActivity({
+      inspectionId: inspection.id,
+      flatId: inspection.flat_id,
+      engineerId: inspection.engineer_id,
+      qaId: req.user!.id,
+    })
 
     const itemLabel = getItemLabel(response.item_id as string, response.category_id as string)
     const categoryName = getCategoryName(response.category_id as string)

@@ -40,6 +40,7 @@ import ChecklistTemplates from './pages/admin/templates/ChecklistTemplates'
 import Reports from './pages/admin/reports/Reports'
 
 import ActivityLog from './pages/admin/ActivityLog'
+import NotificationSettings from './pages/admin/NotificationSettings'
 
 function HomeRedirect() {
   const user  = useAuthStore((s) => s.user)
@@ -98,6 +99,7 @@ export default function App() {
               <Route path={ROUTES.ADMIN_REPORTS}     element={<Reports />} />
               <Route path={ROUTES.ADMIN_MONITORING}  element={<FlatMonitoring />} />
               <Route path={ROUTES.ADMIN_ACTIVITY}    element={<ActivityLog />} />
+              <Route path={ROUTES.ADMIN_NOTIF_SETTINGS} element={<NotificationSettings />} />
             </Route>
 
             {/* ── De-Snagging — all roles ── */}

@@ -72,6 +72,20 @@ export async function resolveNotificationRoute(
   const id = n.relatedId
 
   switch (n.type) {
+    case 'inspection_started':
+    case 'inspection_resumed': {
+      if (role === 'qa' || role === 'admin') {
+        const inspectionId = await inspectionIdForFlat(id)
+        if (inspectionId) return ROUTES.QA_REVIEW_DETAIL(inspectionId)
+        return ROUTES.QA_ALL_FLATS
+      }
+      return ROUTES.ENGINEER_FLAT(id)
+    }
+
+    case 'qa_review_started':
+    case 'qa_review_resumed':
+      return ROUTES.ENGINEER_FLAT(id)
+
     case 'inspection_submitted': {
       if (role === 'qa' || role === 'admin') {
         const inspectionId = await inspectionIdForFlat(id)

@@ -9,7 +9,7 @@ import { authenticate } from '../middleware/auth'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToFlat } from '../utils/mappers'
 import { validateAndSubmitFromSync } from '../services/syncService'
-import { createNotification } from '../utils/notifications'
+import { createNotification, touchEngineerActivity } from '../utils/notifications'
 import { logTaskResponseChange } from '../utils/taskChangeLog'
 import { markFeedbackSeenForResponse } from '../utils/engineerFeedbackLog'
 
@@ -69,6 +69,13 @@ router.post(
             markFeedbackSeenForResponse(r.id)
           }
           db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
+          if (inspection) {
+            touchEngineerActivity({
+              inspectionId,
+              flatId: inspection.flat_id,
+              engineerId: inspection.engineer_id,
+            })
+          }
           processed++
 
         // ── 2. Submit / resubmit inspection ──────────────────────────────

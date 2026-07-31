@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
 import { OfflineBanner } from './OfflineBanner'
@@ -10,12 +10,22 @@ import { useNotificationStore } from '../../store/notificationStore'
 import { usePrefetchStore } from '../../store/prefetchStore'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
+import { notificationsApi } from '../../utils/api'
+import {
+  addLocalNotificationTapListener,
+  announceNewNotifications,
+  initLocalNotifications,
+} from '../../utils/localPush'
+import { resolveNotificationRoute, warmRouteData } from '../../utils/notificationNavigation'
+import type { Notification } from '../../types'
 
 export function AppShell() {
   const user = useAuthStore((s) => s.user)
   const fetchCount = useNotificationStore((s) => s.fetchCount)
+  const setUnreadCount = useNotificationStore((s) => s.setUnreadCount)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -29,6 +39,60 @@ export function AppShell() {
     fetchCount()
     return cleanup
   }, [user?.id, user?.role, fetchCount])
+
+  // Local notifications + 30s poll for new activity
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+
+    initLocalNotifications().catch(() => {})
+
+    const poll = async () => {
+      try {
+        const { data } = await notificationsApi.list()
+        if (cancelled) return
+        const list = data as Notification[]
+        const unread = list.filter((n) => !n.isRead).length
+        setUnreadCount(unread)
+        await announceNewNotifications(list)
+      } catch {
+        await fetchCount()
+      }
+    }
+
+    poll()
+    const interval = setInterval(poll, 30_000)
+
+    const removeTap = addLocalNotificationTapListener(async (extra) => {
+      try {
+        if (extra.notificationId) {
+          await notificationsApi.markRead(extra.notificationId).catch(() => {})
+        }
+        const fake: Notification = {
+          id: extra.notificationId || '',
+          userId: user.id,
+          type: (extra.type as Notification['type']) || 'inspection_submitted',
+          title: '',
+          message: '',
+          relatedId: extra.relatedId || '',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        }
+        const route = await resolveNotificationRoute(fake, user.role)
+        await warmRouteData(route)
+        navigate(route)
+        fetchCount()
+      } catch {
+        navigate(ROUTES_FALLBACK(user.role))
+      }
+    })
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      removeTap()
+    }
+  }, [user?.id, user?.role, fetchCount, setUnreadCount, navigate, user])
 
   // Prefetch all role data immediately after login / session restore
   useEffect(() => {
@@ -61,30 +125,29 @@ export function AppShell() {
   }, [isMobileMenuOpen])
 
   return (
-    // h-full inherits 100dvh from #root — never use h-screen here
     <div className="flex h-full bg-slate-100 text-slate-800">
-
-      {/* Desktop sidebar (≥1024px) */}
       <div className="hidden lg:flex lg:w-60 lg:shrink-0">
         <Sidebar />
       </div>
-      {/* Tablet icon sidebar (768–1023px) */}
       <div className="hidden md:flex md:w-[68px] md:shrink-0 lg:hidden">
         <Sidebar isCollapsed />
       </div>
 
-      {/* Mobile slide-in sidebar */}
       <Sidebar isMobile isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
-      {/* Main content column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMenuClick={() => setIsMobileMenuOpen(true)} />
         <OfflineBanner />
-        {/* flex-1 + overflow-y-auto = only this scrolls, shell stays fixed */}
         <main className="flex-1 overflow-y-auto overscroll-contain p-4 pb-safe md:p-6">
           <Outlet />
         </main>
       </div>
     </div>
   )
+}
+
+function ROUTES_FALLBACK(role: string): string {
+  if (role === 'qa') return '/qa/dashboard'
+  if (role === 'admin') return '/admin'
+  return '/engineer/dashboard'
 }

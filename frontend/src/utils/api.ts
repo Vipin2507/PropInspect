@@ -166,6 +166,10 @@ export const snagsApi = {
 export const reviewsApi = {
   queue: (filter?: string) => api.get('/reviews/queue', { params: { filter } }),
   get: (inspectionId: string) => api.get(`/reviews/${inspectionId}`),
+  start: (inspectionId: string) =>
+    api.post<{ ok: boolean; started: boolean; resumed: boolean }>(
+      `/reviews/${inspectionId}/start`
+    ),
   submit: (data: {
     inspectionId: string
     decision: string
@@ -173,6 +177,24 @@ export const reviewsApi = {
     itemComments: Record<string, string>
   }) => api.post<Review>('/reviews', data),
   history: () => api.get('/reviews/history/list'),
+}
+
+export type AppSettings = {
+  'notif.enabled': boolean
+  'notif.engineer_start_flat': boolean
+  'notif.engineer_resume_flat': boolean
+  'notif.qa_start_review': boolean
+  'notif.qa_resume_review': boolean
+  'notif.existing_submit_review': boolean
+  'notif.flat_completion': boolean
+  'notif.qa_task_feedback': boolean
+  'notif.resume_idle_hours': number
+  'notif.notify_admins': boolean
+}
+
+export const settingsApi = {
+  get: () => api.get<AppSettings>('/settings'),
+  update: (data: Partial<AppSettings>) => api.put<AppSettings>('/settings', data),
 }
 
 export const engineerFeedbackApi = {

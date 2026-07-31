@@ -6,6 +6,7 @@ import type { Notification } from '../types'
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
   const fetchCount = useNotificationStore((s) => s.fetchCount)
 
   const refresh = useCallback(async () => {
@@ -17,6 +18,7 @@ export function useNotifications() {
         setNotifications(
           cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         )
+        setLoading(false)
       }
     } catch { /* ignore */ }
 
@@ -30,9 +32,12 @@ export function useNotifications() {
       setNotifications(data)
       await fetchCount()
     } catch { /* keep cached */ }
+    finally {
+      setLoading(false)
+    }
   }, [fetchCount])
 
   useEffect(() => { refresh().catch(() => {}) }, [refresh])
 
-  return { notifications, refresh }
+  return { notifications, refresh, loading }
 }

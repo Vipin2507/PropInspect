@@ -8,7 +8,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToSnag, rowToImage } from '../utils/mappers'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
 import { getItemMandatoryImage } from '../constants/checklist'
-import { createNotification, createNotifications } from '../utils/notifications'
+import { createNotification, createNotifications, notifyInspectionStarted, touchEngineerActivity } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
 import { param } from '../utils/params'
 import {
@@ -99,6 +99,8 @@ function createDraftInspection(flatId: string, engineerId: string) {
     description: 'Snagging inspection checklist created for this flat.',
   })
 
+  notifyInspectionStarted({ flatId, engineerId, inspectionId })
+
   return loadInspection(inspectionId)!
 }
 
@@ -186,6 +188,12 @@ router.put(
 
     db.prepare(`UPDATE inspections SET last_updated = datetime('now') WHERE id = ?`).run(inspectionId)
     db.prepare(`UPDATE flats SET status = 'in_progress' WHERE id = ? AND status = 'not_started'`).run(inspection.flat_id)
+
+    touchEngineerActivity({
+      inspectionId,
+      flatId: inspection.flat_id as string,
+      engineerId: req.user!.id,
+    })
 
     // Fire flat_completion notification the first time we hit 100%
     const insp100 = db.prepare('SELECT id, flat_id, engineer_id, completion_notified FROM inspections WHERE id = ?')

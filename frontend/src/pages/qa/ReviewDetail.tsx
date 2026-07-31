@@ -84,6 +84,8 @@ export default function ReviewDetail() {
         setItemComments({})
         setIsOffline(false)
         setLoadError(null)
+        // Mark QA review started / resumed (server-side idle check)
+        reviewsApi.start(inspectionId).catch(() => {})
       })
       .catch(async (err: { response?: { status?: number; data?: { error?: string } } }) => {
         if (cancelled) return

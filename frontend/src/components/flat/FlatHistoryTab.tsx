@@ -36,6 +36,12 @@ const EVENT_CONFIG: Record<
     bg: 'bg-violet-50',
     border: 'border-violet-200',
   },
+  inspection_resumed: {
+    icon: RotateCcw,
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+  },
   review_approved: {
     icon: CheckCircle2,
     color: 'text-green-600',
@@ -53,6 +59,18 @@ const EVENT_CONFIG: Record<
     color: 'text-amber-600',
     bg: 'bg-amber-50',
     border: 'border-amber-200',
+  },
+  qa_review_started: {
+    icon: ClipboardList,
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
+  },
+  qa_review_resumed: {
+    icon: RotateCcw,
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
   },
   qa_task_revision: {
     icon: RotateCcw,

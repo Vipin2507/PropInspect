@@ -8,7 +8,9 @@ import { asyncHandler } from '../middleware/errorHandler'
 import { rowToInspection, rowToResponse, rowToImage, rowToSnag } from '../utils/mappers'
 import { createNotification, createNotifications } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
+import { param } from '../utils/params'
 import { isInspectionFullyComplete, syncInspectionResponses } from '../utils/inspectionTasks'
+import { touchQaActivity } from '../utils/notifications'
 
 const router = Router()
 router.use(authenticate)
@@ -95,7 +97,8 @@ router.get(
   requireRole('qa', 'admin', 'engineer'),
   asyncHandler(async (req, res) => {
     const db = getDB()
-    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(req.params.inspectionId) as Record<string, unknown>
+    const inspectionId = param(req, 'inspectionId')
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown>
     if (!row) {
       res.status(404).json({ error: 'Inspection not found' })
       return
@@ -106,13 +109,13 @@ router.get(
       return
     }
     const responses = (
-      db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(req.params.inspectionId) as Record<string, unknown>[]
+      db.prepare('SELECT * FROM responses WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
     ).map((r) => {
       const images = (db.prepare('SELECT * FROM images WHERE response_id = ?').all(r.id) as Record<string, unknown>[]).map(rowToImage)
       return rowToResponse(r, images)
     })
     const snags = (
-      db.prepare('SELECT * FROM snags WHERE inspection_id = ?').all(req.params.inspectionId) as Record<string, unknown>[]
+      db.prepare('SELECT * FROM snags WHERE inspection_id = ?').all(inspectionId) as Record<string, unknown>[]
     ).map((s) => rowToSnag(s, [], []))
     const flat = db.prepare('SELECT flat_number FROM flats WHERE id = ?').get(row.flat_id) as { flat_number: string }
     const engineer = db.prepare('SELECT name FROM users WHERE id = ?').get(row.engineer_id) as { name: string }
@@ -122,6 +125,28 @@ router.get(
       flatNumber: flat.flat_number,
       engineerName: engineer.name,
     })
+  })
+)
+
+/** POST /reviews/:inspectionId/start — QA opened a flat for review */
+router.post(
+  '/:inspectionId/start',
+  requireRole('qa', 'admin'),
+  asyncHandler(async (req, res) => {
+    const db = getDB()
+    const inspectionId = param(req, 'inspectionId')
+    const row = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown>
+    if (!row) {
+      res.status(404).json({ error: 'Inspection not found' })
+      return
+    }
+    const result = touchQaActivity({
+      inspectionId,
+      flatId: row.flat_id as string,
+      engineerId: row.engineer_id as string,
+      qaId: req.user!.id,
+    })
+    res.json({ ok: true, ...result })
   })
 )
 

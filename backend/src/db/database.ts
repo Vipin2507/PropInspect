@@ -64,9 +64,9 @@ export function runMigrations(database: SnagDeskDatabase): void {
   const additiveMigrations = [
     `ALTER TABLE responses ADD COLUMN qa_decision TEXT CHECK(qa_decision IN ('approved','rejected','revision_required'))`,
     `ALTER TABLE inspections ADD COLUMN completion_notified INTEGER NOT NULL DEFAULT 0`,
-    // Allow 'handed_over' status — SQLite doesn't support ALTER CHECK,
-    // so we recreate the index and rely on app-level validation instead.
-    // The CHECK constraint on existing rows won't block new inserts from Node.
+    `ALTER TABLE inspections ADD COLUMN last_engineer_activity_at TEXT`,
+    `ALTER TABLE inspections ADD COLUMN last_qa_activity_at TEXT`,
+    `ALTER TABLE inspections ADD COLUMN qa_review_started_at TEXT`,
   ]
   for (const sql of additiveMigrations) {
     try { database.exec(sql) } catch { /* column already exists */ }
@@ -383,6 +383,12 @@ export function runMigrations(database: SnagDeskDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_eng_feedback_engineer ON engineer_feedback_log(engineer_id, seen_at);
     CREATE INDEX IF NOT EXISTS idx_eng_feedback_flat     ON engineer_feedback_log(flat_id);
     CREATE INDEX IF NOT EXISTS idx_eng_feedback_created  ON engineer_feedback_log(created_at);
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
 }
 

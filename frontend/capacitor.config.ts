@@ -32,6 +32,11 @@ const config: CapacitorConfig = {
       backgroundColor: '#ffffff',
       overlaysWebView: false,
     },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#1A6FE8',
+      sound: 'default',
+    },
     Camera: {
       permissions: ['camera', 'photos'],
     },
