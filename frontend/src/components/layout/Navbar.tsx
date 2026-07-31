@@ -71,15 +71,10 @@ export function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
 
   return (
     <header
-      className="relative z-20 shrink-0 border-b border-ink-100/80 bg-surface/85 backdrop-blur-md md:px-4"
-      style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingLeft: 'env(safe-area-inset-left, 0px)',
-        paddingRight: 'env(safe-area-inset-right, 0px)',
-      }}
+      className="relative z-20 shrink-0 border-b border-ink-100/80 bg-surface/85 backdrop-blur-md pt-[env(safe-area-inset-top,0px)]"
     >
       {/* Mobile */}
-      <div className="flex h-12 w-full items-center px-1.5 md:hidden">
+      <div className="flex h-12 w-full items-center pl-[max(0.375rem,env(safe-area-inset-left,0px))] pr-[max(0.375rem,env(safe-area-inset-right,0px))] md:hidden">
         <div className="flex w-11 shrink-0 items-center">
           <button
             type="button"
@@ -123,8 +118,8 @@ export function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
       </div>
 
-      {/* Desktop */}
-      <div className="hidden h-14 w-full items-center md:flex">
+      {/* Desktop — align with main content padding */}
+      <div className="hidden h-14 w-full items-center px-5 md:flex lg:px-6">
         <AnimatePresence mode="wait" initial={false}>
           <motion.h1
             key={title}

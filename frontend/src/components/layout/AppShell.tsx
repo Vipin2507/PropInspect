@@ -167,7 +167,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMenuClick={() => setIsMobileMenuOpen(true)} />
         <OfflineBanner />
-        <main className="flex-1 overflow-y-auto overscroll-contain p-3 pb-safe md:p-4">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-3 pb-safe md:px-5 md:py-4 lg:px-6">
           <Outlet />
         </main>
       </div>
