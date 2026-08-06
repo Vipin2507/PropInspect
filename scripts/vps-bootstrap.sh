@@ -32,7 +32,7 @@ if [[ ! -f backend/.env ]]; then
   echo "==> Creating backend/.env from example — EDIT SECRETS before going live"
   cp backend/.env.example backend/.env
   sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' backend/.env || true
-  sed -i 's|^CORS_ORIGIN=.*|CORS_ORIGIN=https://147.93.30.96|' backend/.env || true
+  sed -i 's|^CORS_ORIGIN=.*|CORS_ORIGIN=https://snagdesk.cravingcodetech.in|' backend/.env || true
 fi
 
 mkdir -p backend/data backend/uploads

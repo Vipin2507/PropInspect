@@ -41,11 +41,23 @@ const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads'
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
 const allowedOrigins = [
   CORS_ORIGIN,
+  'https://snagdesk.cravingcodetech.in',
+  'http://snagdesk.cravingcodetech.in',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
   'http://localhost',
-  'https://localhost',       // Capacitor Android (androidScheme: https)
+  'https://localhost', // Capacitor Android (androidScheme: https)
   'capacitor://localhost', // Capacitor iOS
   'ionic://localhost',
 ]
+
+function isLocalDevOrigin(origin: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+}
 
 getDB()
 seedDatabase()
@@ -73,20 +85,30 @@ seedDatabase()
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(cors({
   origin: (origin, callback) => {
-    const isWildcard = process.env.CORS_ORIGIN === '*';
-    
-    if (!origin || isWildcard || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    const isWildcard = process.env.CORS_ORIGIN === '*'
+
+    if (
+      !origin ||
+      isWildcard ||
+      allowedOrigins.includes(origin) ||
+      isLocalDevOrigin(origin)
+    ) {
+      callback(null, true)
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('Not allowed by CORS'))
     }
   },
   credentials: true,
 }))
 
 app.use(morgan('dev'))
-app.use(express.json({ limit: '50mb' })) 
+app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
+
+// Health before rate limits — used by uptime checks & nginx; must never 429
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', app: 'SnagDesk API' })
+})
 
 // Rate limit — auth endpoints only; logged-in API traffic is not throttled here
 const authRateLimiter = rateLimit({
@@ -106,6 +128,7 @@ const apiRateLimiter = rateLimit({
     const ip = req.ip || ''
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true
     if (req.headers.authorization?.startsWith('Bearer ')) return true
+    if (req.path === '/health' || req.path === '/api/health') return true
     return false
   },
 })
@@ -114,10 +137,6 @@ app.use('/api/auth', authRateLimiter)
 app.use('/api', apiRateLimiter)
 
 app.use('/uploads', express.static(UPLOADS_DIR))
-
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', app: 'SnagDesk API' })
-})
 
 app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectRoutes)

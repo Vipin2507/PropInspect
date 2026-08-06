@@ -17,14 +17,30 @@ import type {
   FlatHistoryEntry,
 } from '../types'
 
-const getBaseURL = () =>
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+const PROD_ORIGIN = 'https://snagdesk.cravingcodetech.in'
 
-// Base URL for static media (uploads). Relative paths from the server
-// need to be prefixed with the VPS host when running as a native app,
-// because capacitor://localhost cannot resolve /uploads/... paths.
+const getBaseURL = () => {
+  // Native WebView cannot resolve relative /api — always use the public domain.
+  if (Capacitor.isNativePlatform()) {
+    return (
+      import.meta.env.VITE_NATIVE_API_BASE_URL ||
+      `${PROD_ORIGIN}/api`
+    )
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'
+}
+
+// Base URL for static media (uploads). Relative /uploads needs an absolute
+// origin on native (capacitor://localhost cannot resolve them).
 export const getMediaBaseURL = () => {
-  return getBaseURL().replace(/\/api$/, '')
+  const base = getBaseURL()
+  if (base.startsWith('/')) {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin
+    }
+    return PROD_ORIGIN
+  }
+  return base.replace(/\/api$/, '')
 }
 
 // Resolve a relative server path like /uploads/... to a full URL on native.

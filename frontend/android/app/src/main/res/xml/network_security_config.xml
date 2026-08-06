@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- VPS: trust pinned self-signed cert for HTTPS -->
+    <!-- Production domain uses a public CA (Let's Encrypt) — system trust is enough. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">snagdesk.cravingcodetech.in</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Legacy IP + pinned self-signed (keep until all clients use the domain) -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="false">147.93.30.96</domain>
         <trust-anchors>
             <certificates src="@raw/snagdesk" />
+            <certificates src="system" />
         </trust-anchors>
     </domain-config>
 
