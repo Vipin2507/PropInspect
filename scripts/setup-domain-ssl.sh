@@ -4,29 +4,63 @@
 #
 # Prerequisites:
 #   - DNS A record: snagdesk.cravingcodetech.in → this server's public IP
-#   - App already deployed (frontend dist + PM2 API on :4000)
+#   - Repo checked out (PM2 API on :4000 recommended)
 #
-# Usage:
-#   export DEPLOY_PATH=/apps/PropInspect
-#   export WEB_ROOT=/apps/PropInspect/frontend/dist   # optional
+# Usage (from the repo — path is auto-detected):
+#   cd ~/apps/PropInspect
+#   sudo -E bash scripts/setup-domain-ssl.sh
+#
+# Or set explicitly:
+#   export DEPLOY_PATH=/home/deploy/apps/PropInspect
 #   sudo -E bash scripts/setup-domain-ssl.sh
 
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-snagdesk.cravingcodetech.in}"
-DEPLOY_PATH="${DEPLOY_PATH:-/apps/PropInspect}"
+
+# Prefer explicit env, else directory containing this script's repo root,
+# else common deploy locations.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [[ -n "${DEPLOY_PATH:-}" ]]; then
+  :
+elif [[ -d "$REPO_ROOT/frontend" && -d "$REPO_ROOT/backend" ]]; then
+  DEPLOY_PATH="$REPO_ROOT"
+elif [[ -d /home/deploy/apps/PropInspect/.git ]]; then
+  DEPLOY_PATH=/home/deploy/apps/PropInspect
+elif [[ -d /apps/PropInspect/.git ]]; then
+  DEPLOY_PATH=/apps/PropInspect
+else
+  DEPLOY_PATH="$REPO_ROOT"
+fi
+
 WEB_ROOT="${WEB_ROOT:-$DEPLOY_PATH/frontend/dist}"
 EMAIL="${CERTBOT_EMAIL:-admin@${DOMAIN#*.}}"
 SITE_AVAIL="/etc/nginx/sites-available/snagdesk"
 SITE_ENABLED="/etc/nginx/sites-enabled/snagdesk"
 
 echo "==> Domain SSL setup for $DOMAIN"
+echo "    deploy:   $DEPLOY_PATH"
 echo "    web root: $WEB_ROOT"
 
-if [[ ! -d "$WEB_ROOT" ]]; then
-  echo "ERROR: WEB_ROOT missing: $WEB_ROOT"
-  echo "Build frontend first (npm run build) or set WEB_ROOT."
+if [[ ! -d "$DEPLOY_PATH" ]]; then
+  echo "ERROR: DEPLOY_PATH does not exist: $DEPLOY_PATH"
+  echo "cd into the repo (e.g. ~/apps/PropInspect) and re-run, or export DEPLOY_PATH=..."
   exit 1
+fi
+
+# Certbot only needs a reachable HTTP root; create a stub if frontend isn't built yet.
+if [[ ! -d "$WEB_ROOT" ]]; then
+  echo "==> WEB_ROOT missing — creating stub (run frontend build / deploy.sh after SSL)"
+  mkdir -p "$WEB_ROOT"
+  if [[ ! -f "$WEB_ROOT/index.html" ]]; then
+    cat > "$WEB_ROOT/index.html" <<'HTML'
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SnagDesk</title></head>
+<body><p>SnagDesk — build frontend (deploy.sh) to replace this page.</p></body></html>
+HTML
+  fi
 fi
 
 if ! command -v nginx >/dev/null 2>&1; then
