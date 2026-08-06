@@ -144,7 +144,7 @@ export default function LoginPage() {
   )
 
   return (
-    <div className="relative min-h-screen-safe overflow-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600 safe-all">
+    <div className="relative min-h-screen-safe overflow-x-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-600 safe-all">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <motion.div
           className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"
@@ -159,7 +159,7 @@ export default function LoginPage() {
         <div className="absolute bottom-1/3 left-1/3 h-64 w-64 rounded-full bg-brand-900/30 blur-3xl" />
       </div>
 
-      <div className="relative flex min-h-screen-safe flex-col md:hidden">
+      <div className="relative flex min-h-screen-safe flex-col overflow-y-auto md:hidden">
         <motion.div
           className="flex flex-1 flex-col items-center justify-end pb-8 pt-16"
           {...fadeUp}

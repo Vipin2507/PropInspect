@@ -138,16 +138,25 @@ export function AppShell() {
   }, [location.pathname])
 
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+    }
   }, [isMobileMenuOpen])
 
   return (
-    <div className="flex h-full bg-brand-50 text-ink-800">
+    <div className="flex h-full min-h-0 w-full flex-1 bg-brand-50 text-ink-800">
       {/* Desktop / tablet sidebar — width animates */}
       <div
         className={cn(
-          'hidden h-full shrink-0 overflow-hidden md:flex',
+          'hidden h-full min-h-0 shrink-0 overflow-hidden md:flex',
           'transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]',
           sidebarCollapsed ? 'w-14' : 'w-52'
         )}
@@ -164,10 +173,10 @@ export function AppShell() {
         onClose={() => setIsMobileMenuOpen(false)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar onMenuClick={() => setIsMobileMenuOpen(true)} />
         <OfflineBanner />
-        <main className="flex-1 overflow-y-auto overscroll-contain p-3 pb-safe md:px-5 md:py-4 lg:px-6">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y p-3 pb-safe md:px-5 md:py-4 lg:px-6">
           <Outlet />
         </main>
       </div>
