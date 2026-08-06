@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # One-time VPS setup. Run as the deploy user on the server.
 # Usage:
-#   export DEPLOY_PATH=/opt/propinspect
+#   export DEPLOY_PATH=/apps/PropInspect
 #   export GIT_REPO=https://github.com/Vipin2507/PropInspect.git
 #   bash scripts/vps-bootstrap.sh
 #
 # Or after cloning manually:
-#   cd /opt/propinspect && bash scripts/vps-bootstrap.sh
+#   cd /apps/PropInspect && bash scripts/vps-bootstrap.sh
 
 set -euo pipefail
 
-DEPLOY_PATH="${DEPLOY_PATH:-/opt/propinspect}"
+DEPLOY_PATH="${DEPLOY_PATH:-/apps/PropInspect}"
 GIT_REPO="${GIT_REPO:-https://github.com/Vipin2507/PropInspect.git}"
 PM2_APP_NAME="${PM2_APP_NAME:-propinspect-api}"
 

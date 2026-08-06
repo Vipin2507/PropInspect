@@ -11,7 +11,7 @@ server {
     # ssl_certificate     /etc/ssl/certs/propinspect.crt;
     # ssl_certificate_key /etc/ssl/private/propinspect.key;
 
-    root /opt/propinspect/frontend/dist;
+    root /apps/PropInspect/frontend/dist;
     index index.html;
 
     client_max_body_size 20M;

@@ -7,14 +7,14 @@
 #   - App already deployed (frontend dist + PM2 API on :4000)
 #
 # Usage:
-#   export DEPLOY_PATH=/opt/propinspect
-#   export WEB_ROOT=/opt/propinspect/frontend/dist   # optional
+#   export DEPLOY_PATH=/apps/PropInspect
+#   export WEB_ROOT=/apps/PropInspect/frontend/dist   # optional
 #   sudo -E bash scripts/setup-domain-ssl.sh
 
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-snagdesk.cravingcodetech.in}"
-DEPLOY_PATH="${DEPLOY_PATH:-/opt/propinspect}"
+DEPLOY_PATH="${DEPLOY_PATH:-/apps/PropInspect}"
 WEB_ROOT="${WEB_ROOT:-$DEPLOY_PATH/frontend/dist}"
 EMAIL="${CERTBOT_EMAIL:-admin@${DOMAIN#*.}}"
 SITE_AVAIL="/etc/nginx/sites-available/snagdesk"

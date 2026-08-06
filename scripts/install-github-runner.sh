@@ -51,4 +51,4 @@ echo "Done. In GitHub → Settings → Actions → Runners you should see 'propi
 echo "Then push to main (or Run workflow) to deploy."
 echo ""
 echo "You can remove these secrets if you only used SSH deploy: VPS_SSH_PRIVATE_KEY, VPS_HOST, VPS_USER, VPS_PORT, VPS_SSH_KNOWN_HOSTS"
-echo "Keep: DEPLOY_PATH=/home/deploy/apps/PropInspect  PM2_APP_NAME=propinspect-api"
+echo "Keep: DEPLOY_PATH=/apps/PropInspect  PM2_APP_NAME=propinspect-api"
