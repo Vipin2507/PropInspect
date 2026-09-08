@@ -39,11 +39,16 @@ export default function LoginPage() {
         message?: string
       }
       const serverMsg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message
-      const networkErr = axiosErr?.code || axiosErr?.message
-      toast.error(
-        serverMsg ||
-          (networkErr ? `Network error: ${networkErr}` : 'Login failed. Check connection.')
-      )
+      const code = axiosErr?.code
+      if (serverMsg) {
+        toast.error(serverMsg)
+      } else if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+        toast.error('Connection timed out. Check your network and try again.')
+      } else if (code === 'ERR_NETWORK' || axiosErr?.message === 'Network Error') {
+        toast.error('Cannot reach server. Check internet connection.')
+      } else {
+        toast.error(code ? `Network error: ${code}` : 'Login failed. Check connection.')
+      }
     } finally {
       setLoading(false)
     }

@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    cleartext: true,  // allow HTTP to VPS IP (self-signed cert workaround)
+    // HTTPS-only to production domain (Let's Encrypt). No cleartext needed.
+    cleartext: false,
   },
   android: {
     backgroundColor: '#ffffff',
