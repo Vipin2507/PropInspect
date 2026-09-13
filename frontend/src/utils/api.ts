@@ -22,16 +22,12 @@ const PROD_API = `${PROD_ORIGIN}/api`
 
 const getBaseURL = () => {
   // Native WebView must use an absolute HTTPS URL (relative /api won't resolve).
-  // Always prefer the public domain — never the old IP / self-signed host.
   if (Capacitor.isNativePlatform()) {
-    const configured = import.meta.env.VITE_NATIVE_API_BASE_URL
-    if (configured && !configured.includes('147.93.30.96')) return configured
-    return PROD_API
+    return import.meta.env.VITE_NATIVE_API_BASE_URL || PROD_API
   }
 
   const web = import.meta.env.VITE_API_BASE_URL
-  if (web && !web.includes('147.93.30.96')) return web
-  // Dev fallback
+  if (web) return web
   if (import.meta.env.DEV) return 'http://localhost:4000/api'
   return '/api'
 }

@@ -2,6 +2,11 @@
 # Runs on the VPS (piped over SSH from GitHub Actions).
 # Required env: DEPLOY_PATH
 # Optional: PM2_APP_NAME (default propinspect-api), WEB_ROOT, GIT_BRANCH (default main)
+#
+# CloudPanel defaults (snagdesk.cravingcodetech.in):
+#   DEPLOY_PATH=/home/snagdesk/apps/PropInspect
+#   WEB_ROOT=/home/snagdesk/htdocs/snagdesk.cravingcodetech.in
+#   API listens on PORT from backend/.env (4010 on this VPS; nginx proxies /api)
 
 set -euo pipefail
 
@@ -10,10 +15,18 @@ PM2_APP_NAME="${PM2_APP_NAME:-propinspect-api}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 WEB_ROOT="${WEB_ROOT:-}"
 
+# Auto-pick CloudPanel htdocs when WEB_ROOT unset
+if [[ -z "$WEB_ROOT" ]]; then
+  if [[ -d /home/snagdesk/htdocs/snagdesk.cravingcodetech.in ]]; then
+    WEB_ROOT=/home/snagdesk/htdocs/snagdesk.cravingcodetech.in
+  fi
+fi
+
 echo "==> Deploying PropInspect"
 echo "    path:   $DEPLOY_PATH"
 echo "    branch: $GIT_BRANCH"
 echo "    pm2:    $PM2_APP_NAME"
+echo "    web:    ${WEB_ROOT:-"(none — frontend dist only)"}"
 
 # Non-interactive SSH often skips .bashrc — load Node from common install locations.
 load_node() {
@@ -93,7 +106,14 @@ npm run build
 if [[ -n "$WEB_ROOT" ]]; then
   echo "==> Syncing frontend dist → $WEB_ROOT"
   mkdir -p "$WEB_ROOT"
-  rsync -a --delete "$DEPLOY_PATH/frontend/dist/" "$WEB_ROOT/"
+  # Keep ACME challenge dir / any panel files under .well-known
+  rsync -a --delete --exclude '.well-known' \
+    "$DEPLOY_PATH/frontend/dist/" "$WEB_ROOT/"
+  mkdir -p "$WEB_ROOT/.well-known/acme-challenge"
+  # CloudPanel site user ownership when deploying as root
+  if id snagdesk >/dev/null 2>&1 && [[ "$WEB_ROOT" == /home/snagdesk/* ]]; then
+    chown -R snagdesk:snagdesk "$WEB_ROOT" || true
+  fi
 fi
 
 echo "==> Restart API ($PM2_APP_NAME)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# One-time VPS setup. Run as the deploy user on the server.
+# One-time VPS setup. Run as the site/deploy user on the server.
 # Usage:
-#   export DEPLOY_PATH=/home/deploy/apps/PropInspect
+#   export DEPLOY_PATH=/home/snagdesk/apps/PropInspect
 #   export GIT_REPO=https://github.com/Vipin2507/PropInspect.git
 #   bash scripts/vps-bootstrap.sh
 #
@@ -10,9 +10,11 @@
 
 set -euo pipefail
 
-DEPLOY_PATH="${DEPLOY_PATH:-/home/deploy/apps/PropInspect}"
+DEPLOY_PATH="${DEPLOY_PATH:-/home/snagdesk/apps/PropInspect}"
 GIT_REPO="${GIT_REPO:-https://github.com/Vipin2507/PropInspect.git}"
 PM2_APP_NAME="${PM2_APP_NAME:-propinspect-api}"
+# On this CloudPanel host, 4000 is used by another app — default SnagDesk to 4010.
+API_PORT="${API_PORT:-4010}"
 
 echo "==> Bootstrap PropInspect at $DEPLOY_PATH"
 
@@ -32,6 +34,7 @@ if [[ ! -f backend/.env ]]; then
   echo "==> Creating backend/.env from example — EDIT SECRETS before going live"
   cp backend/.env.example backend/.env
   sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' backend/.env || true
+  sed -i "s/^PORT=.*/PORT=${API_PORT}/" backend/.env || true
   sed -i 's|^CORS_ORIGIN=.*|CORS_ORIGIN=https://snagdesk.cravingcodetech.in|' backend/.env || true
 fi
 
@@ -53,5 +56,7 @@ else
   echo "Then: cd $DEPLOY_PATH && pm2 start ecosystem.config.cjs && pm2 save && pm2 startup"
 fi
 
-echo "==> Bootstrap done. Point nginx root at $DEPLOY_PATH/frontend/dist"
-echo "    and proxy /api → http://127.0.0.1:4000"
+echo "==> Bootstrap done."
+echo "    Sync frontend to CloudPanel htdocs (or set WEB_ROOT in GitHub Actions):"
+echo "      rsync -a --delete frontend/dist/ /home/snagdesk/htdocs/snagdesk.cravingcodetech.in/"
+echo "    Nginx must proxy /api and /uploads → http://127.0.0.1:${API_PORT}"

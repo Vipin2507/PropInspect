@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Production domain uses a public CA (Let's Encrypt) — system trust is enough. -->
+    <!-- Production: Let's Encrypt on snagdesk.cravingcodetech.in — system CAs. -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">snagdesk.cravingcodetech.in</domain>
         <trust-anchors>
@@ -8,16 +8,7 @@
         </trust-anchors>
     </domain-config>
 
-    <!-- Legacy IP + pinned self-signed (keep until all clients use the domain) -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="false">147.93.30.96</domain>
-        <trust-anchors>
-            <certificates src="@raw/snagdesk" />
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
-
-    <!-- Local dev -->
+    <!-- Local / emulator dev -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>

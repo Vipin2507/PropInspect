@@ -31,10 +31,9 @@ jobs:
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          HOST="${VPS_HOST:-}"
-          PORT="${VPS_PORT:-}"
-          HOST="${HOST:-147.93.30.96}"
-          PORT="${PORT:-22}"
+          # CloudPanel VPS (snagdesk.cravingcodetech.in)
+          HOST="${VPS_HOST:-69.62.84.237}"
+          PORT="${VPS_PORT:-22}"
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -68,18 +67,12 @@ jobs:
           WEB_ROOT: ${{ secrets.WEB_ROOT }}
         run: |
           set -euo pipefail
-          HOST="${VPS_HOST:-}"
-          USER="${VPS_USER:-}"
-          PORT="${VPS_PORT:-}"
-          PATH_ON_VPS="${DEPLOY_PATH:-}"
-          APP_NAME="${PM2_APP_NAME:-}"
-          WEB="${WEB_ROOT:-}"
-
-          HOST="${HOST:-147.93.30.96}"
-          USER="${USER:?Set secret VPS_USER}"
-          PORT="${PORT:-22}"
-          PATH_ON_VPS="${PATH_ON_VPS:?Set secret DEPLOY_PATH}"
-          APP_NAME="${APP_NAME:-propinspect-api}"
+          HOST="${VPS_HOST:-69.62.84.237}"
+          USER="${VPS_USER:?Set secret VPS_USER (e.g. root or snagdesk)}"
+          PORT="${VPS_PORT:-22}"
+          PATH_ON_VPS="${DEPLOY_PATH:-/home/snagdesk/apps/PropInspect}"
+          APP_NAME="${PM2_APP_NAME:-propinspect-api}"
+          WEB="${WEB_ROOT:-/home/snagdesk/htdocs/snagdesk.cravingcodetech.in}"
 
           SSH_OPTS=(
             -p "$PORT"
@@ -94,13 +87,11 @@ jobs:
             SSH_OPTS+=(-o StrictHostKeyChecking=yes)
           fi
 
-          echo "Deploying to ${USER}@${HOST}:${PORT} path=${PATH_ON_VPS} pm2=${APP_NAME}"
+          echo "Deploying to ${USER}@${HOST}:${PORT} path=${PATH_ON_VPS} web=${WEB} pm2=${APP_NAME}"
 
           if ! ssh "${SSH_OPTS[@]}" "${USER}@${HOST}" "echo ssh_ok"; then
             echo "::error::SSH timed out or was refused."
-            echo "Hostinger panel firewall looks open — also check ON the VPS:"
-            echo "  sudo ufw status"
-            echo "  sudo iptables -L INPUT -n | head -40"
+            echo "Check VPS firewall / ufw and that secrets VPS_HOST / VPS_USER / VPS_SSH_PRIVATE_KEY match the new server."
             exit 1
           fi
 

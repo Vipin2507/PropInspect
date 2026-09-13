@@ -4,19 +4,21 @@
 #
 # Prerequisites:
 #   - DNS A record: snagdesk.cravingcodetech.in → this server's public IP
-#   - Repo checked out (PM2 API on :4000 recommended)
+#   - Repo checked out (PM2 API on :4010 on CloudPanel host; override API_PORT)
 #
 # Usage (from the repo — path is auto-detected):
 #   cd ~/apps/PropInspect
 #   sudo -E bash scripts/setup-domain-ssl.sh
 #
 # Or set explicitly:
-#   export DEPLOY_PATH=/home/deploy/apps/PropInspect
+#   export DEPLOY_PATH=/home/snagdesk/apps/PropInspect
+#   export WEB_ROOT=/home/snagdesk/htdocs/snagdesk.cravingcodetech.in
 #   sudo -E bash scripts/setup-domain-ssl.sh
 
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-snagdesk.cravingcodetech.in}"
+API_PORT="${API_PORT:-4010}"
 
 # Prefer explicit env, else directory containing this script's repo root,
 # else common deploy locations.
@@ -27,6 +29,8 @@ if [[ -n "${DEPLOY_PATH:-}" ]]; then
   :
 elif [[ -d "$REPO_ROOT/frontend" && -d "$REPO_ROOT/backend" ]]; then
   DEPLOY_PATH="$REPO_ROOT"
+elif [[ -d /home/snagdesk/apps/PropInspect/.git ]]; then
+  DEPLOY_PATH=/home/snagdesk/apps/PropInspect
 elif [[ -d /home/deploy/apps/PropInspect/.git ]]; then
   DEPLOY_PATH=/home/deploy/apps/PropInspect
 elif [[ -d /apps/PropInspect/.git ]]; then
@@ -35,7 +39,13 @@ else
   DEPLOY_PATH="$REPO_ROOT"
 fi
 
-WEB_ROOT="${WEB_ROOT:-$DEPLOY_PATH/frontend/dist}"
+if [[ -z "${WEB_ROOT:-}" ]]; then
+  if [[ -d /home/snagdesk/htdocs/${DOMAIN} ]]; then
+    WEB_ROOT=/home/snagdesk/htdocs/${DOMAIN}
+  else
+    WEB_ROOT="$DEPLOY_PATH/frontend/dist"
+  fi
+fi
 EMAIL="${CERTBOT_EMAIL:-admin@${DOMAIN#*.}}"
 SITE_AVAIL="/etc/nginx/sites-available/snagdesk"
 SITE_ENABLED="/etc/nginx/sites-enabled/snagdesk"
@@ -43,6 +53,7 @@ SITE_ENABLED="/etc/nginx/sites-enabled/snagdesk"
 echo "==> Domain SSL setup for $DOMAIN"
 echo "    deploy:   $DEPLOY_PATH"
 echo "    web root: $WEB_ROOT"
+echo "    api port: $API_PORT"
 
 if [[ ! -d "$DEPLOY_PATH" ]]; then
   echo "ERROR: DEPLOY_PATH does not exist: $DEPLOY_PATH"
@@ -78,7 +89,7 @@ fi
 # Write HTTP site (certbot will add SSL)
 cat > "$SITE_AVAIL" <<EOF
 upstream snagdesk_api {
-    server 127.0.0.1:4000;
+    server 127.0.0.1:${API_PORT};
     keepalive 16;
 }
 
