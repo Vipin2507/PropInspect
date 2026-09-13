@@ -37,14 +37,11 @@ jobs:
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+          : > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-          if [ -n "${VPS_SSH_KNOWN_HOSTS:-}" ]; then
-            printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-            chmod 600 ~/.ssh/known_hosts
-            echo "Loaded known_hosts from secret."
-            exit 0
-          fi
-
+          # Always fetch keys for the *current* host (avoids stale VPS_SSH_KNOWN_HOSTS
+          # left over from an old IP after migration).
           echo "Scanning ${HOST}:${PORT}..."
           if ssh-keyscan -T 15 -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err \
             && grep -qE 'ssh-(rsa|ed25519)|ecdsa-' ~/.ssh/known_hosts; then
@@ -54,6 +51,14 @@ jobs:
 
           echo "ssh-keyscan failed:"
           cat /tmp/keyscan.err || true
+
+          if [ -n "${VPS_SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/known_hosts
+            echo "Fell back to VPS_SSH_KNOWN_HOSTS secret."
+            exit 0
+          fi
+
           echo "ACCEPT_NEW=1" >> "$GITHUB_ENV"
           echo "Will use StrictHostKeyChecking=accept-new"
 
