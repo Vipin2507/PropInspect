@@ -79,10 +79,14 @@ fi
 
 cd "$DEPLOY_PATH"
 
+# CloudPanel: repo often owned by site user (snagdesk) while Actions SSHs as root.
+# Without this, git refuses: "detected dubious ownership in repository".
+git config --global --add safe.directory "$DEPLOY_PATH" || true
+
 echo "==> Fetching $GIT_BRANCH"
-git fetch --prune origin "$GIT_BRANCH"
-git checkout "$GIT_BRANCH"
-git reset --hard "origin/$GIT_BRANCH"
+git -c "safe.directory=$DEPLOY_PATH" fetch --prune origin "$GIT_BRANCH"
+git -c "safe.directory=$DEPLOY_PATH" checkout "$GIT_BRANCH"
+git -c "safe.directory=$DEPLOY_PATH" reset --hard "origin/$GIT_BRANCH"
 
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
   echo "ERROR: node/npm not found on PATH after loading nvm/fnm."
@@ -135,4 +139,4 @@ fi
 
 pm2 status "$PM2_APP_NAME" || pm2 status
 
-echo "==> Deploy complete ($(git rev-parse --short HEAD))"
+echo "==> Deploy complete ($(git -c "safe.directory=$DEPLOY_PATH" rev-parse --short HEAD))"
