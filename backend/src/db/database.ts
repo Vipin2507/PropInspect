@@ -68,6 +68,61 @@ export function getDB(): SnagDeskDatabase {
   return db
 }
 
+const FLATS_STATUS_CHECK_SQL = `CHECK(status IN (
+                           'not_started','in_progress','submitted',
+                           'approved','rejected','revision_required',
+                           'desnagging','handed_over'
+                         ))`
+
+function flatsAllowsHandedOver(database: SnagDeskDatabase): boolean {
+  const row = database
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'flats'`)
+    .get() as { sql?: string } | undefined
+  return Boolean(row?.sql?.includes('handed_over'))
+}
+
+/** SQLite cannot ALTER a CHECK constraint. Rebuild flats with FK checks off. */
+function migrateFlatsStatusCheck(database: SnagDeskDatabase): void {
+  const exists = database
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'flats'`)
+    .get()
+  if (!exists) return
+  if (flatsAllowsHandedOver(database)) return
+
+  database.exec('PRAGMA foreign_keys = OFF')
+  try {
+    database.exec('DROP TABLE IF EXISTS flats_new')
+    database.exec(`
+      CREATE TABLE flats_new (
+        id           TEXT PRIMARY KEY,
+        tower_id     TEXT NOT NULL REFERENCES towers(id) ON DELETE CASCADE,
+        project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        floor_id     TEXT NOT NULL REFERENCES floors(id) ON DELETE CASCADE,
+        flat_number  TEXT NOT NULL,
+        floor        INTEGER NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'not_started'
+                       ${FLATS_STATUS_CHECK_SQL},
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    database.exec('INSERT INTO flats_new SELECT * FROM flats')
+    database.exec('DROP TABLE flats')
+    database.exec('ALTER TABLE flats_new RENAME TO flats')
+    database.exec('CREATE INDEX IF NOT EXISTS idx_flats_tower   ON flats(tower_id)')
+    database.exec('CREATE INDEX IF NOT EXISTS idx_flats_project ON flats(project_id)')
+    database.exec('CREATE INDEX IF NOT EXISTS idx_flats_floor   ON flats(floor_id)')
+    database.exec('CREATE INDEX IF NOT EXISTS idx_flats_status  ON flats(status)')
+  } finally {
+    database.exec('PRAGMA foreign_keys = ON')
+  }
+
+  if (!flatsAllowsHandedOver(database)) {
+    console.error('[db] Failed to migrate flats.status CHECK to include handed_over')
+  } else {
+    console.log('[db] flats.status CHECK updated to include handed_over')
+  }
+}
+
 export function runMigrations(database: SnagDeskDatabase): void {
   // Additive column migrations — safe to run on existing DBs
   const additiveMigrations = [
@@ -81,41 +136,7 @@ export function runMigrations(database: SnagDeskDatabase): void {
     try { database.exec(sql) } catch { /* column already exists */ }
   }
 
-  // Migrate flats status CHECK to include handed_over (SQLite workaround)
-  try {
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS _flats_status_migration (done INTEGER DEFAULT 0);
-    `)
-    const done = database.prepare('SELECT done FROM _flats_status_migration LIMIT 1').get() as { done: number } | undefined
-    if (!done) {
-      // SQLite can't ALTER CHECK constraints — we recreate the table
-      database.exec(`
-        CREATE TABLE IF NOT EXISTS flats_new (
-          id           TEXT PRIMARY KEY,
-          tower_id     TEXT NOT NULL REFERENCES towers(id) ON DELETE CASCADE,
-          project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-          floor_id     TEXT NOT NULL REFERENCES floors(id) ON DELETE CASCADE,
-          flat_number  TEXT NOT NULL,
-          floor        INTEGER NOT NULL,
-          status       TEXT NOT NULL DEFAULT 'not_started'
-                         CHECK(status IN (
-                           'not_started','in_progress','submitted',
-                           'approved','rejected','revision_required',
-                           'desnagging','handed_over'
-                         )),
-          created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-        INSERT OR IGNORE INTO flats_new SELECT * FROM flats;
-        DROP TABLE flats;
-        ALTER TABLE flats_new RENAME TO flats;
-        CREATE INDEX IF NOT EXISTS idx_flats_tower   ON flats(tower_id);
-        CREATE INDEX IF NOT EXISTS idx_flats_project ON flats(project_id);
-        CREATE INDEX IF NOT EXISTS idx_flats_floor   ON flats(floor_id);
-        CREATE INDEX IF NOT EXISTS idx_flats_status  ON flats(status);
-        INSERT INTO _flats_status_migration (done) VALUES (1);
-      `)
-    }
-  } catch { /* already migrated */ }
+  migrateFlatsStatusCheck(database)
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -174,7 +195,8 @@ export function runMigrations(database: SnagDeskDatabase): void {
       status       TEXT NOT NULL DEFAULT 'not_started'
                      CHECK(status IN (
                        'not_started','in_progress','submitted',
-                       'approved','rejected','revision_required','desnagging'
+                       'approved','rejected','revision_required',
+                       'desnagging','handed_over'
                      )),
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );

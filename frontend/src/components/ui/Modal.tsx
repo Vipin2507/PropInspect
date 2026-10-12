@@ -25,6 +25,7 @@ export function Modal({ open, isOpen, onOpenChange, onClose, title, children, cl
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 transition-opacity" />
         <Dialog.Content
+          aria-describedby={undefined}
           className={cn(
             // Mobile: full-width bottom sheet
             'fixed z-50 w-full bg-white shadow-2xl outline-none',
@@ -40,11 +41,12 @@ export function Modal({ open, isOpen, onOpenChange, onClose, title, children, cl
           {/* Drag handle (mobile only) */}
           <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-300 md:hidden" />
 
-          {title && (
-            <Dialog.Title className="mb-5 pr-10 text-lg font-bold text-slate-900">
-              {title}
-            </Dialog.Title>
-          )}
+          <Dialog.Title className={title ? 'mb-5 pr-10 text-lg font-bold text-slate-900' : 'sr-only'}>
+            {title || 'Dialog'}
+          </Dialog.Title>
+          <Dialog.Description className="sr-only">
+            {title || 'Dialog'}
+          </Dialog.Description>
 
           <Dialog.Close asChild>
             <button

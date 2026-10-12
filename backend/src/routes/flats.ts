@@ -189,7 +189,18 @@ router.patch(
     }
 
     const previousStatus = flat.status
-    db.prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, flatId)
+    try {
+      db.prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, flatId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.toLowerCase().includes('constraint')) {
+        res.status(500).json({
+          error: `Cannot set status to "${status}". Restart the API so the database migration for handed_over can run.`,
+        })
+        return
+      }
+      throw err
+    }
 
     const inspection = db
       .prepare('SELECT id, status FROM inspections WHERE flat_id = ?')
