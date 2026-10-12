@@ -1,10 +1,10 @@
+import './loadEnv'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import path from 'path'
-import dotenv from 'dotenv'
 
 import { getDB } from './db/database'
 import { seedDatabase } from './db/seed'
@@ -31,8 +31,6 @@ import bulkUploadRoutes from './routes/bulkUpload'
 import qaChangesRoutes from './routes/qaChanges'
 import engineerFeedbackRoutes from './routes/engineerFeedback'
 import settingsRoutes from './routes/settings'
-
-dotenv.config()
 
 const app = express()
 app.set('trust proxy', 1);
@@ -162,5 +160,7 @@ app.use('/api/settings', settingsRoutes)
 app.use(errorHandler)
 
 app.listen(PORT, () => {
-  console.log(`SnagDesk API running on http://localhost:${PORT}`)
+  console.log(
+    `SnagDesk API running on http://localhost:${PORT} cwd=${process.cwd()} jwt=${process.env.JWT_SECRET ? 'loaded' : 'MISSING'}`
+  )
 })

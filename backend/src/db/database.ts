@@ -12,7 +12,16 @@ export function utcTs(ts: unknown): string | undefined {
   return s.replace(' ', 'T') + 'Z'
 }
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/snagdesk.db')
+function resolveDbPath(): string {
+  const backendRoot = path.join(__dirname, '../..')
+  const fromEnv = process.env.DB_PATH
+  if (fromEnv) {
+    return path.isAbsolute(fromEnv) ? fromEnv : path.resolve(backendRoot, fromEnv)
+  }
+  return path.join(backendRoot, 'data/snagdesk.db')
+}
+
+const DB_PATH = resolveDbPath()
 
 export interface SnagDeskDatabase {
   exec(sql: string): void

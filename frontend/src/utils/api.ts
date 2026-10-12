@@ -67,9 +67,43 @@ if (typeof window !== 'undefined') {
   console.log('[API] isNative:', Capacitor.isNativePlatform())
 }
 
+function readStoredToken(): string | null {
+  const direct = localStorage.getItem('snagdesk_token')
+  if (direct) return direct
+  try {
+    const raw = localStorage.getItem('snagdesk-auth')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { state?: { token?: string | null } }
+    return parsed.state?.token ?? null
+  } catch {
+    return null
+  }
+}
+
+function isPublicAuthRequest(url?: string): boolean {
+  if (!url) return false
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/otp/send') ||
+    url.includes('/auth/otp/verify')
+  )
+}
+
+function forceLogoutToLogin(): void {
+  localStorage.removeItem('snagdesk_token')
+  localStorage.removeItem('snagdesk_last_prefetch')
+  void import('../store/authStore').then(({ useAuthStore }) => {
+    useAuthStore.getState().logout()
+  })
+  if (typeof window === 'undefined') return
+  const path = window.location.pathname
+  if (path === '/login' || path === '/otp') return
+  window.location.assign('/login')
+}
+
 api.interceptors.request.use((config) => {
   config.baseURL = getBaseURL()
-  const token = localStorage.getItem('snagdesk_token')
+  const token = readStoredToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -84,7 +118,11 @@ api.interceptors.response.use(
       status: error?.response?.status,
       code: error?.code,
       message: error?.message,
+      apiError: error?.response?.data?.error,
     })
+    if (error?.response?.status === 401 && !isPublicAuthRequest(error?.config?.url)) {
+      forceLogoutToLogin()
+    }
     return Promise.reject(error)
   }
 )

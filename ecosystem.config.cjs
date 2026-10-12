@@ -1,9 +1,13 @@
+const path = require('path')
+
+const backendDir = path.join(__dirname, 'backend')
+
 /** PM2 process file — used on the VPS for the PropInspect API. */
 module.exports = {
   apps: [
     {
       name: 'propinspect-api',
-      cwd: './backend',
+      cwd: backendDir,
       script: 'dist/index.js',
       interpreter: 'node',
       interpreter_args: '--experimental-sqlite',

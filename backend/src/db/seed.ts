@@ -1,10 +1,8 @@
+import '../loadEnv'
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
-import dotenv from 'dotenv'
 import { getDB } from './database'
 import { DEFAULT_CHECKLIST_CATEGORIES } from '../constants/checklist'
-
-dotenv.config()
 
 const SEED_USERS = [
   { name: 'Admin User', email: 'admin@snagdesk.in', mobile: '9000000001', role: 'admin', password: 'Admin@123' },
