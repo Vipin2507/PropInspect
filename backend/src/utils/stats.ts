@@ -32,8 +32,11 @@ export function getProjectStats(projectId: string, projectName: string) {
     revisionRequired: map.revision_required || 0,
     desnagging: map.desnagging || 0,
     handedOver: map.handed_over || 0,
+    handedOverSnagLeft: map.handed_over_snag_left || 0,
     openSnags,
     closedSnags,
-    completionPct: totalFlats ? Math.round(((approved + (map.handed_over || 0)) / totalFlats) * 100) : 0,
+    completionPct: totalFlats
+      ? Math.round(((approved + (map.handed_over || 0)) / totalFlats) * 100)
+      : 0,
   }
 }

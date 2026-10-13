@@ -71,14 +71,14 @@ export function getDB(): SnagDeskDatabase {
 const FLATS_STATUS_CHECK_SQL = `CHECK(status IN (
                            'not_started','in_progress','submitted',
                            'approved','rejected','revision_required',
-                           'desnagging','handed_over'
+                           'desnagging','handed_over','handed_over_snag_left'
                          ))`
 
 function flatsAllowsHandedOver(database: SnagDeskDatabase): boolean {
   const row = database
     .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'flats'`)
     .get() as { sql?: string } | undefined
-  return Boolean(row?.sql?.includes('handed_over'))
+  return Boolean(row?.sql?.includes('handed_over_snag_left'))
 }
 
 /** SQLite cannot ALTER a CHECK constraint. Rebuild flats with FK checks off. */
@@ -117,9 +117,9 @@ function migrateFlatsStatusCheck(database: SnagDeskDatabase): void {
   }
 
   if (!flatsAllowsHandedOver(database)) {
-    console.error('[db] Failed to migrate flats.status CHECK to include handed_over')
+    console.error('[db] Failed to migrate flats.status CHECK to include handed_over_snag_left')
   } else {
-    console.log('[db] flats.status CHECK updated to include handed_over')
+    console.log('[db] flats.status CHECK updated to include handed_over_snag_left')
   }
 }
 
@@ -196,7 +196,7 @@ export function runMigrations(database: SnagDeskDatabase): void {
                      CHECK(status IN (
                        'not_started','in_progress','submitted',
                        'approved','rejected','revision_required',
-                       'desnagging','handed_over'
+                       'desnagging','handed_over','handed_over_snag_left'
                      )),
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );

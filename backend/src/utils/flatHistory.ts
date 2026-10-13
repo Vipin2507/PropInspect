@@ -15,6 +15,7 @@ export type FlatHistoryEventType =
   | 'qa_task_rejected'
   | 'qa_task_approved'
   | 'handed_over'
+  | 'handed_over_snag_left'
   | 'engineer_assigned'
   | 'status_changed'
 
@@ -200,13 +201,19 @@ function backfillFlatHistory(flatId: string): void {
   }
 
   const flat = db.prepare('SELECT status FROM flats WHERE id = ?').get(flatId) as { status: string } | undefined
-  if (flat?.status === 'handed_over') {
+  if (flat?.status === 'handed_over' || flat?.status === 'handed_over_snag_left') {
     insertHistory({
       id: `${prefix}-handover`,
       flatId,
-      eventType: 'handed_over',
-      title: 'Handed over to client',
-      description: 'Flat marked as handed over to the client.',
+      eventType: flat.status === 'handed_over_snag_left' ? 'handed_over_snag_left' : 'handed_over',
+      title:
+        flat.status === 'handed_over_snag_left'
+          ? 'Handed over with snag left'
+          : 'Handed over to client',
+      description:
+        flat.status === 'handed_over_snag_left'
+          ? 'Flat handed over to the client before the checklist was 100% complete.'
+          : 'Flat marked as handed over to the client.',
     })
   }
 }

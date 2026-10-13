@@ -9,6 +9,11 @@ import { calcCompletionPct, countPendingTasks, getExpectedTaskCount, repairParti
 import { getFlatHistory, logFlatHistory } from '../utils/flatHistory'
 import { countUnreviewedChanges } from '../utils/taskChangeLog'
 import { param } from '../utils/params'
+import {
+  handoverHistoryCopy,
+  isHandoverStatus,
+  resolveHandoverStatus,
+} from '../utils/handover'
 
 const router = Router()
 router.use(authenticate)
@@ -38,7 +43,7 @@ router.get(
       LEFT JOIN floors fl ON fl.id = f.floor_id
       LEFT JOIN inspections i ON i.flat_id = f.id
       LEFT JOIN users u   ON u.id  = i.engineer_id
-      WHERE f.status IN ('in_progress','submitted','approved','rejected','revision_required','desnagging','handed_over')
+      WHERE f.status IN ('in_progress','submitted','approved','rejected','revision_required','desnagging','handed_over','handed_over_snag_left')
     `
     const params: unknown[] = []
 
@@ -114,7 +119,7 @@ router.get(
     if (role === 'qa') {
       rows = rows.filter((row) => {
         const status = row.status as string
-        return ['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)
+        return ['submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over', 'handed_over_snag_left'].includes(status)
       })
     }
 
@@ -136,7 +141,7 @@ router.get(
       return
     }
     if (req.user!.role === 'qa') {
-      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(row.status)) {
+      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over', 'handed_over_snag_left'].includes(row.status)) {
         res.status(403).json({ error: 'Flat is not available for review' })
         return
       }
@@ -156,7 +161,7 @@ router.get(
     // QA can only see flats that have been submitted for review or are in a reviewed state
     if (req.user!.role === 'qa') {
       const status = row.status as string
-      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over'].includes(status)) {
+      if (!['in_progress', 'submitted', 'approved', 'rejected', 'revision_required', 'desnagging', 'handed_over', 'handed_over_snag_left'].includes(status)) {
         res.status(403).json({ error: 'Flat is not available for review' })
         return
       }
@@ -170,11 +175,12 @@ router.patch(
   requireRole('admin'),
   asyncHandler(async (req, res) => {
     const flatId = param(req, 'id')
-    const { status } = z
+    const parsed = z
       .object({
         status: z.enum([
           'not_started', 'in_progress', 'submitted', 'approved',
           'rejected', 'revision_required', 'desnagging', 'handed_over',
+          'handed_over_snag_left',
         ]),
       })
       .parse(req.body)
@@ -189,13 +195,16 @@ router.patch(
     }
 
     const previousStatus = flat.status
+    const status = isHandoverStatus(parsed.status)
+      ? resolveHandoverStatus(flatId)
+      : parsed.status
     try {
       db.prepare('UPDATE flats SET status = ? WHERE id = ?').run(status, flatId)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (message.toLowerCase().includes('constraint')) {
         res.status(500).json({
-          error: `Cannot set status to "${status}". Restart the API so the database migration for handed_over can run.`,
+          error: `Cannot set status to "${status}". Restart the API so the database migration can run.`,
         })
         return
       }
@@ -216,6 +225,7 @@ router.patch(
         revision_required: 'revision_required',
         desnagging: 'approved',
         handed_over: 'approved',
+        handed_over_snag_left: 'approved',
       }
       const inspectionStatus = inspectionStatusMap[status]
       if (inspectionStatus) {
@@ -239,13 +249,14 @@ router.patch(
         description: `Admin updated flat status from ${previousStatus.replace(/_/g, ' ')} to ${status.replace(/_/g, ' ')}.`,
         metadata: { from: previousStatus, to: status },
       })
-      if (status === 'handed_over') {
+      if (isHandoverStatus(status)) {
+        const copy = handoverHistoryCopy(status)
         logFlatHistory({
           flatId,
-          eventType: 'handed_over',
+          eventType: copy.eventType,
           actorId: req.user!.id,
-          title: 'Handed over to client',
-          description: 'Flat marked as handed over to the client.',
+          title: copy.title,
+          description: copy.description,
         })
       }
     }
@@ -274,13 +285,27 @@ router.post(
       res.status(400).json({ error: 'Flat must be approved or desnagging before handover' })
       return
     }
-    db.prepare(`UPDATE flats SET status = 'handed_over' WHERE id = ?`).run(req.params.id)
+    const flatId = param(req, 'id')
+    const status = resolveHandoverStatus(flatId)
+    try {
+      db.prepare(`UPDATE flats SET status = ? WHERE id = ?`).run(status, flatId)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.toLowerCase().includes('constraint')) {
+        res.status(500).json({
+          error: `Cannot set status to "${status}". Restart the API so the database migration can run.`,
+        })
+        return
+      }
+      throw err
+    }
+    const copy = handoverHistoryCopy(status)
     logFlatHistory({
-      flatId: param(req, 'id'),
-      eventType: 'handed_over',
+      flatId,
+      eventType: copy.eventType,
       actorId: req.user!.id,
-      title: 'Handed over to client',
-      description: 'Flat marked as handed over to the client.',
+      title: copy.title,
+      description: copy.description,
     })
     const updated = db.prepare('SELECT * FROM flats WHERE id = ?').get(req.params.id) as Record<string, unknown>
     res.json(enrichFlat(updated))

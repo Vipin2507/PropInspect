@@ -141,6 +141,7 @@ router.get(
       revisionRequired: rows.filter((r) => r.flat_status === 'revision_required').length,
       desnagging: rows.filter((r) => r.flat_status === 'desnagging').length,
       handedOver: rows.filter((r) => r.flat_status === 'handed_over').length,
+      handedOverSnagLeft: rows.filter((r) => r.flat_status === 'handed_over_snag_left').length,
       openSnags: rows.reduce((acc, r) => acc + (Number(r.open_snags) || 0), 0),
     }
 
