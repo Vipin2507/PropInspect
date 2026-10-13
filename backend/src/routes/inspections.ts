@@ -139,7 +139,7 @@ router.get(
 
 router.put(
   '/:id',
-  requireRole('engineer'),
+  requireRole('engineer', 'admin'),
   asyncHandler(async (req, res) => {
     const body = z.object({ responses: z.array(z.record(z.unknown())) }).parse(req.body)
     const db = getDB()
@@ -332,7 +332,7 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
 
 router.post(
   '/:id/submit',
-  requireRole('engineer'),
+  requireRole('engineer', 'admin'),
   asyncHandler(async (req, res) => {
     const inspectionId = param(req, 'id')
     const inspection = getDB().prepare('SELECT id FROM inspections WHERE id = ?').get(inspectionId)
@@ -347,7 +347,7 @@ router.post(
 
 router.post(
   '/:id/resubmit',
-  requireRole('engineer'),
+  requireRole('engineer', 'admin'),
   asyncHandler(async (req, res) => {
     const inspectionId = param(req, 'id')
     const inspection = getDB().prepare('SELECT id FROM inspections WHERE id = ?').get(inspectionId)

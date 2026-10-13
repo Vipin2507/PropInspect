@@ -93,7 +93,7 @@ router.get(
  */
 router.patch(
   '/:id',
-  requireRole('engineer'),
+  requireRole('engineer', 'admin'),
   asyncHandler(async (req, res) => {
     const body = z
       .object({
@@ -113,8 +113,8 @@ router.patch(
       .get(response.inspection_id) as { id: string; flat_id: string; engineer_id: string; status: string }
     if (!inspection) throw new AppError('Inspection not found', 404)
 
-    // Only the assigned engineer may edit
-    if (inspection.engineer_id !== req.user!.id) {
+    // Assigned engineer, or admin override
+    if (req.user!.role !== 'admin' && inspection.engineer_id !== req.user!.id) {
       throw new AppError('Not authorized', 403)
     }
 
