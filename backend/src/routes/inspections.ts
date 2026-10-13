@@ -11,6 +11,7 @@ import { getItemMandatoryImage } from '../constants/checklist'
 import { createNotification, createNotifications, notifyInspectionStarted, touchEngineerActivity } from '../utils/notifications'
 import { logFlatHistory } from '../utils/flatHistory'
 import { param } from '../utils/params'
+import { HANDOVER_SNAG_LEFT, isInspectionWorkAllowed } from '../utils/handover'
 import {
   calcCompletionPct,
   countCompletedTasks,
@@ -149,9 +150,20 @@ router.put(
       res.status(404).json({ error: 'Inspection not found' })
       return
     }
-    if (!['draft', 'revision_required'].includes(inspection.status as string)) {
+    const flatRow = db
+      .prepare('SELECT status FROM flats WHERE id = ?')
+      .get(inspection.flat_id) as { status: string } | undefined
+    if (!isInspectionWorkAllowed(inspection.status as string, flatRow?.status)) {
       res.status(400).json({ error: 'Cannot edit inspection in current status' })
       return
+    }
+    if (
+      flatRow?.status === HANDOVER_SNAG_LEFT &&
+      !['draft', 'revision_required'].includes(inspection.status as string)
+    ) {
+      db.prepare(
+        `UPDATE inspections SET status = 'draft', last_updated = datetime('now') WHERE id = ?`
+      ).run(inspectionId)
     }
 
     const update = db.prepare(
@@ -224,7 +236,13 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
   if (isResubmit && inspection.status !== 'revision_required') {
     throw new AppError('Can only resubmit after revision required', 400)
   }
-  if (!isResubmit && !['draft', 'revision_required'].includes(inspection.status as string)) {
+  const flatForSubmit = db
+    .prepare('SELECT status FROM flats WHERE id = ?')
+    .get(inspection.flat_id) as { status: string } | undefined
+  if (
+    !isResubmit &&
+    !isInspectionWorkAllowed(inspection.status as string, flatForSubmit?.status)
+  ) {
     throw new AppError('Inspection already submitted', 400)
   }
 

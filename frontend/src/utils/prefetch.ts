@@ -52,7 +52,7 @@ async function mapPool<T>(
   await Promise.all(workers)
 }
 
-const SKIP_INSPECTION_STATUSES = new Set(['handed_over', 'handed_over_snag_left'])
+const SKIP_INSPECTION_STATUSES = new Set(['handed_over'])
 
 function flatPriority(a: Flat, b: Flat): number {
   const rank = (s: string) =>

@@ -8,6 +8,15 @@ export function isHandoverStatus(status: string): boolean {
   return status === HANDOVER_COMPLETE || status === HANDOVER_SNAG_LEFT
 }
 
+/** Checklist work stays open after incomplete handover. */
+export function isInspectionWorkAllowed(
+  inspectionStatus: string,
+  flatStatus?: string | null
+): boolean {
+  if (flatStatus === HANDOVER_SNAG_LEFT) return true
+  return ['draft', 'revision_required'].includes(inspectionStatus)
+}
+
 /** Incomplete checklist (< 100%) → handed over with snag left. */
 export function resolveHandoverStatus(
   flatId: string

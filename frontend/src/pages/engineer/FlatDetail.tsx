@@ -348,11 +348,19 @@ export default function FlatDetail() {
                   </Button>
                 )}
 
-                {isHandoverStatus(currentFlatStatus) && (
+                {currentFlatStatus === 'handed_over_snag_left' && (
+                  <Button
+                    size="sm"
+                    className={cn(compactBtn, 'w-full')}
+                    onClick={startOrContinueInspection}
+                  >
+                    Continue Inspection
+                  </Button>
+                )}
+
+                {isHandoverStatus(currentFlatStatus) && currentFlatStatus !== 'handed_over_snag_left' && (
                   <p className="text-center text-[11px] font-medium text-accent-500">
-                    {currentFlatStatus === 'handed_over_snag_left'
-                      ? 'Already handed over with snag left'
-                      : 'Already handed over to client'}
+                    Already handed over to client
                   </p>
                 )}
               </>

@@ -18,6 +18,7 @@ import {
 } from '../utils/inspectionTasks'
 import { logTaskResponseChange } from '../utils/taskChangeLog'
 import { param } from '../utils/params'
+import { HANDOVER_COMPLETE, HANDOVER_SNAG_LEFT, isInspectionWorkAllowed } from '../utils/handover'
 
 const router = Router()
 router.use(authenticate)
@@ -118,9 +119,21 @@ router.patch(
       throw new AppError('Not authorized', 403)
     }
 
-    // Req 1.4 / 2.4 — inspection must be editable
-    if (!['draft', 'revision_required'].includes(inspection.status)) {
+    const flat = db
+      .prepare('SELECT status FROM flats WHERE id = ?')
+      .get(inspection.flat_id) as { status: string } | undefined
+    if (!isInspectionWorkAllowed(inspection.status, flat?.status)) {
       throw new AppError('Inspection is locked and cannot be edited in its current status', 400)
+    }
+
+    if (
+      flat?.status === HANDOVER_SNAG_LEFT &&
+      !['draft', 'revision_required'].includes(inspection.status)
+    ) {
+      db.prepare(
+        `UPDATE inspections SET status = 'draft', last_updated = datetime('now') WHERE id = ?`
+      ).run(inspection.id)
+      inspection.status = 'draft'
     }
 
     const newStatus = body.status ?? (response.status as string)
@@ -175,6 +188,13 @@ router.patch(
     maybeNotifyCompletion(inspection.id)
     const completionPct = calcCompletionPctFromDb(inspection.id)
     const pendingCount = countPendingTasksFromDb(inspection.id)
+
+    if (flat?.status === HANDOVER_SNAG_LEFT && completionPct >= 100) {
+      db.prepare(`UPDATE flats SET status = ? WHERE id = ?`).run(
+        HANDOVER_COMPLETE,
+        inspection.flat_id
+      )
+    }
 
     const updated = db
       .prepare('SELECT * FROM responses WHERE id = ?')

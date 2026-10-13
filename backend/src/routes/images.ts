@@ -9,6 +9,7 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToImage } from '../utils/mappers'
+import { isInspectionWorkAllowed } from '../utils/handover'
 
 const router = Router()
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads')
@@ -86,7 +87,7 @@ router.post(
 
 router.delete(
   '/:id',
-  requireRole('engineer'),
+  requireRole('engineer', 'admin'),
   asyncHandler(async (req, res) => {
     const db = getDB()
     const image = db.prepare('SELECT * FROM images WHERE id = ?').get(req.params.id) as Record<string, unknown>
@@ -94,8 +95,15 @@ router.delete(
       res.status(404).json({ error: 'Image not found' })
       return
     }
-    const inspection = db.prepare('SELECT engineer_id, status FROM inspections WHERE id = ?').get(image.inspection_id) as { engineer_id: string; status: string }
-    if (!inspection || inspection.engineer_id !== req.user!.id || !['draft', 'revision_required'].includes(inspection.status)) {
+    const inspection = db.prepare('SELECT engineer_id, status, flat_id FROM inspections WHERE id = ?').get(image.inspection_id) as { engineer_id: string; status: string; flat_id: string } | undefined
+    const flat = inspection
+      ? (db.prepare('SELECT status FROM flats WHERE id = ?').get(inspection.flat_id) as { status: string } | undefined)
+      : undefined
+    const canEdit =
+      inspection &&
+      (req.user!.role === 'admin' || inspection.engineer_id === req.user!.id) &&
+      isInspectionWorkAllowed(inspection.status, flat?.status)
+    if (!canEdit) {
       res.status(403).json({ error: 'Cannot delete image' })
       return
     }

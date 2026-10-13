@@ -225,7 +225,7 @@ router.patch(
         revision_required: 'revision_required',
         desnagging: 'approved',
         handed_over: 'approved',
-        handed_over_snag_left: 'approved',
+        handed_over_snag_left: 'draft',
       }
       const inspectionStatus = inspectionStatusMap[status]
       if (inspectionStatus) {
