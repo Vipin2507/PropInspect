@@ -121,6 +121,7 @@ export default function Reports() {
       Rejected: p.rejected,
       Desnagging: p.desnagging,
       HandedOver: p.handedOver,
+      HandedOverSnagLeft: p.handedOverSnagLeft ?? 0,
       NotStarted: p.notStarted,
     }))
   }, [data])
@@ -134,6 +135,7 @@ export default function Reports() {
       { key: 'Rejected', name: 'Rejected', fill: CHART_COLORS.rejected },
       { key: 'Desnagging', name: 'Desnagging', fill: CHART_COLORS.desnagging },
       { key: 'HandedOver', name: 'Handed Over', fill: CHART_COLORS.handed_over },
+      { key: 'HandedOverSnagLeft', name: 'Snag Left', fill: CHART_COLORS.handed_over_snag_left },
       { key: 'NotStarted', name: 'Not Started', fill: CHART_COLORS.not_started },
     ] as const
     return series.filter((s) =>
@@ -415,6 +417,7 @@ export default function Reports() {
                   { key: 'rejected', value: p.rejected, fill: CHART_COLORS.rejected },
                   { key: 'desnagging', value: p.desnagging, fill: CHART_COLORS.desnagging },
                   { key: 'handedOver', value: p.handedOver, fill: CHART_COLORS.handed_over },
+                  { key: 'handedOverSnagLeft', value: p.handedOverSnagLeft ?? 0, fill: CHART_COLORS.handed_over_snag_left },
                   { key: 'notStarted', value: p.notStarted, fill: CHART_COLORS.not_started },
                 ].filter((s) => s.value > 0)
 

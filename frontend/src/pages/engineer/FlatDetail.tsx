@@ -22,6 +22,7 @@ import { flatsApi } from '../../utils/api'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { AdminFlatStatusControl } from '../../components/admin/AdminFlatStatusControl'
+import { isHandoverStatus } from '../../constants/flatStatus'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 import { cn } from '../../utils/cn'
 import type { Flat } from '../../types'
@@ -69,21 +70,33 @@ export default function FlatDetail() {
   const isComplete = completionPct === 100 && pendingCount === 0
 
   const canMarkHandover =
-    canHandover && (isAdmin || ['approved', 'desnagging'].includes(currentFlatStatus ?? ''))
+    canHandover &&
+    !isHandoverStatus(currentFlatStatus) &&
+    (isAdmin || ['approved', 'desnagging'].includes(currentFlatStatus ?? ''))
 
   const handleHandover = async () => {
     if (!flatId) return
     setHandoverLoading(true)
     try {
-      if (isAdmin && currentFlatStatus !== 'handed_over') {
+      if (isAdmin && !isHandoverStatus(currentFlatStatus)) {
         const { data } = await flatsApi.setStatus(flatId, 'handed_over')
         setFlatOverride(data)
-        setFlatStatus('handed_over')
+        setFlatStatus(data.status)
+        toast.success(
+          data.status === 'handed_over_snag_left'
+            ? 'Marked Handed Over with Snag Left (checklist not 100%)'
+            : 'Flat marked as Handed Over to Client'
+        )
       } else {
-        await flatsApi.handover(flatId)
-        setFlatStatus('handed_over')
+        const { data } = await flatsApi.handover(flatId)
+        setFlatOverride(data)
+        setFlatStatus(data.status)
+        toast.success(
+          data.status === 'handed_over_snag_left'
+            ? 'Marked Handed Over with Snag Left (checklist not 100%)'
+            : 'Flat marked as Handed Over to Client'
+        )
       }
-      toast.success('Flat marked as Handed Over to Client')
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
@@ -134,6 +147,18 @@ export default function FlatDetail() {
           <div>
             <p className="text-sm font-semibold text-accent-500">Handed Over to Client</p>
             <p className="text-[11px] text-accent-500/80">This flat has been delivered to the client.</p>
+          </div>
+        </Card>
+      )}
+
+      {currentFlatStatus === 'handed_over_snag_left' && (
+        <Card className="flex items-center gap-2.5 border-warning-600/20 bg-warning-100/50 p-3 shadow-xs">
+          <PackageCheck size={18} className="shrink-0 text-warning-600" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-semibold text-warning-600">Handed Over with Snag Left</p>
+            <p className="text-[11px] text-warning-600/80">
+              Delivered to the client before the checklist reached 100%.
+            </p>
           </div>
         </Card>
       )}
@@ -323,9 +348,11 @@ export default function FlatDetail() {
                   </Button>
                 )}
 
-                {currentFlatStatus === 'handed_over' && (
+                {isHandoverStatus(currentFlatStatus) && (
                   <p className="text-center text-[11px] font-medium text-accent-500">
-                    Already handed over to client
+                    {currentFlatStatus === 'handed_over_snag_left'
+                      ? 'Already handed over with snag left'
+                      : 'Already handed over to client'}
                   </p>
                 )}
               </>
@@ -358,7 +385,11 @@ export default function FlatDetail() {
         open={handoverConfirmOpen}
         onOpenChange={setHandoverConfirmOpen}
         title="Mark as Handed Over to Client?"
-        message={`This will mark flat ${flat?.flatNumber ?? ''} as delivered to the client. This action cannot be undone without admin override.`}
+        message={
+          completionPct < 100
+            ? `Checklist is ${Math.round(completionPct)}% complete. Flat ${flat?.flatNumber ?? ''} will be marked Handed Over with Snag Left.`
+            : `This will mark flat ${flat?.flatNumber ?? ''} as delivered to the client. This action cannot be undone without admin override.`
+        }
         confirmLabel="Yes, Mark Handed Over"
         onConfirm={handleHandover}
       />

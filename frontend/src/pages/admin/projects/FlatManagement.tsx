@@ -315,6 +315,7 @@ export default function FlatManagement() {
             <option value="revision_required">Revision Required</option>
             <option value="desnagging">Desnagging</option>
             <option value="handed_over">Handed Over</option>
+            <option value="handed_over_snag_left">Handed Over with Snag Left</option>
           </Select>
           <Select
             value={filterAssignment}

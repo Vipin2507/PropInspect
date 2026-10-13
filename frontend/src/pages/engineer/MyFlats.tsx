@@ -28,6 +28,7 @@ const TABS = [
   { id: 'revision', label: 'Revision' },
   { id: 'approved', label: 'Approved' },
   { id: 'handed_over', label: 'Handed Over' },
+  { id: 'handed_over_snag_left', label: 'Snag Left' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -59,6 +60,7 @@ export default function MyFlats() {
       revision: flats.filter((f) => f.status === 'revision_required').length,
       approved: flats.filter((f) => f.status === 'approved').length,
       handed_over: flats.filter((f) => f.status === 'handed_over').length,
+      handed_over_snag_left: flats.filter((f) => f.status === 'handed_over_snag_left').length,
     }),
     [flats]
   )
@@ -72,6 +74,7 @@ export default function MyFlats() {
     if (tab === 'revision') list = list.filter((f) => f.status === 'revision_required')
     if (tab === 'approved') list = list.filter((f) => f.status === 'approved')
     if (tab === 'handed_over') list = list.filter((f) => f.status === 'handed_over')
+    if (tab === 'handed_over_snag_left') list = list.filter((f) => f.status === 'handed_over_snag_left')
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -111,7 +114,7 @@ export default function MyFlats() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <StatCard
           index={0}
           label="Total"
@@ -164,6 +167,15 @@ export default function MyFlats() {
           colorClass="text-accent-500 bg-accent-100"
           selected={tab === 'handed_over'}
           onClick={() => selectStat('handed_over')}
+        />
+        <StatCard
+          index={6}
+          label="Snag Left"
+          value={counts.handed_over_snag_left}
+          icon={AlertTriangle}
+          colorClass="text-warning-600 bg-warning-100"
+          selected={tab === 'handed_over_snag_left'}
+          onClick={() => selectStat('handed_over_snag_left')}
         />
       </div>
 

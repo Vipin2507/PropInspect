@@ -90,4 +90,5 @@ export const CHART_COLORS = {
   desnagging: '#7C3AED',
   not_started: '#94A3B8',
   handed_over: '#0D9488',
+  handed_over_snag_left: '#D97706',
 } as const

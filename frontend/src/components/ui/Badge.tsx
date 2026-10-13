@@ -1,5 +1,6 @@
 import { cn } from '../../utils/cn'
 import type { FlatStatus, InspectionStatus, SnagStatus } from '../../types'
+import { FLAT_STATUS_LABEL } from '../../constants/flatStatus'
 
 const statusStyles: Record<string, string> = {
   not_started: 'bg-ink-100 text-ink-600 border-ink-200',
@@ -10,6 +11,7 @@ const statusStyles: Record<string, string> = {
   revision_required: 'bg-warning-100 text-warning-600 border-warning-600/20',
   desnagging: 'bg-info-100 text-info-600 border-info-600/20',
   handed_over: 'bg-accent-100 text-accent-500 border-accent-500/20',
+  handed_over_snag_left: 'bg-warning-100 text-warning-600 border-warning-600/20',
   pass: 'bg-success-100 text-success-600 border-success-600/20',
   fail: 'bg-danger-100 text-danger-600 border-danger-600/20',
   na: 'bg-ink-100 text-ink-600 border-ink-200',
@@ -34,6 +36,7 @@ const dotStyles: Record<string, string> = {
   revision_required: 'bg-warning-600',
   desnagging: 'bg-info-600',
   handed_over: 'bg-accent-500',
+  handed_over_snag_left: 'bg-warning-600',
   pass: 'bg-success-600',
   fail: 'bg-danger-600',
   na: 'bg-ink-400',
@@ -80,7 +83,11 @@ export function StatusBadge({
   className?: string
 }) {
   const key = status || ''
-  const label = children ?? (status ? formatStatus(status) : '')
+  const label =
+    children ??
+    (status
+      ? (FLAT_STATUS_LABEL[status as FlatStatus] ?? formatStatus(status))
+      : '')
   return (
     <span
       className={cn(

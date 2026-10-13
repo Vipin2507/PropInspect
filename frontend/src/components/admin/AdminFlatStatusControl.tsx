@@ -46,7 +46,7 @@ export function AdminFlatStatusControl({
         <p className="text-sm font-bold text-slate-800">Admin: Update Flat Status</p>
       </div>
       <p className="mb-3 text-xs text-slate-500">
-        Override the workflow stage at any point — inspection status will be synced automatically.
+        Override the workflow stage at any point. Handover uses “with snag left” when the checklist is not 100% complete.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Select

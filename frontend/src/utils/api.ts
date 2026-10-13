@@ -316,7 +316,7 @@ export const reportsApi = {
     summary: {
       total: number; notStarted: number; inProgress: number; submitted: number
       approved: number; rejected: number; revisionRequired: number; desnagging: number
-      handedOver: number; openSnags: number
+      handedOver: number; handedOverSnagLeft: number; openSnags: number
     }
     flats: Array<{
       flatId: string; flatNumber: string; flatStatus: string; towerName: string

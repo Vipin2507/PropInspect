@@ -96,6 +96,12 @@ const EVENT_CONFIG: Record<
     bg: 'bg-teal-50',
     border: 'border-teal-200',
   },
+  handed_over_snag_left: {
+    icon: PackageCheck,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+  },
   engineer_assigned: {
     icon: UserPlus,
     color: 'text-slate-600',

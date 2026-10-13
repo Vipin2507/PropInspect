@@ -93,6 +93,7 @@ export type FlatStatus =
   | 'revision_required'
   | 'desnagging'
   | 'handed_over'
+  | 'handed_over_snag_left'
 
 export interface Assignment {
   id: string
@@ -292,6 +293,7 @@ export type FlatHistoryEventType =
   | 'qa_task_rejected'
   | 'qa_task_approved'
   | 'handed_over'
+  | 'handed_over_snag_left'
   | 'engineer_assigned'
   | 'status_changed'
 
@@ -340,6 +342,7 @@ export interface ProjectStats {
   revisionRequired: number
   desnagging: number
   handedOver: number
+  handedOverSnagLeft: number
   openSnags: number
   closedSnags: number
   completionPct: number

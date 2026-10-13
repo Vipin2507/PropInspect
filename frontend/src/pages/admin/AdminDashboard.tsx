@@ -43,7 +43,7 @@ interface FlatRow {
 interface Summary {
   total: number; notStarted: number; inProgress: number; submitted: number
   approved: number; rejected: number; revisionRequired: number; desnagging: number
-  handedOver: number; openSnags: number
+  handedOver: number; handedOverSnagLeft?: number; openSnags: number
 }
 
 const FLAT_STATUS_OPTIONS = [
@@ -56,6 +56,7 @@ const FLAT_STATUS_OPTIONS = [
   { value: 'rejected',          label: 'Rejected' },
   { value: 'desnagging',        label: 'Desnagging' },
   { value: 'handed_over',       label: 'Handed Over to Client' },
+  { value: 'handed_over_snag_left', label: 'Handed Over with Snag Left' },
 ]
 
 const STATUS_COLOR: Record<string, string> = {
@@ -67,6 +68,7 @@ const STATUS_COLOR: Record<string, string> = {
   desnagging:        CHART_COLORS.desnagging,
   not_started:       CHART_COLORS.not_started,
   handed_over:       CHART_COLORS.handed_over,
+  handed_over_snag_left: CHART_COLORS.handed_over_snag_left,
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -169,10 +171,10 @@ export default function AdminDashboard() {
   // ── Bar chart — group filtered flats by project ───────────────────────
   const barData = useMemo(() => {
     if (!result?.flats.length) return []
-    const map = new Map<string, { name: string; Approved:number; Submitted:number; InProgress:number; Revision:number; Rejected:number; Desnagging:number; NotStarted:number; HandedOver:number }>()
+    const map = new Map<string, { name: string; Approved:number; Submitted:number; InProgress:number; Revision:number; Rejected:number; Desnagging:number; NotStarted:number; HandedOver:number; HandedOverSnagLeft:number }>()
     for (const f of result.flats) {
       if (!map.has(f.projectId)) {
-        map.set(f.projectId, { name: f.projectName.slice(0,16), Approved:0, Submitted:0, InProgress:0, Revision:0, Rejected:0, Desnagging:0, NotStarted:0, HandedOver:0 })
+        map.set(f.projectId, { name: f.projectName.slice(0,16), Approved:0, Submitted:0, InProgress:0, Revision:0, Rejected:0, Desnagging:0, NotStarted:0, HandedOver:0, HandedOverSnagLeft:0 })
       }
       const entry = map.get(f.projectId)!
       if (f.flatStatus === 'approved')          entry.Approved++
@@ -183,6 +185,7 @@ export default function AdminDashboard() {
       else if (f.flatStatus === 'desnagging')   entry.Desnagging++
       else if (f.flatStatus === 'not_started')  entry.NotStarted++
       else if (f.flatStatus === 'handed_over')  entry.HandedOver++
+      else if (f.flatStatus === 'handed_over_snag_left') entry.HandedOverSnagLeft++
     }
     return Array.from(map.values())
   }, [result])
@@ -192,6 +195,7 @@ export default function AdminDashboard() {
     if (!s) return []
     return [
       { name: 'Handed Over', value: s.handedOver ?? 0,      fill: STATUS_COLOR.handed_over },
+      { name: 'Snag Left',   value: s.handedOverSnagLeft ?? 0, fill: STATUS_COLOR.handed_over_snag_left },
       { name: 'Approved',    value: s.approved,             fill: STATUS_COLOR.approved },
       { name: 'Submitted',   value: s.submitted,            fill: STATUS_COLOR.submitted },
       { name: 'In Progress', value: s.inProgress,           fill: STATUS_COLOR.in_progress },
@@ -247,6 +251,7 @@ export default function AdminDashboard() {
       { key: 'Rejected',   name: 'Rejected',    fill: STATUS_COLOR.rejected },
       { key: 'Desnagging', name: 'Desnagging',  fill: STATUS_COLOR.desnagging },
       { key: 'HandedOver', name: 'Handed Over', fill: STATUS_COLOR.handed_over },
+      { key: 'HandedOverSnagLeft', name: 'Snag Left', fill: STATUS_COLOR.handed_over_snag_left },
       { key: 'NotStarted', name: 'Not Started', fill: STATUS_COLOR.not_started },
     ] as const
     return series.filter((s) =>
@@ -274,6 +279,7 @@ export default function AdminDashboard() {
       revision_required: 'Revision required',
       rejected: 'Rejected flats',
       handed_over: 'Handed over flats',
+      handed_over_snag_left: 'Handed over with snag left',
       open_snags: 'Flats with open snags',
     }
     if (!activeCard) return { title: '', items: [] as DrilldownItem[] }
@@ -453,7 +459,8 @@ export default function AdminDashboard() {
             <StatCard index={5} label="Revision" value={s.revisionRequired} icon={RotateCcw} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'revision_required'} onClick={() => selectCard('revision_required')} />
             <StatCard index={6} label="Rejected" value={s.rejected} icon={XCircle} colorClass="text-danger-600 bg-danger-100" selected={activeCard === 'rejected'} onClick={() => selectCard('rejected')} />
             <StatCard index={7} label="Handed Over" value={s.handedOver ?? 0} icon={PackageCheck} colorClass="text-accent-500 bg-accent-100" selected={activeCard === 'handed_over'} onClick={() => selectCard('handed_over')} />
-            <StatCard index={8} label="Open Snags" value={s.openSnags} icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" selected={activeCard === 'open_snags'} onClick={() => selectCard('open_snags')} />
+            <StatCard index={8} label="Snag Left" value={s.handedOverSnagLeft ?? 0} icon={AlertTriangle} colorClass="text-warning-600 bg-warning-100" selected={activeCard === 'handed_over_snag_left'} onClick={() => selectCard('handed_over_snag_left')} />
+            <StatCard index={9} label="Open Snags" value={s.openSnags} icon={AlertTriangle} colorClass="text-danger-600 bg-danger-100" selected={activeCard === 'open_snags'} onClick={() => selectCard('open_snags')} />
           </div>
 
           {s.total > 0 && (

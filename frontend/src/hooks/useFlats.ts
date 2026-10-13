@@ -110,6 +110,7 @@ export function useFlats(projectId?: string) {
         const toCache = sorted.filter(
           (f) =>
             f.status !== 'handed_over' &&
+            f.status !== 'handed_over_snag_left' &&
             !(f.status === 'not_started' && !f.inspectionId && !f.inspection?.id)
         )
         void prefetchInspections(toCache, { cacheImages: true })
