@@ -124,7 +124,7 @@ export function useInspection(flatId: string | undefined) {
           if (!prev) return prev
           const responses = prev.responses.map((r) => {
             if (r.id !== responseId) return r
-            savedRow = { ...r, ...server }
+            savedRow = { ...r, ...server, images: r.images }
             return savedRow
           })
           return applyCompletionToInspection(

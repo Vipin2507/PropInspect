@@ -16,6 +16,7 @@ import { generateId } from '../../utils/id'
 import type { InspectionResponse, SnagImage } from '../../types'
 import { Spinner } from '../../components/ui/Spinner'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
+import toast from 'react-hot-toast'
 
 export default function FillChecklist() {
   const { flatId, categoryId } = useParams<{ flatId: string; categoryId: string }>()
@@ -108,7 +109,13 @@ export default function FillChecklist() {
               ...r,
               images: r.images.map((i) =>
                 i.id === img.id
-                  ? { ...i, url: data.url, thumbnailUrl: data.thumbnailUrl, isLocal: false }
+                  ? {
+                      ...i,
+                      id: data.id,
+                      url: data.url,
+                      thumbnailUrl: data.thumbnailUrl,
+                      isLocal: false,
+                    }
                   : i
               ),
             }
@@ -132,16 +139,35 @@ export default function FillChecklist() {
 
   const handleImageRemove = async (responseId: string, imageId: string) => {
     if (!inspectionRef.current) return
+    const now = new Date().toISOString()
+    const removed = inspectionRef.current.responses
+      .find((r) => r.id === responseId)
+      ?.images.find((i) => i.id === imageId)
     const responses = inspectionRef.current.responses.map((r) =>
-      r.id === responseId ? { ...r, images: r.images.filter((i) => i.id !== imageId) } : r
+      r.id === responseId
+        ? {
+            ...r,
+            images: r.images.filter((i) => i.id !== imageId),
+            updatedAt: now,
+          }
+        : r
     )
     const updated = {
       ...inspectionRef.current,
       responses,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
     }
     setInspection(updated)
     await saveInspection(updated)
+
+    const onServer = removed && !removed.isLocal && !removed.url?.startsWith('data:')
+    if (!onServer) return
+    try {
+      await imagesApi.delete(imageId)
+    } catch {
+      await queueChange('delete_image', { imageId })
+      toast.error('Could not delete photo on server — will retry when online')
+    }
   }
 
   if (loading || !inspection) {

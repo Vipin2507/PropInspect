@@ -156,7 +156,7 @@ export function ReviewItemRow({
       setEvidenceImages((prev) =>
         prev.map((i) =>
           i.id === localImg.id
-            ? { ...i, url: data.url, thumbnailUrl: data.thumbnailUrl, isLocal: false }
+            ? { ...i, id: data.id, url: data.url, thumbnailUrl: data.thumbnailUrl, isLocal: false }
             : i
         )
       )
@@ -174,8 +174,16 @@ export function ReviewItemRow({
     }
   }
 
-  const handleEvidenceRemove = (imgId: string) => {
+  const handleEvidenceRemove = async (imgId: string) => {
+    const removed = evidenceImages.find((i) => i.id === imgId)
     setEvidenceImages((prev) => prev.filter((i) => i.id !== imgId))
+    const onServer = removed && !removed.isLocal && !removed.url?.startsWith('data:')
+    if (!onServer) return
+    try {
+      await imagesApi.delete(imgId)
+    } catch {
+      await queueChange('delete_image', { imageId: imgId })
+    }
   }
 
   const engineerImages = response.images.filter((i) => i.type !== 'evidence')

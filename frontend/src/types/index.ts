@@ -316,6 +316,7 @@ export type PendingChangeType =
   | 'resubmit_inspection'
   | 'review_decision'
   | 'upload_image'
+  | 'delete_image'
   | 'create_snag'
   | 'update_snag'
   | 'qa_decision'

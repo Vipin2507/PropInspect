@@ -107,8 +107,11 @@ router.delete(
       res.status(403).json({ error: 'Cannot delete image' })
       return
     }
-    const filepath = path.join(UPLOADS_DIR, (image.url as string).replace('/uploads/', ''))
+    const relative = (image.url as string).replace('/uploads/', '')
+    const filepath = path.join(UPLOADS_DIR, relative)
+    const thumbpath = path.join(UPLOADS_DIR, relative.replace(/([^/]+)$/, 'thumbs/$1'))
     if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+    if (fs.existsSync(thumbpath)) fs.unlinkSync(thumbpath)
     db.prepare('DELETE FROM images WHERE id = ?').run(req.params.id)
     res.json({ success: true })
   })

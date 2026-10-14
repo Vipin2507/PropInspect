@@ -39,25 +39,38 @@ function feedbackMeta(type: string) {
 export default function EngineerChangesLog() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [markingFlat, setMarkingFlat] = useState<string | null>(null)
-  const [showAll, setShowAll] = useState(false)
+  const [showAll, setShowAll] = useState(true)
   const { fadeUp, reduced, stagger } = useMotionSafe()
   const { groups, totalUnseen, loading, error, markFlatSeen, reload } = useEngineerFeedback({
     unseenOnly: !showAll,
   })
 
+  const sortedGroups = useMemo(() => {
+    return [...groups]
+      .map((g) => ({
+        ...g,
+        feedback: [...g.feedback].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+      }))
+      .sort(
+        (a, b) => new Date(b.lastFeedbackAt).getTime() - new Date(a.lastFeedbackAt).getTime()
+      )
+  }, [groups])
+
   const stats = useMemo(() => {
     let revisions = 0
     let rejected = 0
     let approved = 0
-    for (const g of groups) {
+    for (const g of sortedGroups) {
       for (const f of g.feedback) {
         if (f.feedbackType === 'revision_required') revisions++
         else if (f.feedbackType === 'rejected') rejected++
         else if (f.feedbackType === 'approved') approved++
       }
     }
-    return { flats: groups.length, revisions, rejected, approved }
-  }, [groups])
+    return { flats: sortedGroups.length, revisions, rejected, approved }
+  }, [sortedGroups])
 
   const toggleExpand = (flatId: string) => {
     setExpanded((prev) => {
@@ -111,7 +124,7 @@ export default function EngineerChangesLog() {
         </div>
       </div>
 
-      {groups.length > 0 && (
+      {sortedGroups.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StatCard index={0} label="Flats" value={stats.flats} icon={Building2} />
           <StatCard
@@ -144,11 +157,11 @@ export default function EngineerChangesLog() {
         </Card>
       )}
 
-      {loading && groups.length === 0 ? (
+      {loading && sortedGroups.length === 0 ? (
         <div className="flex flex-1 items-center justify-center py-16">
           <Spinner size="lg" />
         </div>
-      ) : groups.length === 0 ? (
+      ) : sortedGroups.length === 0 ? (
         <EmptyState
           icon={ScrollText}
           title={showAll ? 'No QA feedback yet' : 'No new QA feedback'}
@@ -165,7 +178,7 @@ export default function EngineerChangesLog() {
             exit={reduced ? undefined : { opacity: 0 }}
             transition={{ duration: 0.28, ease: easeOut }}
           >
-            {groups.map((group, i) => {
+            {sortedGroups.map((group, i) => {
               const isOpen = expanded.has(group.flatId)
 
               return (

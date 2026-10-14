@@ -190,6 +190,23 @@ router.post(
 
           processed++
 
+        } else if (type === 'delete_image') {
+          const { imageId } = payload as { imageId: string }
+          if (imageId) {
+            const image = db
+              .prepare('SELECT url FROM images WHERE id = ?')
+              .get(imageId) as { url: string } | undefined
+            if (image?.url) {
+              const relative = image.url.replace('/uploads/', '')
+              const filepath = path.join(UPLOADS_DIR, relative)
+              const thumbpath = path.join(UPLOADS_DIR, relative.replace(/([^/]+)$/, 'thumbs/$1'))
+              if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+              if (fs.existsSync(thumbpath)) fs.unlinkSync(thumbpath)
+            }
+            db.prepare('DELETE FROM images WHERE id = ?').run(imageId)
+          }
+          processed++
+
         // ── 5. Per-task QA decision (queued offline) ─────────────────────
         } else if (type === 'qa_decision') {
           const { responseId, qaDecision, qaRemark } = payload as {
