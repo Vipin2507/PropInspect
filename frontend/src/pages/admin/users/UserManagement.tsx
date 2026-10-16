@@ -110,13 +110,21 @@ export default function UserManagement() {
 
   const create = async () => {
     try {
-      await usersApi.create(createForm)
+      await usersApi.create({
+        ...createForm,
+        name: createForm.name.trim(),
+        email: createForm.email.trim(),
+        mobile: createForm.mobile.trim(),
+      })
       toast.success('User created')
       setCreateOpen(false)
       setCreateForm(emptyCreate)
       refresh()
-    } catch {
-      toast.error('Failed to create user')
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Failed to create user'
+      toast.error(msg)
     }
   }
 
@@ -504,7 +512,7 @@ export default function UserManagement() {
             disabled={
               !createForm.name.trim() ||
               !createForm.email.trim() ||
-              !createForm.password.trim()
+              createForm.password.trim().length < 6
             }
           >
             Create User

@@ -30,26 +30,59 @@ router.get(
   })
 )
 
+function sqliteToUserError(err: unknown): AppError {
+  const message = err instanceof Error ? err.message : String(err)
+  if (/UNIQUE/i.test(message)) {
+    return new AppError('Email or mobile already registered', 400)
+  }
+  if (/CHECK constraint/i.test(message)) {
+    return new AppError('Invalid role', 400)
+  }
+  if (/NOT NULL/i.test(message)) {
+    return new AppError('Name, email, mobile and password are required', 400)
+  }
+  return new AppError(message || 'Could not create user', 500)
+}
+
 router.post(
   '/',
   requireRole('admin'),
   asyncHandler(async (req, res) => {
     const body = z
       .object({
-        name: z.string(),
+        name: z.string().min(1),
         email: z.string().email(),
-        mobile: z.string(),
+        mobile: z.string().optional(),
         password: z.string().min(6),
         role: z.enum(['admin', 'engineer', 'qa', 'viewer']),
       })
       .parse(req.body)
+
     const id = uuidv4()
+    const name = body.name.trim()
     const email = body.email.trim().toLowerCase()
+    const mobile = (body.mobile ?? '').replace(/\s+/g, '').trim() || `u-${id.slice(0, 8)}`
     const hash = bcrypt.hashSync(body.password, 10)
-    getDB()
-      .prepare(`INSERT INTO users (id, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(id, body.name, email, body.mobile, hash, body.role)
-    const row = getDB().prepare('SELECT * FROM users WHERE id = ?').get(id) as Record<string, unknown>
+    const db = getDB()
+
+    const taken = db
+      .prepare('SELECT email, mobile FROM users WHERE LOWER(email) = ? OR mobile = ?')
+      .get(email, mobile) as { email?: string; mobile?: string } | undefined
+    if (taken) {
+      const sameEmail = String(taken.email ?? '').toLowerCase() === email
+      throw new AppError(sameEmail ? 'Email already registered' : 'Mobile already registered', 400)
+    }
+
+    try {
+      db.prepare(
+        `INSERT INTO users (id, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(id, name, email, mobile, hash, body.role)
+    } catch (err) {
+      throw sqliteToUserError(err)
+    }
+
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
+    if (!row) throw new AppError('User was created but could not be loaded', 500)
     res.status(201).json(rowToUser(row))
   })
 )
