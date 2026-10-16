@@ -10,7 +10,7 @@ export function ProtectedRoute({ roles }: { roles?: UserRole[] }) {
     return <Navigate to={ROUTES.LOGIN} replace />
   }
 
-  if (roles && !roles.includes(user.role)) {
+  if (roles && user.role !== 'admin' && !roles.includes(user.role)) {
     return <Navigate to={dashboardForRole(user.role)} replace />
   }
 

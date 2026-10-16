@@ -15,6 +15,7 @@ import { Lightbox } from '../../components/ui/Lightbox'
 import { Badge } from '../../components/ui/Badge'
 import { ROUTES } from '../../constants/routes'
 import { Spinner } from '../../components/ui/Spinner'
+import { hasRole } from '../../utils/roles'
 
 /** Single image thumbnail with offline fallback via IndexedDB */
 function OfflineThumb({ img, onClick }: { img: SnagImage; onClick: (src: string) => void }) {
@@ -146,8 +147,8 @@ export default function SnagDetail() {
   }
 
   const isEngineerActionable =
-    user?.role === 'engineer' && ['open', 'assigned', 'in_rectification'].includes(snag.status)
-  const isQaActionable = user?.role === 'qa' && snag.status === 'rectified'
+    hasRole(user?.role, 'engineer') && ['open', 'assigned', 'in_rectification'].includes(snag.status)
+  const isQaActionable = hasRole(user?.role, 'qa') && snag.status === 'rectified'
 
   return (
     <div className="flex flex-col gap-4 pb-6">

@@ -20,16 +20,61 @@ declare global {
   }
 }
 
+const FALLBACK_JWT_SECRET = 'dev_secret_minimum_32_characters_long'
+
+function jwtSecrets(): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const s of [process.env.JWT_SECRET, FALLBACK_JWT_SECRET]) {
+    if (s && !seen.has(s)) {
+      seen.add(s)
+      out.push(s)
+    }
+  }
+  return out
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  if (!value) return undefined
+  return Array.isArray(value) ? value[0] : value
+}
+
+/** Bearer from Authorization, or X-Auth-Token (nginx/CloudPanel often drops Authorization). */
+function getBearerToken(req: Request): string | null {
+  const candidates = [
+    headerValue(req.headers.authorization),
+    headerValue(req.headers['x-auth-token']),
+    headerValue(req.headers['x-authorization']),
+  ]
+  for (const raw of candidates) {
+    if (!raw?.trim()) continue
+    const v = raw.trim()
+    if (v.toLowerCase().startsWith('bearer ')) return v.slice(7).trim()
+    return v
+  }
+  return null
+}
+
+function verifyToken(token: string): { userId: string } {
+  let lastErr: unknown
+  for (const secret of jwtSecrets()) {
+    try {
+      return jwt.verify(token, secret) as { userId: string }
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Invalid token')
+}
+
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
-  if (!header?.startsWith('Bearer ')) {
+  const token = getBearerToken(req)
+  if (!token) {
     res.status(401).json({ error: 'Authentication required' })
     return
   }
-  const token = header.slice(7)
   try {
-    const secret = process.env.JWT_SECRET || 'dev_secret_minimum_32_characters_long'
-    const payload = jwt.verify(token, secret) as { userId: string }
+    const payload = verifyToken(token)
     const row = getDB().prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(payload.userId)
     if (!row) {
       res.status(401).json({ error: 'User not found or inactive' })
@@ -43,7 +88,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
 }
 
 export function signToken(userId: string): string {
-  const secret = process.env.JWT_SECRET || 'dev_secret_minimum_32_characters_long'
+  const secret = process.env.JWT_SECRET || FALLBACK_JWT_SECRET
   const expiresIn = process.env.JWT_EXPIRES_IN || '7d'
   return jwt.sign({ userId }, secret, { expiresIn } as SignOptions)
 }

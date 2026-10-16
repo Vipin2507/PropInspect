@@ -20,10 +20,12 @@ import { ROUTES } from '../../constants/routes'
 import { Drawer } from '../../components/ui/Drawer'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 import { cn } from '../../utils/cn'
+import { useAuthStore } from '../../store/authStore'
 
 export default function ReviewDetail() {
   const { inspectionId } = useParams()
   const navigate = useNavigate()
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin')
   const [data, setData] = useState<{
     inspection: Inspection
     flatNumber: string
@@ -239,9 +241,9 @@ export default function ReviewDetail() {
   }
 
   const isFormalReview = data.inspection.status === 'submitted'
-  const canReviewTasks = ['draft', 'submitted', 'revision_required'].includes(
-    data.inspection.status
-  )
+  const canReviewTasks =
+    isAdmin ||
+    ['draft', 'submitted', 'revision_required'].includes(data.inspection.status)
 
   return (
     <motion.div

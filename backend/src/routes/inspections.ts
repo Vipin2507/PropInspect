@@ -123,8 +123,7 @@ router.get(
     let row = db.prepare('SELECT * FROM inspections WHERE flat_id = ?').get(flatId) as Record<string, unknown>
 
     if (!row) {
-      if (role !== 'engineer') {
-        // QA/admin: no inspection yet means nothing to review
+      if (role !== 'engineer' && role !== 'admin') {
         res.status(404).json({ error: 'No inspection for this flat' })
         return
       }
@@ -153,7 +152,7 @@ router.put(
     const flatRow = db
       .prepare('SELECT status FROM flats WHERE id = ?')
       .get(inspection.flat_id) as { status: string } | undefined
-    if (!isInspectionWorkAllowed(inspection.status as string, flatRow?.status)) {
+    if (!isInspectionWorkAllowed(inspection.status as string, flatRow?.status, req.user!.role)) {
       res.status(400).json({ error: 'Cannot edit inspection in current status' })
       return
     }
@@ -228,7 +227,7 @@ router.put(
   })
 )
 
-function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
+function validateAndSubmit(inspectionId: string, isResubmit: boolean, actorRole?: string) {
   const db = getDB()
   const inspection = db.prepare('SELECT * FROM inspections WHERE id = ?').get(inspectionId) as Record<string, unknown>
   if (!inspection) throw new AppError('Inspection not found', 404)
@@ -241,7 +240,7 @@ function validateAndSubmit(inspectionId: string, isResubmit: boolean) {
     .get(inspection.flat_id) as { status: string } | undefined
   if (
     !isResubmit &&
-    !isInspectionWorkAllowed(inspection.status as string, flatForSubmit?.status)
+    !isInspectionWorkAllowed(inspection.status as string, flatForSubmit?.status, actorRole)
   ) {
     throw new AppError('Inspection already submitted', 400)
   }
@@ -358,7 +357,7 @@ router.post(
       res.status(404).json({ error: 'Inspection not found' })
       return
     }
-    const result = validateAndSubmit(inspectionId, false)
+    const result = validateAndSubmit(inspectionId, false, req.user!.role)
     res.json(result)
   })
 )
@@ -373,7 +372,7 @@ router.post(
       res.status(404).json({ error: 'Inspection not found' })
       return
     }
-    const result = validateAndSubmit(inspectionId, true)
+    const result = validateAndSubmit(inspectionId, true, req.user!.role)
     res.json(result)
   })
 )

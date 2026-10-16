@@ -33,7 +33,11 @@ import engineerFeedbackRoutes from './routes/engineerFeedback'
 import settingsRoutes from './routes/settings'
 
 const app = express()
-app.set('trust proxy', 1);
+app.set('trust proxy', 1)
+// node:sqlite INTEGER columns serialize as BigInt — Express res.json would 500 without this.
+app.set('json replacer', (_key: string, value: unknown) =>
+  typeof value === 'bigint' ? Number(value) : value
+)
 const PORT = parseInt(process.env.PORT || '4000', 10)
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../uploads')
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
@@ -125,7 +129,11 @@ const apiRateLimiter = rateLimit({
   skip: (req) => {
     const ip = req.ip || ''
     if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true
-    if (req.headers.authorization?.startsWith('Bearer ')) return true
+    const auth = req.headers.authorization
+    const alt = req.headers['x-auth-token']
+    const altVal = Array.isArray(alt) ? alt[0] : alt
+    if (auth?.toLowerCase().startsWith('bearer ')) return true
+    if (typeof altVal === 'string' && altVal.toLowerCase().startsWith('bearer ')) return true
     if (req.path === '/health' || req.path === '/api/health') return true
     return false
   },

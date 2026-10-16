@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getDB, rowToUser } from '../db/database'
 import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
-import { asyncHandler } from '../middleware/errorHandler'
+import { asyncHandler, AppError } from '../middleware/errorHandler'
 
 const router = Router()
 router.use(authenticate)
@@ -14,17 +14,25 @@ router.get(
   '/',
   requireRole('admin'),
   asyncHandler(async (req, res) => {
-    const role = req.query.role as string | undefined
+    const roleRaw = req.query.role
+    const role = typeof roleRaw === 'string' && roleRaw.trim() ? roleRaw.trim() : undefined
     const db = getDB()
-    const rows = role
-      ? (db.prepare('SELECT * FROM users WHERE role = ? ORDER BY name').all(role) as Record<string, unknown>[])
-      : (db.prepare('SELECT * FROM users ORDER BY name').all() as Record<string, unknown>[])
-    res.json(rows.map(rowToUser))
+    try {
+      const rows = role
+        ? db.prepare('SELECT * FROM users WHERE role = ? ORDER BY name').all(role)
+        : db.prepare('SELECT * FROM users ORDER BY name').all()
+      res.json((Array.isArray(rows) ? rows : []).map(rowToUser))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[users.list]', err)
+      throw new AppError(`Could not load users: ${message}`, 500)
+    }
   })
 )
 
 router.post(
   '/',
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
     const body = z
       .object({
@@ -99,7 +107,10 @@ router.patch(
       res.status(404).json({ error: 'User not found' })
       return
     }
-    db.prepare('UPDATE users SET is_active = ?, updated_at = datetime("now") WHERE id = ?').run(row.is_active ? 0 : 1, req.params.id)
+    db.prepare(`UPDATE users SET is_active = ?, updated_at = datetime('now') WHERE id = ?`).run(
+      row.is_active ? 0 : 1,
+      req.params.id
+    )
     const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as Record<string, unknown>
     res.json(rowToUser(updated))
   })

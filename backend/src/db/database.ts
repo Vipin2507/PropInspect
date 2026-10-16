@@ -32,6 +32,19 @@ export interface SnagDeskDatabase {
   }
 }
 
+function cloneRow(row: unknown): Record<string, unknown> | undefined {
+  if (row == null || typeof row !== 'object') return undefined
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+    out[key] = typeof value === 'bigint' ? Number(value) : value
+  }
+  return out
+}
+
+function bindParams(params: unknown[]): SQLInputValue[] {
+  return params.filter((p) => p !== undefined) as SQLInputValue[]
+}
+
 function wrapDatabase(native: DatabaseSync): SnagDeskDatabase {
   return {
     exec(sql: string) {
@@ -40,11 +53,23 @@ function wrapDatabase(native: DatabaseSync): SnagDeskDatabase {
     prepare(sql: string) {
       const stmt = native.prepare(sql)
       return {
-        run: (...params: unknown[]) => stmt.run(...(params as SQLInputValue[])),
-        get: (...params: unknown[]) =>
-          stmt.get(...(params as SQLInputValue[])) as Record<string, unknown> | undefined,
-        all: (...params: unknown[]) =>
-          stmt.all(...(params as SQLInputValue[])) as Record<string, unknown>[],
+        run: (...params: unknown[]) => {
+          const p = bindParams(params)
+          return p.length ? stmt.run(...p) : stmt.run()
+        },
+        get: (...params: unknown[]) => {
+          const p = bindParams(params)
+          const row = p.length ? stmt.get(...p) : stmt.get()
+          return cloneRow(row)
+        },
+        all: (...params: unknown[]) => {
+          const p = bindParams(params)
+          const rows = p.length ? stmt.all(...p) : stmt.all()
+          if (!Array.isArray(rows)) return []
+          return rows
+            .map(cloneRow)
+            .filter((r): r is Record<string, unknown> => Boolean(r))
+        },
       }
     },
   }
@@ -131,6 +156,11 @@ export function runMigrations(database: SnagDeskDatabase): void {
     `ALTER TABLE inspections ADD COLUMN last_engineer_activity_at TEXT`,
     `ALTER TABLE inspections ADD COLUMN last_qa_activity_at TEXT`,
     `ALTER TABLE inspections ADD COLUMN qa_review_started_at TEXT`,
+    `ALTER TABLE users ADD COLUMN avatar TEXT`,
+    `ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`,
+    `ALTER TABLE users ADD COLUMN mobile TEXT`,
+    `ALTER TABLE users ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))`,
+    `ALTER TABLE users ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))`,
   ]
   for (const sql of additiveMigrations) {
     try { database.exec(sql) } catch { /* column already exists */ }
@@ -425,13 +455,13 @@ export function runMigrations(database: SnagDeskDatabase): void {
 
 export function rowToUser(row: Record<string, unknown>) {
   return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    mobile: row.mobile,
-    role: row.role,
-    avatar: row.avatar || undefined,
-    isActive: Boolean(row.is_active),
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    email: String(row.email ?? ''),
+    mobile: String(row.mobile ?? ''),
+    role: String(row.role ?? ''),
+    avatar: row.avatar ? String(row.avatar) : undefined,
+    isActive: Number(row.is_active) !== 0,
     createdAt: utcTs(row.created_at),
   }
 }

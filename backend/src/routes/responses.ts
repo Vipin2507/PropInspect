@@ -18,7 +18,12 @@ import {
 } from '../utils/inspectionTasks'
 import { logTaskResponseChange } from '../utils/taskChangeLog'
 import { param } from '../utils/params'
-import { HANDOVER_COMPLETE, HANDOVER_SNAG_LEFT, isInspectionWorkAllowed } from '../utils/handover'
+import {
+  HANDOVER_COMPLETE,
+  HANDOVER_SNAG_LEFT,
+  canMutateChecklist,
+  isInspectionWorkAllowed,
+} from '../utils/handover'
 
 const router = Router()
 router.use(authenticate)
@@ -114,15 +119,14 @@ router.patch(
       .get(response.inspection_id) as { id: string; flat_id: string; engineer_id: string; status: string }
     if (!inspection) throw new AppError('Inspection not found', 404)
 
-    // Assigned engineer, or admin override
-    if (req.user!.role !== 'admin' && inspection.engineer_id !== req.user!.id) {
+    if (!canMutateChecklist(req.user!)) {
       throw new AppError('Not authorized', 403)
     }
 
     const flat = db
       .prepare('SELECT status FROM flats WHERE id = ?')
       .get(inspection.flat_id) as { status: string } | undefined
-    if (!isInspectionWorkAllowed(inspection.status, flat?.status)) {
+    if (!isInspectionWorkAllowed(inspection.status, flat?.status, req.user!.role)) {
       throw new AppError('Inspection is locked and cannot be edited in its current status', 400)
     }
 
@@ -244,7 +248,7 @@ router.patch(
     if (!inspection) throw new AppError('Inspection not found', 404)
 
     const reviewableStatuses = ['draft', 'submitted', 'revision_required']
-    if (!reviewableStatuses.includes(inspection.status)) {
+    if (req.user!.role !== 'admin' && !reviewableStatuses.includes(inspection.status)) {
       throw new AppError('Inspection is not available for per-task review', 400)
     }
 

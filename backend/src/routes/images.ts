@@ -9,7 +9,7 @@ import { authenticate } from '../middleware/auth'
 import { requireRole } from '../middleware/requireRole'
 import { asyncHandler } from '../middleware/errorHandler'
 import { rowToImage } from '../utils/mappers'
-import { isInspectionWorkAllowed } from '../utils/handover'
+import { canMutateChecklist, isInspectionWorkAllowed } from '../utils/handover'
 
 const router = Router()
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads')
@@ -101,8 +101,8 @@ router.delete(
       : undefined
     const canEdit =
       inspection &&
-      (req.user!.role === 'admin' || inspection.engineer_id === req.user!.id) &&
-      isInspectionWorkAllowed(inspection.status, flat?.status)
+      canMutateChecklist(req.user!) &&
+      isInspectionWorkAllowed(inspection.status, flat?.status, req.user!.role)
     if (!canEdit) {
       res.status(403).json({ error: 'Cannot delete image' })
       return

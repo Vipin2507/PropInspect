@@ -104,23 +104,49 @@ function forceLogoutToLogin(): void {
 api.interceptors.request.use((config) => {
   config.baseURL = getBaseURL()
   const token = readStoredToken()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    const bearer = `Bearer ${token}`
+    config.headers.Authorization = bearer
+    // CloudPanel/nginx often strips Authorization; API also accepts this header.
+    config.headers['X-Auth-Token'] = bearer
+  }
   return config
 })
 
 // Log errors to help debug network issues on Android
+function isTransientNetworkError(error: {
+  response?: unknown
+  code?: string
+  message?: string
+}): boolean {
+  if (error?.response) return false
+  const blob = `${error?.code || ''} ${error?.message || ''}`
+  return /network|internet|offline|ERR_NAME|ERR_INTERNET|ERR_NETWORK|ECONNABORTED|Failed to fetch/i.test(
+    blob
+  )
+}
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('[API] Error:', {
-      url: error?.config?.url,
-      baseURL: error?.config?.baseURL,
-      status: error?.response?.status,
-      code: error?.code,
-      message: error?.message,
-      apiError: error?.response?.data?.error,
-    })
+    if (!isTransientNetworkError(error)) {
+      console.error('[API] Error:', {
+        url: error?.config?.url,
+        baseURL: error?.config?.baseURL,
+        status: error?.response?.status,
+        code: error?.code,
+        message: error?.message,
+        apiError: error?.response?.data?.error,
+      })
+    }
     if (error?.response?.status === 401 && !isPublicAuthRequest(error?.config?.url)) {
+      const apiError = error?.response?.data?.error as string | undefined
+      const headers = error?.config?.headers as Record<string, string> | undefined
+      const sentToken = Boolean(headers?.Authorization || headers?.['X-Auth-Token'] || headers?.['x-auth-token'])
+      // Proxy dropped the JWT — logging out here traps the user in a login loop.
+      if (apiError === 'Authentication required' && sentToken) {
+        return Promise.reject(error)
+      }
       forceLogoutToLogin()
     }
     return Promise.reject(error)

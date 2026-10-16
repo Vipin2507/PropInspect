@@ -8,13 +8,20 @@ export function isHandoverStatus(status: string): boolean {
   return status === HANDOVER_COMPLETE || status === HANDOVER_SNAG_LEFT
 }
 
-/** Checklist work stays open after incomplete handover. */
+/** Checklist work stays open after incomplete handover. Admin can always edit. */
 export function isInspectionWorkAllowed(
   inspectionStatus: string,
-  flatStatus?: string | null
+  flatStatus?: string | null,
+  actorRole?: string
 ): boolean {
+  if (actorRole === 'admin') return true
   if (flatStatus === HANDOVER_SNAG_LEFT) return true
   return ['draft', 'revision_required'].includes(inspectionStatus)
+}
+
+/** Any engineer or admin may edit a checklist (flats are shared, not locked to the starter). */
+export function canMutateChecklist(user: { role: string }): boolean {
+  return user.role === 'admin' || user.role === 'engineer'
 }
 
 /** Incomplete checklist (< 100%) → handed over with snag left. */

@@ -19,7 +19,11 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return
   }
   console.error(err)
-  res.status(500).json({ error: 'Internal server error' })
+  const message = err instanceof Error ? err.message : 'Internal server error'
+  const isBigInt = message.includes('BigInt')
+  res.status(500).json({
+    error: isBigInt ? 'Failed to serialize database result' : 'Internal server error',
+  })
 }
 
 export function asyncHandler(

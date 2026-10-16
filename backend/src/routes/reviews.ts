@@ -169,7 +169,7 @@ router.post(
       res.status(404).json({ error: 'Inspection not found' })
       return
     }
-    if (inspection.status !== 'submitted') {
+    if (inspection.status !== 'submitted' && req.user!.role !== 'admin') {
       res.status(400).json({
         error: `This inspection cannot be reviewed right now (status: ${inspection.status}). Pull to refresh and try again.`,
       })

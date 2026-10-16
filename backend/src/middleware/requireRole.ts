@@ -6,7 +6,7 @@ export function requireRole(...roles: string[]) {
       res.status(401).json({ error: 'Authentication required' })
       return
     }
-    if (!roles.includes(req.user.role)) {
+    if (req.user.role !== 'admin' && !roles.includes(req.user.role)) {
       res.status(403).json({ error: 'Insufficient permissions' })
       return
     }

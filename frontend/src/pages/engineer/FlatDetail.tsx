@@ -23,6 +23,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { AdminFlatStatusControl } from '../../components/admin/AdminFlatStatusControl'
 import { isHandoverStatus } from '../../constants/flatStatus'
+import { hasRole } from '../../utils/roles'
 import { useMotionSafe } from '../../hooks/useMotionSafe'
 import { cn } from '../../utils/cn'
 import type { Flat } from '../../types'
@@ -38,8 +39,8 @@ export default function FlatDetail() {
   const { fadeUp, reduced } = useMotionSafe()
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
-  const isQA = user?.role === 'qa'
-  const canHandover = isAdmin || isQA
+  const isEngineerLike = hasRole(user?.role, 'engineer')
+  const canHandover = hasRole(user?.role, 'qa')
 
   const [activeTab, setActiveTab] = useState<FlatTab>('overview')
   const { inspection, loading } = useInspection(flatId)
@@ -137,7 +138,7 @@ export default function FlatDetail() {
         All Flats
       </Link>
 
-      {!isAdmin && inspection?.status === 'revision_required' && activeTab === 'overview' && (
+      {isEngineerLike && inspection?.status === 'revision_required' && activeTab === 'overview' && (
         <RevisionBanner comments="Please address QA comments and resubmit." />
       )}
 
@@ -215,8 +216,7 @@ export default function FlatDetail() {
           </div>
         )}
 
-        {!isAdmin &&
-          !isQA &&
+        {isEngineerLike &&
           isComplete &&
           inspection?.status === 'draft' &&
           activeTab === 'overview' && (
@@ -257,7 +257,7 @@ export default function FlatDetail() {
             exit={reduced ? undefined : { opacity: 0, y: -6 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
           >
-            {!isAdmin && !isQA && openSnagCount > 0 && (
+            {isEngineerLike && openSnagCount > 0 && (
               <button
                 type="button"
                 onClick={() => navigate(ROUTES.ENGINEER_FLAT_SNAGS?.(flatId!) ?? ROUTES.DESNAGGING)}
@@ -293,11 +293,11 @@ export default function FlatDetail() {
                 <Card className="px-4 py-10 text-center shadow-xs">
                   <h3 className="text-sm font-semibold text-ink-800">No Inspection Started</h3>
                   <p className="mb-4 mt-1.5 text-xs text-ink-500">
-                    {canHandover
-                      ? 'The engineer has not started this inspection yet.'
-                      : 'Start the inspection to fill in the checklist.'}
+                    {isEngineerLike
+                      ? 'Start the inspection to fill in the checklist.'
+                      : 'The engineer has not started this inspection yet.'}
                   </p>
-                  {!canHandover && (
+                  {isEngineerLike && (
                     <Button size="sm" onClick={startOrContinueInspection} className={cn(compactBtn, 'mx-auto')}>
                       Start Inspection
                     </Button>
@@ -348,7 +348,7 @@ export default function FlatDetail() {
                   </Button>
                 )}
 
-                {currentFlatStatus === 'handed_over_snag_left' && (
+                {currentFlatStatus === 'handed_over_snag_left' && !isEngineerLike && (
                   <Button
                     size="sm"
                     className={cn(compactBtn, 'w-full')}
@@ -366,7 +366,7 @@ export default function FlatDetail() {
               </>
             )}
 
-            {!canHandover && inspection && totalCount > 0 && (
+            {isEngineerLike && inspection && totalCount > 0 && (
               <>
                 <Button
                   size="sm"

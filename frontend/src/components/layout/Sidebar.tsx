@@ -36,6 +36,8 @@ const adminSections: NavSection[] = [
     title: 'Workspace',
     items: [
       { to: ROUTES.ADMIN, label: 'Dashboard', icon: LayoutDashboard },
+      { to: ROUTES.ENGINEER_DASHBOARD, label: 'Engineer', icon: ClipboardList },
+      { to: ROUTES.QA_DASHBOARD, label: 'QA', icon: ClipboardCheck },
       { to: ROUTES.ADMIN_PROJECTS, label: 'Projects', icon: Building2 },
       { to: ROUTES.ENGINEER_FLATS, label: 'All Flats', icon: ClipboardList },
     ],
