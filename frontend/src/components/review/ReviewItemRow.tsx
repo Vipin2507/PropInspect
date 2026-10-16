@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StatusBadge } from '../ui/Badge'
 import { Card } from '../ui/Card'
 import type { InspectionResponse, SnagImage } from '../../types'
@@ -71,15 +71,15 @@ export function ReviewItemRow({
   const [expanded, setExpanded] = useState(false)
 
   const { setQaDecision } = useResponses()
+  const remarkFocused = useRef(false)
 
-  // Keep in sync when parent refreshes this row
+  // Keep in sync when parent refreshes this row — never while the remark box is focused
   useEffect(() => {
     setResponse(initialResponse)
     setEvidenceImages(initialResponse.images.filter((i) => i.type === 'evidence'))
-    if (initialResponse.qaRemarks) {
-      setRemarkText(initialResponse.qaRemarks)
-    }
-  }, [initialResponse.id, initialResponse.qaRemarks, initialResponse.qaDecision, initialResponse.images])
+    if (remarkFocused.current) return
+    setRemarkText(initialResponse.qaRemarks || qaComment || '')
+  }, [initialResponse.id, initialResponse.qaRemarks, initialResponse.qaDecision, qaComment])
 
   const saveDecision = async (decision: QADecision, remark?: string) => {
     const effectiveRemark = (remark ?? remarkText).trim()
@@ -271,6 +271,12 @@ export function ReviewItemRow({
               <Textarea
                 id={`qa-remark-${response.id}`}
                 value={remarkText}
+                onFocus={() => {
+                  remarkFocused.current = true
+                }}
+                onBlur={() => {
+                  remarkFocused.current = false
+                }}
                 onChange={(e) => {
                   setRemarkText(e.target.value)
                   onQaComment(e.target.value)

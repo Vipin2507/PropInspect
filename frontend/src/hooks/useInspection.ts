@@ -16,8 +16,10 @@ function mergeInspections(local: Inspection, remote: Inspection): Inspection {
   const byItem = new Map(remote.responses.map((r) => [r.itemId, r]))
   for (const lr of local.responses) {
     const rr = byItem.get(lr.itemId)
-    if (!rr || new Date(lr.updatedAt).getTime() > new Date(rr.updatedAt).getTime()) {
-      byItem.set(lr.itemId, lr)
+    const localMs = new Date(lr.updatedAt).getTime()
+    const remoteMs = rr ? new Date(rr.updatedAt).getTime() : 0
+    if (!rr || localMs >= remoteMs) {
+      byItem.set(lr.itemId, rr ? { ...rr, ...lr, images: lr.images?.length ? lr.images : rr.images } : lr)
     }
   }
   const responses = remote.responses.map((r) => byItem.get(r.itemId) ?? r)
@@ -112,6 +114,8 @@ export function useInspection(flatId: string | undefined) {
       if (trackUi) markSaving()
 
       const responseId = response.id
+      const sentRemarks = response.remarks ?? ''
+      const sentStatus = response.status
       try {
         const { data } = await responsesApi.updateStatus(responseId, {
           status: response.status,
@@ -124,7 +128,10 @@ export function useInspection(flatId: string | undefined) {
           if (!prev) return prev
           const responses = prev.responses.map((r) => {
             if (r.id !== responseId) return r
-            savedRow = { ...r, ...server, images: r.images }
+            const remarks =
+              (r.remarks ?? '') !== sentRemarks ? r.remarks : (server.remarks ?? r.remarks)
+            const status = r.status !== sentStatus ? r.status : (server.status ?? r.status)
+            savedRow = { ...r, ...server, images: r.images, remarks, status }
             return savedRow
           })
           return applyCompletionToInspection(

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '../../utils/cn'
 import type { InspectionResponse, ResponseStatus } from '../../types'
@@ -42,6 +43,17 @@ export function ChecklistItem({
   locked?: boolean
 }) {
   const { reduced } = useMotionSafe()
+  const [draftRemarks, setDraftRemarks] = useState(response.remarks ?? '')
+  const remarksFocused = useRef(false)
+
+  useEffect(() => {
+    setDraftRemarks(response.remarks ?? '')
+  }, [response.id])
+
+  useEffect(() => {
+    if (!remarksFocused.current) setDraftRemarks(response.remarks ?? '')
+  }, [response.remarks])
+
   const setStatus = (status: ResponseStatus) => onChange({ status })
   const hasSnag = response.status === 'fail'
   const hasStatus = response.status !== 'pending'
@@ -151,14 +163,27 @@ export function ChecklistItem({
             placeholder={
               response.status === 'fail' ? 'Remarks (required)…' : 'Remarks (optional)…'
             }
-            value={response.remarks}
-            onChange={(e) => onChange({ remarks: e.target.value })}
+            value={draftRemarks}
+            onFocus={() => {
+              remarksFocused.current = true
+            }}
+            onBlur={() => {
+              remarksFocused.current = false
+              if (draftRemarks !== (response.remarks ?? '')) {
+                onChange({ remarks: draftRemarks })
+              }
+            }}
+            onChange={(e) => {
+              const value = e.target.value
+              setDraftRemarks(value)
+              onChange({ remarks: value })
+            }}
             rows={1}
             className={cn(
               'min-h-[34px] !rounded-md !border-ink-200/80 !bg-ink-50/30 !px-2.5 !py-1.5 text-[13px] leading-snug !shadow-none',
               'focus:!border-brand-500 focus:!bg-white focus:!ring-2 focus:!ring-brand-100',
               response.status === 'fail' &&
-                !response.remarks.trim() &&
+                !draftRemarks.trim() &&
                 '!border-danger-600/40 focus:!border-danger-600 focus:!ring-danger-100'
             )}
           />
